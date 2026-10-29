@@ -20,11 +20,16 @@
     <script src="_framework/blazor.webview.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script>
-        // Tamanho em pixels de um elemento, para converter o clique na prévia em coordenadas do aparelho.
         window.owd = {
+            // Tamanho em pixels de um elemento, para converter o clique na prévia em coordenadas do aparelho.
             size: el => {
                 const r = el.getBoundingClientRect();
                 return [r.width, r.height];
+            },
+            // Posição e tamanho na janela, para o editor saber em qual célula da grade o ponteiro está.
+            rect: el => {
+                const r = el.getBoundingClientRect();
+                return [r.left, r.top, r.width, r.height];
             }
         };
     </script>
