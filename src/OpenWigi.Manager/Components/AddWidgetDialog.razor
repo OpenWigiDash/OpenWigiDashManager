@@ -1,0 +1,152 @@
+@* Assistente de "Adicionar widget": 1) escolher o widget; 2) tamanho e lugar na página. *@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_widget is null ? "Adicionar widget" : $"Adicionar {_widget.Manifest.Name}")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_widget is null)
+        {
+            @if (Widgets.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    Nenhum widget instalado. Copie a pasta do plugin para %LOCALAPPDATA%\OpenWigiDash\Widgets e reabra o manager.
+                </MudAlert>
+            }
+            else
+            {
+                @if (Widgets.Count > 6)
+                {
+                    <MudTextField T="string" @bind-Value="_search" Placeholder="Procurar" Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Class="mb-3" />
+                }
+                <MudGrid Spacing="2">
+                    @foreach (var widget in Filtered)
+                    {
+                        var w = widget;
+                        <MudItem xs="12" sm="6">
+                            <MudCard Outlined="true" Class="owd-pick" @onclick="() => Pick(w)">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.subtitle1">@w.Manifest.Name</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(w.Manifest.Description ?? "Sem descrição")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(w.Manifest.Author is { } author ? $"{author} · " : "")v@(w.Manifest.Version) ·
+                                        @w.Manifest.SupportedSizes.Count tamanho(s)
+                                    </MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        }
+        else
+        {
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Tamanho (colunas × linhas)</MudText>
+            <div class="d-flex flex-wrap gap-1 mb-4">
+                @foreach (var size in _widget.Manifest.SupportedSizes)
+                {
+                    var s = size;
+                    <MudChip T="string" Size="Size.Small" Variant="@(s == _size ? Variant.Filled : Variant.Outlined)"
+                             Color="@(s == _size ? Color.Primary : Color.Default)" Disabled="@(Page.FindFreeCell(s) is null)"
+                             OnClick="() => ChooseSize(s)">@s</MudChip>
+                }
+            </div>
+
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Lugar em "@Page.Name": clique onde fica o canto superior esquerdo</MudText>
+            <div class="owd-grid owd-grid-small">
+                @for (var i = 0; i < WidgetGrid.Columns * WidgetGrid.Rows; i++)
+                {
+                    var column = i % WidgetGrid.Columns;
+                    var row = i / WidgetGrid.Columns;
+                    <div class="owd-cell-empty owd-cell-pick" style="grid-column: @(column + 1); grid-row: @(row + 1)"
+                         @onclick="() => _at = (column, row)"></div>
+                }
+                @foreach (var placement in Page.Widgets)
+                {
+                    <div class="owd-widget owd-occupied"
+                         style="grid-column: @(placement.Column + 1) / span @placement.Size.Columns; grid-row: @(placement.Row + 1) / span @placement.Size.Rows">
+                        <MudText Typo="Typo.caption">@(NameOf(placement.InstanceId) ?? "Widget")</MudText>
+                    </div>
+                }
+                @if (_at is { } at)
+                {
+                    var c = Math.Min(at.Column, WidgetGrid.Columns - 1);
+                    var r = Math.Min(at.Row, WidgetGrid.Rows - 1);
+                    <div class="owd-drop @(Fits ? "ok" : "bad")"
+                         style="grid-column: @(c + 1) / span @Math.Min(_size.Columns, WidgetGrid.Columns - c); grid-row: @(r + 1) / span @Math.Min(_size.Rows, WidgetGrid.Rows - r)">
+                        <span class="owd-drop-label">@_size</span>
+                    </div>
+                }
+            </div>
+            @if (_widget.Manifest.SupportedSizes.All(s => Page.FindFreeCell(s) is null))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                    "@Page.Name" não tem espaço para este widget em nenhum tamanho. Libere espaço ou escolha outra página.
+                </MudAlert>
+            }
+            else if (!Fits)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error">Não cabe aí: escolha outra célula ou outro tamanho.</MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_widget is not null)
+        {
+            <MudButton StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => _widget = null">Voltar</MudButton>
+        }
+        <MudSpacer />
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        @if (_widget is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!Fits)" OnClick="Confirm">Adicionar</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public IReadOnlyList<OpenWigi.Host.Plugins.LoadedWidget> Widgets { get; set; } = [];
+    [Parameter, EditorRequired] public LayoutPage Page { get; set; } = default!;
+    [Parameter] public Func<Guid, string?> NameOf { get; set; } = _ => null;
+
+    /// <summary>O que o assistente devolve ao fechar com "Adicionar".</summary>
+    public sealed record Choice(Guid WidgetId, WidgetSize Size, int Column, int Row);
+
+    private OpenWigi.Host.Plugins.LoadedWidget? _widget;
+    private WidgetSize _size = WidgetSize.Small;
+    private (int Column, int Row)? _at;
+    private string _search = string.Empty;
+
+    private IEnumerable<OpenWigi.Host.Plugins.LoadedWidget> Filtered => string.IsNullOrWhiteSpace(_search)
+        ? Widgets
+        : Widgets.Where(w => w.Manifest.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
+                             || (w.Manifest.Description?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private bool Fits => _at is { } at &&
+        at.Column + _size.Columns <= WidgetGrid.Columns && at.Row + _size.Rows <= WidgetGrid.Rows &&
+        !Page.Widgets.Any(w => w.Overlaps(at.Column, at.Row, _size));
+
+    // Primeiro tamanho que cabe na página, já na primeira posição livre: muitas vezes é só clicar em Adicionar.
+    private void Pick(OpenWigi.Host.Plugins.LoadedWidget widget)
+    {
+        _widget = widget;
+        ChooseSize(widget.Manifest.SupportedSizes.FirstOrDefault(s => Page.FindFreeCell(s) is not null, widget.Manifest.SupportedSizes[0]));
+    }
+
+    private void ChooseSize(WidgetSize size)
+    {
+        _size = size;
+        if (!Fits)
+            _at = Page.FindFreeCell(size);
+    }
+
+    private void Confirm()
+    {
+        if (_widget is not null && _at is { } at && Fits)
+            Dialog.Close(DialogResult.Ok(new Choice(_widget.Manifest.Id, _size, at.Column, at.Row)));
+    }
+}

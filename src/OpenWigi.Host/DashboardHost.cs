@@ -177,8 +177,12 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             ? (type, instance, runtime.Context)
             : null;
 
-    /// <summary>Põe um widget na primeira posição livre da página. Devolve o id da instância, ou null se não coube.</summary>
-    public async Task<Guid?> AddWidgetAsync(Guid widgetId, int page, WidgetSize? size = null, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Põe um widget na página, em <paramref name="at"/> ou, sem posição, na primeira livre. Devolve o id
+    /// da instância, ou null se não coube.
+    /// </summary>
+    public async Task<Guid?> AddWidgetAsync(Guid widgetId, int page, WidgetSize? size = null, CancellationToken cancellationToken = default,
+        (int Column, int Row)? at = null)
     {
         if (_catalog.Find(widgetId) is not { } widget || page < 0 || page >= _layout.Pages.Count)
             return null;
@@ -187,9 +191,14 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         await _state.WaitAsync(cancellationToken);
         try
         {
-            if (_layout.Pages[page].FindFreeCell(chosen) is not { } cell)
+            var target = _layout.Pages[page];
+            (int Column, int Row)? cell = at is { } p
+                ? p.Column >= 0 && p.Row >= 0 && p.Column + chosen.Columns <= WidgetGrid.Columns && p.Row + chosen.Rows <= WidgetGrid.Rows
+                  && !target.Widgets.Any(w => w.Overlaps(p.Column, p.Row, chosen)) ? p : null
+                : target.FindFreeCell(chosen);
+            if (cell is not { } free)
                 return null;
-            var placement = new WidgetPlacement { WidgetId = widgetId, Column = cell.Column, Row = cell.Row, Size = chosen };
+            var placement = new WidgetPlacement { WidgetId = widgetId, Column = free.Column, Row = free.Row, Size = chosen };
             _layout.Pages[page].Widgets.Add(placement);
             await CreateRuntimeAsync(placement, cancellationToken);
             if (_runtimes.TryGetValue(placement.InstanceId, out var runtime))

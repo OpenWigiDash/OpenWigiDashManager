@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IDialogService Dialogs
 
 <MudStack Spacing="4">
     <div>
@@ -30,6 +31,9 @@
             }
         </MudChipSet>
         <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="AddPage">Nova página</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
+            Adicionar widget
+        </MudButton>
         <MudSpacer />
         <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
                       Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
@@ -126,39 +130,15 @@
                 </MudPaper>
             }
 
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudText Typo="Typo.overline" Color="Color.Secondary">Adicionar nesta página</MudText>
-                @if (Dashboard.AvailableWidgets.Count == 0)
-                {
+            else
+            {
+                <MudPaper Class="pa-4" Outlined="true">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Nenhum widget instalado. Copie a pasta do plugin para %LOCALAPPDATA%\OpenWigiDash\Widgets e reabra o manager.
+                        Clique num widget da grade para configurar, mudar o tamanho ou tirar.
+                        Para pôr um novo, use "Adicionar widget".
                     </MudText>
-                }
-                @* Um botão por tamanho que o widget suporta; apagado quando não há espaço livre para ele nesta página. *@
-                @foreach (var widget in Dashboard.AvailableWidgets)
-                {
-                    var w = widget;
-                    <div class="mt-3">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                            <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Small" Color="Color.Secondary" />
-                            <MudText Typo="Typo.body2">@w.Manifest.Name</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">v@(w.Manifest.Version)</MudText>
-                        </MudStack>
-                        <div class="d-flex flex-wrap gap-1 mt-1">
-                            @foreach (var size in w.Manifest.SupportedSizes)
-                            {
-                                var s = size;
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
-                                         Disabled="@(CurrentPage?.FindFreeCell(s) is null)" Icon="@Icons.Material.Filled.Add"
-                                         OnClick="() => Add(w.Manifest.Id, s)">@s</MudChip>
-                            }
-                        </div>
-                    </div>
-                }
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3 d-block">
-                    Clique no tamanho (colunas × linhas) para pôr o widget na primeira posição livre; depois arraste para onde quiser.
-                </MudText>
-            </MudPaper>
+                </MudPaper>
+            }
         </MudItem>
     </MudGrid>
 </MudStack>
@@ -194,12 +174,25 @@
                     yield return (column, row);
     }
 
-    private async Task Add(Guid widgetId, WidgetSize size)
+    private async Task OpenAddWidget()
     {
-        var id = await Dashboard.AddWidgetAsync(widgetId, _page, size);
-        if (id is null)
-            Snackbar.Add("Não há espaço livre nesta página para esse tamanho.", Severity.Warning);
-        _selected = id;
+        if (CurrentPage is not { } page)
+            return;
+        var parameters = new DialogParameters<AddWidgetDialog>
+        {
+            { d => d.Widgets, Dashboard.AvailableWidgets },
+            { d => d.Page, page },
+            { d => d.NameOf, Dashboard.NameOf },
+        };
+        var dialog = await Dialogs.ShowAsync<AddWidgetDialog>("Adicionar widget", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true });
+        if (await dialog.Result is { Canceled: false, Data: AddWidgetDialog.Choice choice })
+        {
+            var id = await Dashboard.AddWidgetAsync(choice.WidgetId, _page, choice.Size, at: (choice.Column, choice.Row));
+            if (id is null)
+                Snackbar.Add("O widget não coube no lugar escolhido.", Severity.Warning);
+            _selected = id;
+        }
     }
 
     private IReadOnlyList<WidgetSize> SizesOf(Guid widgetId) =>
