@@ -8,6 +8,7 @@
     <Project Path="src/OpenWigi.Device/OpenWigi.Device.csproj" />
     <Project Path="src/OpenWigi.Host/OpenWigi.Host.csproj" />
     <Project Path="src/OpenWigi.Ipc/OpenWigi.Ipc.csproj" />
+    <Project Path="src/OpenWigi.Manager/OpenWigi.Manager.csproj" />
     <Project Path="src/OpenWigi.Sdk/OpenWigi.Sdk.csproj" />
     <Project Path="src/OpenWigi.Service/OpenWigi.Service.csproj" />
   </Folder>

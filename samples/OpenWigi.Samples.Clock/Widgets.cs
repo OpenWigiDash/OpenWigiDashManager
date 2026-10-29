@@ -93,16 +93,38 @@ public sealed class CounterWidget : IWidget
         ValueTask.FromResult<IWidgetInstance>(new CounterInstance(context));
 }
 
-internal sealed class CounterInstance(IWidgetContext context) : IWidgetInstance
+public sealed class CounterInstance(IWidgetContext context) : IWidgetInstance
 {
     private int? _count;
     private double _progress;
     private string _last = "toque ou segure";
+    private string? _label;
+
+    public int Count => _count ?? 0;
+
+    /// <summary>Tela de configurações em Razor (CounterSettings.razor).</summary>
+    public Type? SettingsComponent => typeof(CounterSettings);
 
     public async ValueTask<WidgetFrame> RenderAsync(RenderReason reason, CancellationToken cancellationToken)
     {
         _count ??= await context.Settings.GetJsonAsync("count", 0, cancellationToken);
+        _label ??= await context.Settings.GetAsync("label", cancellationToken) ?? string.Empty;
         return Draw();
+    }
+
+    public async Task SetLabelAsync(string label)
+    {
+        _label = label;
+        await context.Settings.SetAsync("label", label);
+        context.RequestRender();
+    }
+
+    public async Task ResetAsync()
+    {
+        _count = 0;
+        _last = "zerado nas configurações";
+        await context.Settings.SetJsonAsync("count", 0);
+        context.RequestRender();
     }
 
     public async ValueTask OnTouchAsync(TouchEvent touch, CancellationToken cancellationToken)
@@ -144,7 +166,7 @@ internal sealed class CounterInstance(IWidgetContext context) : IWidgetInstance
         using var small = new Font(context.Theme.PrimaryFontFamily, 14, GraphicsUnit.Pixel);
         using var center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
         g.DrawString((_count ?? 0).ToString(), number, Brushes.White, new RectangleF(0, 0, size.Width, size.Height * 0.8f), center);
-        g.DrawString(_last, small, Brushes.Gainsboro, new RectangleF(0, size.Height * 0.72f, size.Width, size.Height * 0.25f), center);
+        g.DrawString(string.IsNullOrEmpty(_label) ? _last : $"{_label} · {_last}", small, Brushes.Gainsboro, new RectangleF(0, size.Height * 0.72f, size.Width, size.Height * 0.25f), center);
 
         if (_progress > 0)
         {

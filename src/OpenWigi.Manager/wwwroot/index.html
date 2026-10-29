@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenWigiDash Manager</title>
+    <base href="/" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app">Carregando...</div>
+
+    <div id="blazor-error-ui">
+        Algo deu errado na janela.
+        <a href="" class="reload">Recarregar</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="_framework/blazor.webview.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script>
+        // Tamanho em pixels de um elemento, para converter o clique na prévia em coordenadas do aparelho.
+        window.owd = {
+            size: el => {
+                const r = el.getBoundingClientRect();
+                return [r.width, r.height];
+            }
+        };
+    </script>
+</body>
+</html>

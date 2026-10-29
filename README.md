@@ -20,7 +20,8 @@ O plano e as fases estão nos [milestones](../../milestones). O protocolo USB es
 | `src/OpenWigi.Service` | Serviço Windows dono do USB; decide qual sessão desenha ([docs/multiusuario.md](docs/multiusuario.md)) |
 | `src/OpenWigi.Sdk` | Contrato dos widgets (.NET 10), ver [docs/sdk.md](docs/sdk.md) |
 | `src/OpenWigi.Host` | Host de plugins: carrega widgets, layout, compositor e roteamento de toques ([docs/host.md](docs/host.md)) |
-| `src/OpenWigi.Agent` | Agente por usuário: roda o host quando tem a tela; vira a UI WPF + Blazor na fase 5 |
+| `src/OpenWigi.Manager` | **O manager**: app WPF + Blazor (MudBlazor) no tray de cada usuário. É o agente (desenha os widgets quando tem a tela) e a janela de configuração |
+| `src/OpenWigi.Agent` | Agente de console, sem janela, para depurar o serviço e o host |
 | `samples/OpenWigi.Samples.Clock` | Widgets de exemplo: relógio e contador com long-press |
 | `tests/OpenWigi.Device.Tests` | Testes do protocolo e dos gestos, com transporte e relógio falsos |
 | `tests/OpenWigi.Service.Tests` | Testes da política de posse, do broker e do canal IPC |
@@ -36,6 +37,23 @@ dotnet run --project src/OpenWigi.Cli -- touch --long 600
 ```
 
 `owd` sem argumentos lista todos os comandos.
+
+## Manager
+
+`dotnet run --project src/OpenWigi.Manager` abre a janela e põe o ícone no tray. Fechar a janela só
+esconde; o painel continua rodando. Ele precisa do serviço `OpenWigiDash` rodando
+([docs/multiusuario.md](docs/multiusuario.md)).
+
+| Opção | Efeito |
+| --- | --- |
+| `--tray` | Começa só no tray. É o que o "Abrir ao entrar no Windows" usa |
+| `--open /widgets` | Abre direto numa tela |
+| `--plugins <pasta>` | Pasta de plugins alternativa |
+
+As telas:
+- **Painel:** prévia ao vivo do aparelho. O mouse vira toque: clique, segurar e arrastar.
+- **Widgets e páginas:** grade 5x4 para adicionar, mover e tirar widgets, e criar e renomear páginas. Também abre a tela de configurações do plugin, em Razor.
+- **Ajustes:** brilho, iniciar com o Windows e tema claro ou escuro.
 
 ## Inner loop
 

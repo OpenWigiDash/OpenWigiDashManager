@@ -1,0 +1,28 @@
+@using MudBlazor
+@using OpenWigi.Sdk
+@inherits WidgetSettingsComponent<CounterInstance>
+
+@* Tela de configurações do contador: o manager mostra isto com MudBlazor e o tema dele. *@
+<MudStack Spacing="3">
+    <MudTextField T="string" Label="Legenda" Value="_label" ValueChanged="SaveLabel" Variant="Variant.Outlined"
+                  HelperText="Texto embaixo do número" DebounceInterval="400" />
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText>Valor atual: <b>@Instance.Count</b></MudText>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Reset">Zerar</MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    private string _label = string.Empty;
+
+    protected override async Task OnInitializedAsync() =>
+        _label = await Context.Settings.GetAsync("label") ?? string.Empty;
+
+    private async Task SaveLabel(string value)
+    {
+        _label = value;
+        await Instance.SetLabelAsync(value);
+    }
+
+    private async Task Reset() => await Instance.ResetAsync();
+}

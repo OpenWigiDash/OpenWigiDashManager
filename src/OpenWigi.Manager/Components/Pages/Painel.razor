@@ -1,0 +1,118 @@
+@page "/"
+@implements IDisposable
+@inject AgentClient Agent
+@inject IJSRuntime JS
+
+<MudStack Spacing="4">
+    <div>
+        <MudText Typo="Typo.h5">Painel</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            O que está no WigiDash agora. Clique para tocar, segure para long-press e arraste para trocar de página.
+        </MudText>
+    </div>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <div class="owd-device" @ref="_device"
+                 @onpointerdown="Down" @onpointermove="Move" @onpointerup="Up" @onpointerleave="Up">
+                @if (_image is not null)
+                {
+                    <img src="@_image" alt="Prévia do WigiDash" draggable="false" />
+                }
+                else
+                {
+                    <div class="owd-empty">@(Agent.Status == AgentStatus.Owner ? "Aguardando a primeira imagem..." : Agent.Reason)</div>
+                }
+            </div>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Aparelho</MudText>
+                <MudText Typo="Typo.body1">@(Agent.Device.Connected ? "WigiDash conectado" : "Desconectado")</MudText>
+                @if (Agent.Device.Connected)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Firmware @Agent.Device.Firmware</MudText>
+                }
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Tela</MudText>
+                <MudText Typo="Typo.body1">@Agent.Reason</MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Página</MudText>
+                <MudText Typo="Typo.body1">
+                    @(Agent.Dashboard.CurrentPage + 1) de @Agent.Dashboard.Layout.Pages.Count
+                    — @Agent.Dashboard.Layout.Pages.ElementAtOrDefault(Agent.Dashboard.CurrentPage)?.Name
+                </MudText>
+                <MudStack Row="true" Class="mt-2">
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Disabled="@(Agent.Dashboard.Layout.Pages.Count < 2)"
+                                   OnClick="() => Page(-1)" aria-label="Página anterior" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Disabled="@(Agent.Dashboard.Layout.Pages.Count < 2)"
+                                   OnClick="() => Page(1)" aria-label="Próxima página" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private ElementReference _device;
+    private string? _image;
+    private bool _pressed;
+    private double _width = 1, _height = 1;
+
+    protected override void OnInitialized()
+    {
+        Agent.PreviewChanged += OnPreview;
+        Agent.Changed += Refresh;
+        if (Agent.Preview is { } preview)
+            _image = PreviewImage.ToDataUrl(preview);
+    }
+
+    private void OnPreview()
+    {
+        if (Agent.Preview is { } preview)
+        {
+            _image = PreviewImage.ToDataUrl(preview);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    private async Task Down(PointerEventArgs e)
+    {
+        var size = await JS.InvokeAsync<double[]>("owd.size", _device);
+        (_width, _height) = (Math.Max(1, size[0]), Math.Max(1, size[1]));
+        _pressed = true;
+        await Agent.TouchAsync(OpenWigi.Device.Protocol.TouchContact.Down, X(e), Y(e));
+    }
+
+    private Task Move(PointerEventArgs e) =>
+        _pressed ? Agent.TouchAsync(OpenWigi.Device.Protocol.TouchContact.Down, X(e), Y(e)) : Task.CompletedTask;
+
+    private Task Up(PointerEventArgs e)
+    {
+        if (!_pressed)
+            return Task.CompletedTask;
+        _pressed = false;
+        return Agent.TouchAsync(OpenWigi.Device.Protocol.TouchContact.Up, X(e), Y(e));
+    }
+
+    // offsetX/Y são relativos ao elemento, que tem exatamente a área da tela (a moldura é sombra).
+    private int X(PointerEventArgs e) => Math.Clamp((int)(e.OffsetX * 1016 / _width), 0, 1015);
+    private int Y(PointerEventArgs e) => Math.Clamp((int)(e.OffsetY * 592 / _height), 0, 591);
+
+    private async Task Page(int delta)
+    {
+        var count = Agent.Dashboard.Layout.Pages.Count;
+        var next = (Agent.Dashboard.CurrentPage + delta + count) % count;
+        await Agent.Dashboard.GoToPageAsync(next, delta > 0
+            ? OpenWigi.Device.Protocol.Transition.WipeWest
+            : OpenWigi.Device.Protocol.Transition.WipeEast);
+    }
+
+    public void Dispose()
+    {
+        Agent.PreviewChanged -= OnPreview;
+        Agent.Changed -= Refresh;
+    }
+}
