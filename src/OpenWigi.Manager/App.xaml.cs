@@ -44,6 +44,19 @@ public partial class App : System.Windows.Application
         }
         _ = Task.Run(WaitForShowSignal);
 
+        // O WebView2 precisa de Direct3D para desenhar a janela. Numa sessão RDP desconectada (ou sem
+        // GPU) ele falha ao abrir; isso não pode derrubar o agente, que segue desenhando no aparelho.
+        DispatcherUnhandledException += (_, args) =>
+        {
+            if (args.Exception is System.Runtime.InteropServices.COMException && args.Exception.StackTrace?.Contains("WebView2") == true)
+            {
+                args.Handled = true;
+                _window?.CloseForExit();
+                _window = null;
+                _tray?.ShowBalloon("Não foi possível abrir a janela agora (sem vídeo nesta sessão). O painel continua rodando.");
+            }
+        };
+
         _services = BuildServices(e.Args);
         var agent = _services.GetRequiredService<AgentClient>();
         var dashboard = _services.GetRequiredService<DashboardHost>();
@@ -99,12 +112,15 @@ public partial class App : System.Windows.Application
             _window = new MainWindow(_services!);
             _window.Closed += (_, _) => _window = null;
         }
-        _window.Show();
-        if (_window.WindowState == WindowState.Minimized)
-            _window.WindowState = WindowState.Normal;
-        _window.Activate();
+        var window = _window;
+        window.Show();
+        if (_window is null)
+            return; // o WebView2 não conseguiu abrir (ver DispatcherUnhandledException)
+        if (window.WindowState == WindowState.Minimized)
+            window.WindowState = WindowState.Normal;
+        window.Activate();
         if (route is not null)
-            _window.Navigate(route);
+            window.Navigate(route);
     }
 
     private PreviewWindow? _preview;

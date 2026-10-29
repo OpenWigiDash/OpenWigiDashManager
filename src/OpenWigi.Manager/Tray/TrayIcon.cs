@@ -1,30 +1,39 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using OpenWigi.Manager.Services;
 
 namespace OpenWigi.Manager.Tray;
 
 /// <summary>
-/// Ícone da bandeja. O desenho é um mini WigiDash (tela larga com a grade de widgets) e o ponto no
-/// canto diz o estado: vermelho = com a tela, cinza = tela em outra sessão, âmbar = sem aparelho ou serviço.
+/// Ícone da bandeja (assets/branding/tray). O ponto no canto diz o estado: verde = com a tela,
+/// cinza = tela em outra sessão, âmbar = sem aparelho ou serviço. Há uma versão para a barra de
+/// tarefas escura e outra para a clara, trocada quando o usuário muda o tema do Windows.
 /// </summary>
 public sealed class TrayIcon : IDisposable
 {
+    private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+
     private readonly NotifyIcon _icon;
     private readonly AgentClient _agent;
-    private Icon? _current;
-    private AgentStatus? _drawn;
-
     private readonly Action _onChanged;
+    private readonly UserPreferenceChangedEventHandler _onTheme;
+    private readonly Dictionary<string, Icon> _cache = [];
+    private string? _shown;
 
     /// <param name="post">Leva a atualização para a thread da UI (o agente avisa de outra thread).</param>
     public TrayIcon(AgentClient agent, Action<Action> post, Action open, Action openPreview, Action exit)
     {
         _agent = agent;
         _onChanged = () => post(Update);
+        _onTheme = (_, e) =>
+        {
+            if (e.Category is UserPreferenceCategory.General or UserPreferenceCategory.VisualStyle)
+                post(Update);
+        };
+
         var menu = new ContextMenuStrip();
         menu.Items.Add("Abrir o OpenWigiDash", null, (_, _) => open());
         menu.Items.Add("Prévia do aparelho", null, (_, _) => openPreview());
@@ -39,14 +48,20 @@ public sealed class TrayIcon : IDisposable
         };
         Update();
         agent.Changed += _onChanged;
+        SystemEvents.UserPreferenceChanged += _onTheme;
     }
+
+    public void ShowBalloon(string text) => _icon.ShowBalloonTip(5000, "OpenWigiDash", text, ToolTipIcon.Warning);
 
     public void Dispose()
     {
         _agent.Changed -= _onChanged;
+        SystemEvents.UserPreferenceChanged -= _onTheme;
         _icon.Visible = false;
         _icon.Dispose();
-        DestroyCurrent();
+        foreach (var icon in _cache.Values)
+            icon.Dispose();
+        _cache.Clear();
     }
 
     private void Update()
@@ -55,15 +70,12 @@ public sealed class TrayIcon : IDisposable
         // Texto da dica: até 127 caracteres no Windows.
         var text = $"OpenWigiDash — {Describe(status)}";
         _icon.Text = text.Length > 127 ? text[..127] : text;
-        if (_drawn == status)
-            return;
 
-        var previous = _current;
-        _current = Render(status);
-        _icon.Icon = _current;
-        _drawn = status;
-        if (previous is not null)
-            DestroyIcon(previous.Handle);
+        var name = ResourceName(status, TaskbarIsLight());
+        if (name == _shown)
+            return;
+        _icon.Icon = Load(name);
+        _shown = name;
     }
 
     private string Describe(AgentStatus status) => status switch
@@ -74,63 +86,33 @@ public sealed class TrayIcon : IDisposable
         _ => "serviço não encontrado",
     };
 
-    internal static Icon Render(AgentStatus status)
+    internal static string ResourceName(AgentStatus status, bool light)
     {
-        const int size = 32;
-        using var bitmap = new Bitmap(size, size);
-        using (var g = Graphics.FromImage(bitmap))
+        var state = status switch
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.Clear(Color.Transparent);
-
-            // Corpo do aparelho: tela larga, moldura grafite.
-            using var body = Rounded(new RectangleF(1, 6, 30, 20), 4);
-            using var frame = new SolidBrush(Color.FromArgb(0x1B, 0x1D, 0x24));
-            using var border = new Pen(Color.FromArgb(0x8B, 0x93, 0xA7), 1.5f);
-            g.FillPath(frame, body);
-            g.DrawPath(border, body);
-
-            // Grade 3x2 de widgets, o primeiro em destaque.
-            using var cell = new SolidBrush(Color.FromArgb(0x3A, 0x3E, 0x4A));
-            using var accent = new SolidBrush(Color.FromArgb(0xE5, 0x24, 0x3B));
-            for (var row = 0; row < 2; row++)
-                for (var column = 0; column < 3; column++)
-                    g.FillRectangle(row == 0 && column == 0 ? accent : cell, 5 + column * 8, 10 + row * 7, 6, 5);
-
-            // Estado.
-            var dot = status switch
-            {
-                AgentStatus.Owner => Color.FromArgb(0x3D, 0xD6, 0x8C),
-                AgentStatus.Waiting => Color.FromArgb(0x8B, 0x93, 0xA7),
-                _ => Color.FromArgb(0xF2, 0xB5, 0x44),
-            };
-            using var dotBrush = new SolidBrush(dot);
-            using var dotBorder = new Pen(Color.FromArgb(0x12, 0x13, 0x18), 2);
-            g.FillEllipse(dotBrush, 21, 19, 10, 10);
-            g.DrawEllipse(dotBorder, 21, 19, 10, 10);
-        }
-        return Icon.FromHandle(bitmap.GetHicon());
+            AgentStatus.Owner => "owner",
+            AgentStatus.Waiting => "waiting",
+            _ => "nodevice",
+        };
+        return $"tray-{state}-{(light ? "light" : "dark")}.ico";
     }
 
-    private static GraphicsPath Rounded(RectangleF r, float radius)
+    // O NotifyIcon escolhe o tamanho certo (16, 20, 24, 32) de dentro do .ico conforme o DPI.
+    private Icon Load(string name)
     {
-        var path = new GraphicsPath();
-        var d = radius * 2;
-        path.AddArc(r.X, r.Y, d, d, 180, 90);
-        path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-        path.CloseFigure();
-        return path;
+        if (_cache.TryGetValue(name, out var cached))
+            return cached;
+        using var stream = typeof(TrayIcon).Assembly.GetManifestResourceStream($"OpenWigi.Manager.Tray.{name}")
+            ?? throw new InvalidOperationException($"Ícone da bandeja não embutido: {name}");
+        var icon = new Icon(stream, SystemInformation.SmallIconSize);
+        _cache[name] = icon;
+        return icon;
     }
 
-    private void DestroyCurrent()
+    /// <summary>Barra de tarefas clara? (SystemUsesLightTheme = 1). Na dúvida, escura.</summary>
+    private static bool TaskbarIsLight()
     {
-        if (_current is not null)
-            DestroyIcon(_current.Handle);
-        _current = null;
+        using var key = Registry.CurrentUser.OpenSubKey(PersonalizeKey);
+        return key?.GetValue("SystemUsesLightTheme") is int value && value == 1;
     }
-
-    [DllImport("user32.dll")]
-    private static extern bool DestroyIcon(IntPtr handle);
 }

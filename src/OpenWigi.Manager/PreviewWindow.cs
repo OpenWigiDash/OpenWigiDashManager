@@ -26,6 +26,7 @@ public sealed class PreviewWindow : Window
     {
         _agent = agent;
         Title = "OpenWigiDash — prévia";
+        Icon = BitmapFrame.Create(new Uri("pack://application:,,,/Assets/openwigidash.ico"));
         Width = WigiDashProtocol.Width / 2 + 16;
         Height = WigiDashProtocol.Height / 2 + 72;
         MinWidth = 320;
