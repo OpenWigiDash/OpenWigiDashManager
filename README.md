@@ -52,8 +52,7 @@ esconde; o painel continua rodando. Ele precisa do serviço `OpenWigiDash` rodan
 | `--preview` | Abre a prévia destacada |
 
 As telas:
-- **Painel:** prévia ao vivo do aparelho. O mouse vira toque: clique, segurar e arrastar.
-- **Widgets e páginas:** grade 5x4 para adicionar, mover e tirar widgets, e criar e renomear páginas. Também abre a tela de configurações do plugin, em Razor.
+- **Widgets e páginas** (a tela inicial): estado do aparelho, grade 5x4 com cada widget desenhando ao vivo, e embaixo as páginas em miniatura. Dá para adicionar, mover, redimensionar e tirar widgets, e criar e renomear páginas. Também abre a tela de configurações do plugin, em Razor. "Destacar prévia" abre a tela do aparelho numa janela própria, onde o mouse vira toque.
 - **Ajustes:** brilho, iniciar com o Windows e tema claro ou escuro.
 
 ## Inner loop

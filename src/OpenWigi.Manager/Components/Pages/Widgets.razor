@@ -1,18 +1,54 @@
+@page "/"
 @page "/widgets"
 @implements IAsyncDisposable
 @inject AgentClient Agent
+@inject ManagerSettings Settings
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IDialogService Dialogs
 
 <MudStack Spacing="4">
-    <div>
-        <MudText Typo="Typo.h5">Widgets e páginas</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
-        </MudText>
-    </div>
+    <MudStack Row="true" AlignItems="AlignItems.Start" Wrap="Wrap.Wrap">
+        <div>
+            <MudText Typo="Typo.h5">Widgets e páginas</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
+            </MudText>
+        </div>
+        <MudSpacer />
+        <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
+            Adicionar widget
+        </MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Outlined" OnClick="Settings.RequestPreviewWindow">
+            Destacar prévia
+        </MudButton>
+    </MudStack>
+
+    @* O que era o Painel: estado do aparelho e da tela, numa faixa só. *@
+    <MudPaper Class="owd-info pa-3" Outlined="true">
+        <div>
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Aparelho</MudText>
+            <MudText Typo="Typo.body2">
+                @(Agent.Device.Connected ? "WigiDash conectado" : "Desconectado")
+                @if (Agent.Device.Connected)
+                {
+                    <span class="owd-muted"> · firmware @Agent.Device.Firmware</span>
+                }
+            </MudText>
+        </div>
+        <div>
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Tela</MudText>
+            <MudText Typo="Typo.body2">@Agent.Reason</MudText>
+        </div>
+        <div>
+            <MudText Typo="Typo.overline" Color="Color.Secondary">No aparelho agora</MudText>
+            <MudText Typo="Typo.body2">
+                Página @(Dashboard.CurrentPage + 1) de @Dashboard.Layout.Pages.Count
+                — @Dashboard.Layout.Pages.ElementAtOrDefault(Dashboard.CurrentPage)?.Name
+            </MudText>
+        </div>
+    </MudPaper>
 
     @if (Dashboard.PluginErrors.Count > 0)
     {
@@ -22,29 +58,14 @@
         </MudAlert>
     }
 
-    <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-        <MudChipSet T="int" SelectedValue="_page" SelectedValueChanged="SelectPage" SelectionMode="SelectionMode.SingleSelection" CheckMark="false">
-            @for (var i = 0; i < Dashboard.Layout.Pages.Count; i++)
-            {
-                var index = i;
-                <MudChip T="int" Value="index" Color="Color.Primary" Variant="Variant.Outlined">@Dashboard.Layout.Pages[index].Name</MudChip>
-            }
-        </MudChipSet>
-        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="AddPage">Nova página</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
-            Adicionar widget
-        </MudButton>
-        <MudSpacer />
-        <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
-                      Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
-        <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text"
-                   Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
-            Excluir página vazia
-        </MudButton>
-    </MudStack>
-
     <MudGrid>
         <MudItem xs="12" md="8">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-1">
+                <MudText Typo="Typo.subtitle1">@CurrentPage?.Name</MudText>
+                <MudSpacer />
+                <MudSwitch T="bool" Value="Settings.ShowWidgetNames" ValueChanged="v => Settings.ShowWidgetNames = v"
+                           Color="Color.Primary" Size="Size.Small">Mostrar nomes</MudSwitch>
+            </MudStack>
             @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
                de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
             <div class="owd-grid @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
@@ -63,7 +84,7 @@
                          @onclick="() => _selected = p.InstanceId">
                         @* O tile mostra o que o widget desenha, como vai aparecer no aparelho. *@
                         <WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" />
-                        <div class="owd-widget-label">
+                        <div class="owd-widget-label @(Settings.ShowWidgetNames || p.InstanceId == _selected ? "" : "hidden")">
                             <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
                             <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
                         </div>
@@ -100,6 +121,46 @@
                 Arraste um widget para outra posição, ou puxe o canto inferior direito para mudar o tamanho:
                 a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
             </MudText>
+
+            @* Seletor de páginas: miniaturas ao vivo, numa fila horizontal embaixo da grade. *@
+            <div class="owd-pages">
+                @for (var i = 0; i < Dashboard.Layout.Pages.Count; i++)
+                {
+                    var index = i;
+                    var thumb = Dashboard.Layout.Pages[index];
+                    <button type="button" class="owd-page-thumb @(index == _page ? "selected" : "")" @onclick="() => SelectPage(index)"
+                            title="@thumb.Name">
+                        <div class="owd-thumb-grid">
+                            @foreach (var w in thumb.Widgets)
+                            {
+                                <div @key="w.InstanceId" class="owd-thumb-widget"
+                                     style="grid-column: @(w.Column + 1) / span @w.Size.Columns; grid-row: @(w.Row + 1) / span @w.Size.Rows">
+                                    <WidgetLiveFrame Dashboard="Dashboard" InstanceId="w.InstanceId" MaxPerSecond="1" />
+                                </div>
+                            }
+                        </div>
+                        <span class="owd-page-name">
+                            @if (index == Dashboard.CurrentPage)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Monitor" Size="Size.Small" title="No aparelho agora" />
+                            }
+                            @thumb.Name
+                        </span>
+                    </button>
+                }
+                <button type="button" class="owd-page-thumb owd-page-add" @onclick="AddPage" title="Nova página">
+                    <div class="owd-thumb-grid"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Large" /></div>
+                    <span class="owd-page-name">Nova página</span>
+                </button>
+            </div>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2">
+                <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
+                <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text"
+                           Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
+                    Excluir página vazia
+                </MudButton>
+            </MudStack>
         </MudItem>
 
         <MudItem xs="12" md="4">
@@ -162,6 +223,8 @@
     {
         _page = Dashboard.CurrentPage;
         Dashboard.LayoutChanged += Refresh;
+        Agent.Changed += Refresh;
+        Settings.Changed += Refresh;
     }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
@@ -425,6 +488,8 @@
     public async ValueTask DisposeAsync()
     {
         Dashboard.LayoutChanged -= Refresh;
+        Agent.Changed -= Refresh;
+        Settings.Changed -= Refresh;
         try
         {
             if (_deleteKey is not null)

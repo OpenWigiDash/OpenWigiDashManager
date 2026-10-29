@@ -12,7 +12,7 @@ namespace OpenWigi.Manager;
 /// <summary>
 /// A prévia destacada: só a tela do aparelho, numa janela própria que pode ficar sempre por cima.
 /// WPF puro (sem WebView): o RGB565 do serviço vai direto para um bitmap Bgr565. O mouse vira toque,
-/// como no Painel: clique = tap, segurar = long-press, arrastar = swipe.
+/// assim: clique = tap, segurar = long-press, arrastar = swipe.
 /// </summary>
 public sealed class PreviewWindow : Window
 {

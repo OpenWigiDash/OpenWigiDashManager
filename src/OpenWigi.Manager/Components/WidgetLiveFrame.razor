@@ -11,8 +11,10 @@
     [Parameter, EditorRequired] public DashboardHost Dashboard { get; set; } = default!;
     [Parameter, EditorRequired] public Guid InstanceId { get; set; }
 
-    // Junta os quadros: no máximo 5 imagens por segundo por tile. É para ver, não para espelhar vídeo.
-    private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(200);
+    /// <summary>Junta os quadros: no máximo isto de imagens por segundo. É para ver, não para espelhar vídeo.</summary>
+    [Parameter] public int MaxPerSecond { get; set; } = 5;
+
+    private TimeSpan Interval => TimeSpan.FromSeconds(1.0 / Math.Max(1, MaxPerSecond));
 
     private string? _src;
     private int _pending;
