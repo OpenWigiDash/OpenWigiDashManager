@@ -6,7 +6,16 @@ using OpenWigi.Service.Sessions;
 
 // Roda como serviço Windows (instalado) ou no console, para desenvolvimento:
 //   dotnet run --project src/OpenWigi.Service -- --OpenWigi:AllowRemoteSessions=true
-var builder = Host.CreateApplicationBuilder(args);
+// Como serviço, o diretório atual é System32: a configuração vem da pasta do executável.
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory,
+});
+
+// Ajustes da máquina (ex.: AllowRemoteSessions no PC de dev), fora do que o publish sobrescreve.
+builder.Configuration.AddJsonFile("appsettings.local.json", optional: true);
+builder.Configuration.AddCommandLine(args);
 builder.Services.Configure<ServiceOptions>(builder.Configuration.GetSection(ServiceOptions.Section));
 
 builder.Services.AddWindowsService(o => o.ServiceName = "OpenWigiDash");
