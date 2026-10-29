@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>OpenWigi.Host</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenWigi.Sdk\OpenWigi.Sdk.csproj" />
+    <ProjectReference Include="..\OpenWigi.Device\OpenWigi.Device.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenWigi.Host.Tests" />
+  </ItemGroup>
+
+</Project>
