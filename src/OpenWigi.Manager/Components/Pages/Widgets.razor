@@ -186,6 +186,7 @@
             { d => d.Widgets, Dashboard.AvailableWidgets },
             { d => d.Page, page },
             { d => d.NameOf, id => Dashboard.DisplayNameOf(id) },
+            { d => d.IconOf, async id => await Dashboard.GetCatalogIconAsync(id) is { } frame ? PreviewImage.ToDataUrl(frame) : null },
         };
         var dialog = await Dialogs.ShowAsync<AddWidgetDialog>("Adicionar widget", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true });
