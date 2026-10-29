@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenWigi.Cli/OpenWigi.Cli.csproj" />
+    <Project Path="src/OpenWigi.Device/OpenWigi.Device.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenWigi.Device.Tests/OpenWigi.Device.Tests.csproj" />
+  </Folder>
+</Solution>
