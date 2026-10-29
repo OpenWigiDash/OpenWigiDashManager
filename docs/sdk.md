@@ -1,6 +1,6 @@
 # OpenWigi.Sdk — contrato dos widgets (v2.0)
 
-Pacote `OpenWigi.Sdk` (`net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
+Pacote `victorperez2911.OpenWigi.Sdk` no nuget.org (assembly `OpenWigi.Sdk`, `net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
 compatibilidade binária: plugin antigo precisa ser portado.
 
 ## Peças
@@ -80,7 +80,7 @@ O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Component
 cópia na pasta:
 
 ```xml
-<PackageReference Include="OpenWigi.Sdk" Version="2.0.*" ExcludeAssets="runtime" />
+<PackageReference Include="victorperez2911.OpenWigi.Sdk" Version="2.0.0-preview.1" ExcludeAssets="runtime" />
 <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
 ```
 
