@@ -219,6 +219,27 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Instancias_do_mesmo_widget_ganham_nomes_distintos_e_editaveis()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Outra");
+        var first = await host.AddWidgetAsync(Counter, page);
+        var second = await host.AddWidgetAsync(Counter, page);
+
+        // A primeira execução já pôs um contador no layout: estes são o 2 e o 3.
+        Assert.Equal("Contador (exemplo) 2", host.DisplayNameOf(first!.Value));
+        Assert.Equal("Contador (exemplo) 3", host.DisplayNameOf(second!.Value));
+
+        await host.RenameWidgetAsync(second.Value, "  Contador do café ");
+        Assert.Equal("Contador do café", host.DisplayNameOf(second.Value));
+        Assert.Equal("Contador do café", new LayoutStore(Path.Combine(Data, "layout.json")).Load()
+            .AllPlacements.Single(p => p.InstanceId == second.Value).Name);
+
+        await host.RenameWidgetAsync(second.Value, "");
+        Assert.Equal("Contador (exemplo)", host.DisplayNameOf(second.Value));
+    }
+
+    [Fact]
     public async Task Tela_de_configuracoes_do_plugin_chega_ao_manager()
     {
         var host = await StartAsync();

@@ -168,8 +168,45 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
     public bool IsActive => _active;
 
-    /// <summary>Nome do widget de uma instância do layout, ou null se o plugin não está instalado.</summary>
+    /// <summary>Nome do widget (o tipo) de uma instância do layout, ou null se o plugin não está instalado.</summary>
     public string? NameOf(Guid instanceId) => _runtimes.GetValueOrDefault(instanceId)?.Name;
+
+    /// <summary>Nome que a pessoa vê: o da instância, ou o do widget se ela não deu um.</summary>
+    public string DisplayNameOf(Guid instanceId)
+    {
+        var placement = _layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId);
+        return placement?.Name is { Length: > 0 } name ? name
+            : NameOf(instanceId) ?? _catalog.Find(placement?.WidgetId ?? Guid.Empty)?.Manifest.Name ?? "Widget não instalado";
+    }
+
+    /// <summary>Muda o nome da instância (vazio volta ao nome do widget).</summary>
+    public async Task RenameWidgetAsync(Guid instanceId, string? name, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (_layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId) is not { } placement)
+                return;
+            placement.Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+            _store.Save(_layout);
+            LayoutChanged?.Invoke();
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    // "Relógio", e se já houver um, "Relógio 2", "Relógio 3"...
+    private string SuggestName(string widgetName)
+    {
+        var used = _layout.AllPlacements.Select(p => DisplayNameOf(p.InstanceId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!used.Contains(widgetName))
+            return widgetName;
+        for (var n = 2; ; n++)
+            if (!used.Contains($"{widgetName} {n}"))
+                return $"{widgetName} {n}";
+    }
 
     /// <summary>Tela de configurações da instância (componente Razor do plugin), se houver.</summary>
     public (Type Component, IWidgetInstance Instance, IWidgetContext Context)? GetSettings(Guid instanceId) =>
@@ -198,7 +235,14 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
                 : target.FindFreeCell(chosen);
             if (cell is not { } free)
                 return null;
-            var placement = new WidgetPlacement { WidgetId = widgetId, Column = free.Column, Row = free.Row, Size = chosen };
+            var placement = new WidgetPlacement
+            {
+                WidgetId = widgetId,
+                Name = SuggestName(widget.Manifest.Name),
+                Column = free.Column,
+                Row = free.Row,
+                Size = chosen,
+            };
             _layout.Pages[page].Widgets.Add(placement);
             await CreateRuntimeAsync(placement, cancellationToken);
             if (_runtimes.TryGetValue(placement.InstanceId, out var runtime))

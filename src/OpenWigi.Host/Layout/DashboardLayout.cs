@@ -33,6 +33,10 @@ public sealed class WidgetPlacement
 {
     public Guid InstanceId { get; set; } = Guid.NewGuid();
     public Guid WidgetId { get; set; }
+
+    /// <summary>Nome desta instância, para distinguir dois do mesmo widget. Vazio = o nome do widget.</summary>
+    public string? Name { get; set; }
+
     public int Column { get; set; }
     public int Row { get; set; }
 

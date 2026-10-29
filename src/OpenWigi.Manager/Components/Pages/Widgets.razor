@@ -61,8 +61,8 @@
                          style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
                          @onpointerdown="e => Press(p, e)"
                          @onclick="() => _selected = p.InstanceId">
-                        <MudText Typo="Typo.subtitle2">@(Dashboard.NameOf(p.InstanceId) ?? "Widget não instalado")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Size</MudText>
+                        <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
                         @if (SizesOf(p.WidgetId).Count > 1)
                         {
                             @* Alça do canto: puxar redimensiona, como uma janela. *@
@@ -103,8 +103,11 @@
             {
                 <MudPaper Class="pa-4 mb-4" Outlined="true">
                     <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
-                    <MudText Typo="Typo.h6">@(Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado")</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Coluna @(selected.Column + 1), linha @(selected.Row + 1), tamanho @selected.Size</MudText>
+                    @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@
+                    <MudTextField T="string" @key="selected.InstanceId" Value="@Dashboard.DisplayNameOf(selected.InstanceId)"
+                                  ValueChanged="name => Dashboard.RenameWidgetAsync(selected.InstanceId, name)" DebounceInterval="500"
+                                  Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1"
+                                  HelperText="@($"{Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado"} · coluna {selected.Column + 1}, linha {selected.Row + 1}, {selected.Size}")" />
                     @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
                     {
                         <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
@@ -182,7 +185,7 @@
         {
             { d => d.Widgets, Dashboard.AvailableWidgets },
             { d => d.Page, page },
-            { d => d.NameOf, Dashboard.NameOf },
+            { d => d.NameOf, id => Dashboard.DisplayNameOf(id) },
         };
         var dialog = await Dialogs.ShowAsync<AddWidgetDialog>("Adicionar widget", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true });
@@ -208,8 +211,15 @@
             Snackbar.Add("Esse tamanho não cabe a partir da posição atual.", Severity.Warning);
     }
 
+    // Tirar apaga as configurações e os arquivos da instância: sempre pergunta antes.
     private async Task Remove(Guid instanceId)
     {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Tirar widget",
+            $"Tirar \"{Dashboard.DisplayNameOf(instanceId)}\" desta página? As configurações dele serão apagadas.",
+            yesText: "Tirar", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
         await Dashboard.RemoveWidgetAsync(instanceId);
         _selected = null;
     }
