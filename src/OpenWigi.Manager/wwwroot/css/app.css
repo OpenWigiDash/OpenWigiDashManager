@@ -1,7 +1,8 @@
+/* Fundo do tema atual (claro ou escuro); o grafite só vale antes de o Blazor carregar. */
 html, body {
     margin: 0;
     height: 100%;
-    background: #121318;
+    background: var(--mud-palette-background, #121318);
 }
 
 #blazor-error-ui {

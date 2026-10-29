@@ -4,7 +4,10 @@
 @inject AgentClient Agent
 @inject NavigationManager Navigation
 
-<MudThemeProvider Theme="_theme" IsDarkMode="Settings.DarkMode" />
+@* Tema só pela preferência do manager: sem seguir o Windows (ObserveSystemDarkModeChange), que na
+   primeira renderização trocava para claro por conta própria e deixava a tela misturada. O bind
+   de volta grava qualquer troca que o próprio MudBlazor fizer, para os dois lados não divergirem. *@
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="DarkMode" ObserveSystemDarkModeChange="false" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -32,6 +35,16 @@
 
 @code {
     private readonly MudTheme _theme = OpenWigi.Manager.Theming.OpenWigiDashTheme.Create();
+
+    private bool DarkMode
+    {
+        get => Settings.DarkMode;
+        set
+        {
+            if (Settings.DarkMode != value)
+                Settings.DarkMode = value;
+        }
+    }
 
     protected override void OnInitialized()
     {
