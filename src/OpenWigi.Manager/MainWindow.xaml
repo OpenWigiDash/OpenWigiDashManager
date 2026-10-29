@@ -4,7 +4,8 @@
         xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
         xmlns:local="clr-namespace:OpenWigi.Manager.Components"
         Title="OpenWigiDash Manager" Width="1280" Height="820" MinWidth="960" MinHeight="640"
-        Background="#121318" WindowStartupLocation="CenterScreen">
+        Background="#121318" WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/openwigidash.ico">
     <blazor:BlazorWebView x:Name="WebView" HostPage="wwwroot\index.html">
         <blazor:BlazorWebView.RootComponents>
             <blazor:RootComponent Selector="#app" ComponentType="{x:Type local:Root}" />

@@ -12,7 +12,14 @@
     <UseWindowsForms>true</UseWindowsForms>
     <!-- WPF e WinForms juntos geram ambiguidades nos usings implícitos; listamos os nossos. -->
     <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationIcon>..\..\assets\branding\openwigidash.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ícone das janelas (WPF) e os da bandeja, um por estado e tema (assets/branding/README.md). -->
+    <Resource Include="..\..\assets\branding\openwigidash.ico" Link="Assets\openwigidash.ico" />
+    <EmbeddedResource Include="..\..\assets\branding\tray\*.ico" LogicalName="OpenWigi.Manager.Tray.%(Filename)%(Extension)" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpenWigi.Host\OpenWigi.Host.csproj" />
