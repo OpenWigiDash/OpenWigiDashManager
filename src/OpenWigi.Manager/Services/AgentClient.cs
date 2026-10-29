@@ -45,6 +45,15 @@ public sealed class AgentClient : IAsyncDisposable
     public DeviceStatus Device { get; private set; } = DeviceStatus.Disconnected;
     public int SessionId { get; private set; } = -1;
 
+    /// <summary>Brilho do aparelho em %: o que o serviço leu ao dar a posse, depois o último que a UI mandou.</summary>
+    public int? Brightness { get; private set; }
+
+    public async Task SetBrightnessAsync(int percent)
+    {
+        Brightness = percent;
+        await SendAsync(new SetBrightness(percent));
+    }
+
     /// <summary>Última cópia do que está no aparelho (RGB565, 1016x592), ou null.</summary>
     public byte[]? Preview { get; private set; }
 
@@ -152,6 +161,10 @@ public sealed class AgentClient : IAsyncDisposable
                     break;
                 case Gesture gesture:
                     _ = Dashboard.HandleGestureAsync(gesture.Event, cancellationToken);
+                    break;
+                case BrightnessReport brightness:
+                    Brightness = brightness.Percent;
+                    Changed?.Invoke();
                     break;
                 case PreviewFrame frame:
                     Preview = frame.Pixels;

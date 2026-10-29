@@ -33,6 +33,7 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         DeviceStatus = 66,
         Gesture = 67,
         PreviewFrame = 68,
+        BrightnessReport = 69,
         Error = 127,
     }
 
@@ -149,6 +150,10 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
                 w.Write((int)m.Event.Duration.TotalMilliseconds);
                 w.Write(m.Event.Progress);
                 break;
+            case BrightnessReport m:
+                w.Write((byte)Kind.BrightnessReport);
+                w.Write(m.Percent);
+                break;
             case IpcError m:
                 w.Write((byte)Kind.Error);
                 w.Write(m.Message);
@@ -180,6 +185,7 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
             Kind.DeviceStatus => ReadStatus(r),
             Kind.Gesture => new Gesture(new GestureEvent((GestureKind)r.ReadByte(), r.ReadInt32(), r.ReadInt32(),
                 TimeSpan.FromMilliseconds(r.ReadInt32()), r.ReadDouble())),
+            Kind.BrightnessReport => new BrightnessReport(r.ReadInt32()),
             Kind.Error => new IpcError(r.ReadString()),
             _ => throw new InvalidDataException($"Tipo de mensagem IPC desconhecido: {(byte)kind}."),
         };

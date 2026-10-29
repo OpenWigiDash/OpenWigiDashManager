@@ -30,6 +30,19 @@
             rect: el => {
                 const r = el.getBoundingClientRect();
                 return [r.left, r.top, r.width, r.height];
+            },
+            // Delete no editor de widgets. Não vale enquanto se digita (campo de nome) ou com um diálogo aberto.
+            onDeleteKey: target => {
+                const handler = e => {
+                    if (e.key !== 'Delete' || e.repeat) return;
+                    const el = document.activeElement;
+                    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+                    if (document.querySelector('.mud-dialog')) return;
+                    e.preventDefault();
+                    target.invokeMethodAsync('DeletePressed');
+                };
+                document.addEventListener('keydown', handler);
+                return { dispose: () => document.removeEventListener('keydown', handler) };
             }
         };
     </script>
