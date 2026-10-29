@@ -16,7 +16,11 @@ O plano e as fases estão nos [milestones](../../milestones). O protocolo USB es
 | --- | --- |
 | `src/OpenWigi.Device` | WinUSB por P/Invoke, protocolo do aparelho e reconhecimento de gestos |
 | `src/OpenWigi.Cli` | `owd`, ferramenta de diagnóstico |
+| `src/OpenWigi.Ipc` | Mensagens e canal (named pipe) entre o serviço e os agentes |
+| `src/OpenWigi.Service` | Serviço Windows dono do USB; decide qual sessão desenha ([docs/multiusuario.md](docs/multiusuario.md)) |
+| `src/OpenWigi.Agent` | Agente mínimo por usuário (fase 3); vira a UI WPF + Blazor na fase 5 |
 | `tests/OpenWigi.Device.Tests` | Testes do protocolo e dos gestos, com transporte e relógio falsos |
+| `tests/OpenWigi.Service.Tests` | Testes da política de posse, do broker e do canal IPC |
 
 ## Usar o `owd`
 
