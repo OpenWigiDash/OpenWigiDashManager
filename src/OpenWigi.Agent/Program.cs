@@ -3,16 +3,21 @@ using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using OpenWigi.Agent;
 using OpenWigi.Device.Display;
 using OpenWigi.Device.Protocol;
+using OpenWigi.Host;
+using OpenWigi.Host.Display;
 using OpenWigi.Ipc;
 
-// Agente mínimo da fase 3: prova a troca de dono entre sessões. Pinta a tela com uma cor por
-// usuário, mostra o nome, a hora e o último gesto. A UI de verdade (WPF + Blazor) chega na fase 5.
-// Com --preview abre uma janela com o que está no aparelho; o mouse nela vira toque.
+// Agente de cada usuário: fala com o serviço e, quando tem a tela, desenha o painel com os
+// widgets instalados. Sem widgets, mostra a tela de teste da fase 3 (cor por usuário, nome, hora
+// e último gesto). A UI de configuração (WPF + Blazor) chega na fase 5.
+//   --preview   janela com o que está no aparelho; o mouse nela vira toque
+//   --plugins   pasta de plugins (padrão: %LOCALAPPDATA%\OpenWigiDash\Widgets)
 
-const int Page = 0;
+const int DemoPage = 0;
 var user = Environment.UserName;
 var background = ColorFor(user);
 var lastGesture = "toque na tela";
@@ -20,6 +25,24 @@ var isOwner = false;
 IpcConnection? current = null;
 var stop = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+
+using var loggerFactory = LoggerFactory.Create(b => b
+    .AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss.fff "; })
+    .SetMinimumLevel(LogLevel.Information));
+var log = loggerFactory.CreateLogger("Agente");
+
+var pluginsDirectory = Option("--plugins") ?? Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenWigiDash", "Widgets");
+var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash");
+
+await using var dashboard = new DashboardHost(
+    new DashboardOptions { PluginsDirectory = pluginsDirectory, DataDirectory = dataDirectory },
+    new IpcSink(() => current), loggerFactory);
+await dashboard.StartAsync(stop.Token);
+var useDashboard = dashboard.AvailableWidgets.Count > 0;
+log.LogInformation(useDashboard
+    ? $"{dashboard.AvailableWidgets.Count} widgets em {pluginsDirectory}"
+    : $"nenhum widget em {pluginsDirectory}; usando a tela de teste");
 
 var preview = args.Contains("--preview") ? OpenPreview($"OpenWigiDash — prévia ({user})", stop) : null;
 if (preview is not null)
@@ -39,13 +62,16 @@ while (!stop.IsCancellationRequested)
     }
     catch (Exception ex) when (ex is IOException or TimeoutException or EndOfStreamException)
     {
-        Log($"sem conexão com o serviço ({ex.Message}); tentando de novo");
+        log.LogWarning("sem conexão com o serviço ({Message}); tentando de novo", ex.Message);
     }
     catch (OperationCanceledException)
     {
         break;
     }
 
+    current = null;
+    if (isOwner)
+        await dashboard.ActivateAsync(false);
     isOwner = false;
     try
     {
@@ -68,55 +94,68 @@ async Task RunAsync(CancellationToken cancellationToken)
     current = connection;
 
     using var refresh = new PeriodicTimer(TimeSpan.FromSeconds(10));
-    _ = Task.Run(async () =>
+    if (!useDashboard)
     {
-        while (await refresh.WaitForNextTickAsync(cancellationToken))
-            if (isOwner)
-                await DrawAsync(connection, cancellationToken);
-    }, cancellationToken);
+        _ = Task.Run(async () =>
+        {
+            while (await refresh.WaitForNextTickAsync(cancellationToken))
+                if (isOwner)
+                    await DrawDemoAsync(connection, cancellationToken);
+        }, cancellationToken);
+    }
 
     while (await connection.ReceiveAsync(cancellationToken) is { } message)
     {
         switch (message)
         {
             case Welcome welcome:
-                Log($"conectado ao serviço como sessão {welcome.SessionId}; aparelho {(welcome.Device.Connected ? welcome.Device.Firmware : "desconectado")}");
+                log.LogInformation("conectado ao serviço como sessão {Session}; aparelho {Device}", welcome.SessionId,
+                    welcome.Device.Connected ? welcome.Device.Firmware : "desconectado");
                 break;
             case Ownership ownership:
                 isOwner = ownership.IsOwner;
-                Log(ownership.IsOwner ? $"ganhei a tela ({ownership.Reason})" : $"perdi a tela ({ownership.Reason})");
+                log.LogInformation(ownership.IsOwner ? "ganhei a tela ({Reason})" : "perdi a tela ({Reason})", ownership.Reason);
                 preview?.SetStatus(ownership.IsOwner
                     ? $"OpenWigiDash — prévia ({user}): com a tela"
                     : $"OpenWigiDash — prévia ({user}): sem a tela — {ownership.Reason}");
-                if (isOwner)
-                    await DrawAsync(connection, cancellationToken, show: true);
+                if (useDashboard)
+                    await dashboard.ActivateAsync(ownership.IsOwner, cancellationToken);
+                else if (isOwner)
+                    await DrawDemoAsync(connection, cancellationToken, show: true);
                 break;
             case Gesture gesture:
-                lastGesture = $"{gesture.Event.Kind} em {gesture.Event.X},{gesture.Event.Y} ({gesture.Event.Duration.TotalMilliseconds:F0} ms)";
-                Log(lastGesture);
-                await DrawAsync(connection, cancellationToken);
+                if (useDashboard)
+                {
+                    _ = dashboard.HandleGestureAsync(gesture.Event, cancellationToken);
+                }
+                else
+                {
+                    lastGesture = $"{gesture.Event.Kind} em {gesture.Event.X},{gesture.Event.Y} ({gesture.Event.Duration.TotalMilliseconds:F0} ms)";
+                    log.LogInformation("{Gesture}", lastGesture);
+                    await DrawDemoAsync(connection, cancellationToken);
+                }
                 break;
             case PreviewFrame frame:
                 preview?.ShowFrame(frame.Pixels);
                 break;
             case DeviceStatus status:
-                Log(status.Connected ? $"aparelho conectado ({status.Firmware})" : "aparelho desconectado");
+                log.LogInformation(status.Connected ? "aparelho conectado ({Firmware})" : "aparelho desconectado", status.Firmware);
                 break;
             case IpcError error:
-                Log($"erro do serviço: {error.Message}");
+                log.LogError("erro do serviço: {Message}", error.Message);
                 return;
         }
     }
 }
 
-async Task DrawAsync(IpcConnection connection, CancellationToken cancellationToken, bool show = false)
+async Task DrawDemoAsync(IpcConnection connection, CancellationToken cancellationToken, bool show = false)
 {
-    await connection.SendAsync(new Frame(Page, 0, Render()), cancellationToken);
+    await connection.SendAsync(new Frame(DemoPage, 0, RenderDemo()), cancellationToken);
     if (show)
-        await connection.SendAsync(new ShowPage(Page, Transition.None), cancellationToken);
+        await connection.SendAsync(new ShowPage(DemoPage, Transition.None), cancellationToken);
 }
 
-byte[] Render()
+byte[] RenderDemo()
 {
     const int w = WigiDashProtocol.Width, h = WigiDashProtocol.Height;
     using var bitmap = new Bitmap(w, h, PixelFormat.Format32bppArgb);
@@ -147,6 +186,12 @@ byte[] Render()
     }
 }
 
+string? Option(string name)
+{
+    var index = Array.IndexOf(args, name);
+    return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
+}
+
 static Color ColorFor(string name)
 {
     // Cor estável por usuário, escura o bastante para o texto branco.
@@ -174,4 +219,18 @@ static PreviewWindow OpenPreview(string title, CancellationTokenSource stop)
     return window!;
 }
 
-static void Log(string text) => Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff} {text}");
+/// <summary>Leva os pixels do compositor ao serviço pelo canal atual; sem canal, descarta.</summary>
+internal sealed class IpcSink(Func<IpcConnection?> connection) : IDisplaySink
+{
+    public async ValueTask WriteAsync(int page, int byteOffset, ReadOnlyMemory<byte> rgb565, CancellationToken cancellationToken)
+    {
+        if (connection() is { } c)
+            await c.SendAsync(new Frame(page, byteOffset, rgb565.ToArray()), cancellationToken);
+    }
+
+    public async ValueTask ShowAsync(int page, Transition transition, CancellationToken cancellationToken)
+    {
+        if (connection() is { } c)
+            await c.SendAsync(new ShowPage(page, transition), cancellationToken);
+    }
+}

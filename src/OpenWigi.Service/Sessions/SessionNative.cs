@@ -35,6 +35,14 @@ internal static class SessionNative
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetNamedPipeClientProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientProcessId);
 
+    /// <summary>
+    /// Sessão do cliente direto do pipe. Não precisa abrir o processo do cliente, o que o serviço
+    /// rodando como LocalService não tem permissão de fazer com processos de outros usuários.
+    /// </summary>
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetNamedPipeClientSessionId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientSessionId);
+
     public static bool IsActive(int sessionId)
     {
         if (!WTSQuerySessionInformationW(0, sessionId, WTSConnectState, out var buffer, out _))

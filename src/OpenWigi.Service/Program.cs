@@ -19,6 +19,9 @@ builder.Configuration.AddCommandLine(args);
 builder.Services.Configure<ServiceOptions>(builder.Configuration.GetSection(ServiceOptions.Section));
 
 builder.Services.AddWindowsService(o => o.ServiceName = "OpenWigiDash");
+// A origem do Log de Eventos é criada pelo setup (precisa de admin). Sem isto o provider tentaria
+// usar o nome do executável, que não existe, e os logs sumiriam em silêncio.
+builder.Services.Configure<Microsoft.Extensions.Logging.EventLog.EventLogSettings>(s => s.SourceName = "OpenWigiDash");
 builder.Services.AddSingleton<WtsSessionMonitor>();
 builder.Services.AddSingleton<ISessionMonitor>(sp => sp.GetRequiredService<WtsSessionMonitor>());
 if (WindowsServiceHelpers.IsWindowsService())

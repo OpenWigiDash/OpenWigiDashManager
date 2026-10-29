@@ -18,7 +18,10 @@ O plano e as fases estão nos [milestones](../../milestones). O protocolo USB es
 | `src/OpenWigi.Cli` | `owd`, ferramenta de diagnóstico |
 | `src/OpenWigi.Ipc` | Mensagens e canal (named pipe) entre o serviço e os agentes |
 | `src/OpenWigi.Service` | Serviço Windows dono do USB; decide qual sessão desenha ([docs/multiusuario.md](docs/multiusuario.md)) |
-| `src/OpenWigi.Agent` | Agente mínimo por usuário (fase 3); vira a UI WPF + Blazor na fase 5 |
+| `src/OpenWigi.Sdk` | Contrato dos widgets (.NET 10), ver [docs/sdk.md](docs/sdk.md) |
+| `src/OpenWigi.Host` | Host de plugins: carrega widgets, layout, compositor e roteamento de toques ([docs/host.md](docs/host.md)) |
+| `src/OpenWigi.Agent` | Agente por usuário: roda o host quando tem a tela; vira a UI WPF + Blazor na fase 5 |
+| `samples/OpenWigi.Samples.Clock` | Widgets de exemplo: relógio e contador com long-press |
 | `tests/OpenWigi.Device.Tests` | Testes do protocolo e dos gestos, com transporte e relógio falsos |
 | `tests/OpenWigi.Service.Tests` | Testes da política de posse, do broker e do canal IPC |
 

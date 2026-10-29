@@ -45,10 +45,10 @@ public sealed class AgentServer(SessionBroker broker, TimeProvider time, ILogger
     private async Task ServeAsync(NamedPipeServerStream pipe, CancellationToken stoppingToken)
     {
         await using var connection = new IpcConnection(pipe);
-        if (!SessionNative.GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid)
-            || !SessionNative.ProcessIdToSessionId(pid, out var sessionId))
+        if (!SessionNative.GetNamedPipeClientSessionId(pipe.SafePipeHandle, out var sessionId))
         {
-            logger.LogWarning("Agente sem sessão identificável; conexão recusada");
+            logger.LogWarning("Agente sem sessão identificável (erro {Error}); conexão recusada",
+                System.Runtime.InteropServices.Marshal.GetLastPInvokeError());
             return;
         }
 
