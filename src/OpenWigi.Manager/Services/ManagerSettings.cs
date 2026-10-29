@@ -16,7 +16,7 @@ public sealed class ManagerSettings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash", "manager.json");
     private Stored _stored;
 
-    private sealed record Stored(bool DarkMode = true);
+    private sealed record Stored(bool DarkMode = true, int? Brightness = null);
 
     public ManagerSettings()
     {
@@ -38,6 +38,22 @@ public sealed class ManagerSettings
             _stored = _stored with { DarkMode = value };
             Save();
             Changed?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Brilho que este usuário escolheu, reaplicado sempre que a tela volta para ele. null = nunca mexeu,
+    /// fica o que o aparelho estiver usando.
+    /// </summary>
+    public int? Brightness
+    {
+        get => _stored.Brightness;
+        set
+        {
+            if (_stored.Brightness == value)
+                return;
+            _stored = _stored with { Brightness = value };
+            Save();
         }
     }
 

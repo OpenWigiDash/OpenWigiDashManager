@@ -51,6 +51,9 @@ public sealed record DeviceStatus(bool Connected, Guid DeviceId, string Firmware
 
 public sealed record Gesture(GestureEvent Event) : IpcMessage;
 
+/// <summary>Brilho atual do aparelho, lido dele. Vai ao agente quando ele ganha a posse.</summary>
+public sealed record BrightnessReport(int Percent) : IpcMessage;
+
 /// <summary>Cópia do que está na tela do aparelho: a página mostrada, em RGB565.</summary>
 public sealed record PreviewFrame(int Page, byte[] Pixels) : IpcMessage;
 

@@ -9,6 +9,7 @@ compatibilidade binária: plugin antigo precisa ser portado.
 |---|---|---|
 | `[assembly: OpenWigiWidget(typeof(X))]` | O host acha a entrada do plugin sem varrer o assembly | varredura por `IWidgetObject` |
 | `IWidget` + `WidgetManifest` | Ficha (id, nome, versão, tamanhos, tela cheia) e fábrica de instâncias | `IWidgetObject` / `IWidgetBase` |
+| `IWidget.GetPreviewAsync` | Ícone do widget no assistente "Adicionar widget", pedido no menor tamanho suportado; sem ele o manager usa um genérico | `WidgetThumbnail` |
 | `IWidgetInstance` | Widget na tela: quadros, toques, repouso, tela cheia, ações, remoção | `IWidgetInstance` + `WithRemoval` + `WithFullscreen` |
 | `IWidgetContext` | O que o host oferece a uma instância | `IWidgetManager` (global) |
 | `WidgetSettingsComponent<T>` | Tela de configurações em Razor (MudBlazor) | `UserControl` WPF |

@@ -24,6 +24,23 @@ public sealed class ClockWidget : IWidget
         SupportedSizes = [WidgetSize.Wide, WidgetSize.Small, WidgetSize.Large],
     };
 
+    private WidgetTheme _theme = new();
+
+    public ValueTask LoadAsync(IWidgetHost host, CancellationToken cancellationToken)
+    {
+        _theme = host.Theme;
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Ícone do catálogo: um relógio parado. O Contador não tem e ganha o ícone genérico.</summary>
+    public ValueTask<WidgetFrame?> GetPreviewAsync(WidgetSize size, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<WidgetFrame?>(Painter.Paint(size.PixelSize, _theme, (g, pixels) =>
+        {
+            using var font = new Font(_theme.PrimaryFontFamily, pixels.Height * 0.42f, FontStyle.Bold, GraphicsUnit.Pixel);
+            using var center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString("12:00", font, Brushes.White, new RectangleF(0, 0, pixels.Width, pixels.Height), center);
+        }));
+
     public ValueTask<IWidgetInstance> CreateInstanceAsync(IWidgetContext context, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IWidgetInstance>(new ClockInstance(context));
 }

@@ -27,13 +27,25 @@
                         var w = widget;
                         <MudItem xs="12" sm="6">
                             <MudCard Outlined="true" Class="owd-pick" @onclick="() => Pick(w)">
-                                <MudCardContent>
+                                <MudCardContent Class="d-flex gap-3">
+                                    <div class="owd-pick-icon">
+                                        @if (_icons.GetValueOrDefault(w.Manifest.Id) is { } icon)
+                                        {
+                                            <img src="@icon" alt="" />
+                                        }
+                                        else
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Color="Color.Secondary" />
+                                        }
+                                    </div>
+                                    <div>
                                     <MudText Typo="Typo.subtitle1">@w.Manifest.Name</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">@(w.Manifest.Description ?? "Sem descrição")</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
                                         @(w.Manifest.Author is { } author ? $"{author} · " : "")v@(w.Manifest.Version) ·
                                         @w.Manifest.SupportedSizes.Count tamanho(s)
                                     </MudText>
+                                    </div>
                                 </MudCardContent>
                             </MudCard>
                         </MudItem>
@@ -112,6 +124,22 @@
     [Parameter, EditorRequired] public IReadOnlyList<OpenWigi.Host.Plugins.LoadedWidget> Widgets { get; set; } = [];
     [Parameter, EditorRequired] public LayoutPage Page { get; set; } = default!;
     [Parameter] public Func<Guid, string?> NameOf { get; set; } = _ => null;
+
+    /// <summary>Ícone de cada widget, como data URL; null = o genérico.</summary>
+    [Parameter] public Func<Guid, Task<string?>> IconOf { get; set; } = _ => Task.FromResult<string?>(null);
+
+    private readonly Dictionary<Guid, string> _icons = [];
+
+    // Os cartões aparecem logo; cada ícone entra quando o plugin entrega a prévia.
+    protected override async Task OnInitializedAsync()
+    {
+        foreach (var widget in Widgets)
+            if (await IconOf(widget.Manifest.Id) is { } icon)
+            {
+                _icons[widget.Manifest.Id] = icon;
+                StateHasChanged();
+            }
+    }
 
     /// <summary>O que o assistente devolve ao fechar com "Adicionar".</summary>
     public sealed record Choice(Guid WidgetId, WidgetSize Size, int Column, int Row);
