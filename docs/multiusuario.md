@@ -25,9 +25,26 @@ Named pipe `\\.\pipe\OpenWigiDash.v1`, aberto para usuários autenticados da má
 pela rede. A sessão do agente é descoberta pelo processo do outro lado do pipe, não pelo que ele
 declara. Formato das mensagens em `src/OpenWigi.Ipc/IpcConnection.cs`.
 
+## Serviço de desenvolvimento (admin uma vez só)
+
+`scripts\Setup-DevService.ps1`, uma vez num PowerShell como administrador:
+
+- cria `C:\OpenWigiDash\dev-service` com escrita para o seu usuário;
+- registra o serviço `OpenWigiDash` rodando como **LocalService**, uma conta sem privilégios, porque a pasta é gravável;
+- dá ao seu usuário o direito de iniciar e parar o serviço;
+- registra a origem `OpenWigiDash` no Log de Eventos.
+
+Depois, sem admin, `scripts\Deploy-DevService.ps1 [-AllowRemoteSessions] [-StopOfficial]` publica,
+para o serviço, troca os arquivos e inicia de novo. Os ajustes da máquina ficam em
+`appsettings.local.json` na pasta do serviço. Os logs vão para o Log de Eventos, em Aplicativo,
+origem `OpenWigiDash`.
+
+`scripts\Install-Service.ps1` continua existindo para instalar como LocalSystem em Program Files,
+mais perto do que o instalador vai fazer. Mas cada atualização com ele pede admin.
+
 ## Testar a troca de usuário
 
-1. PowerShell como administrador: `scripts\Install-Service.ps1 -StopOfficial`.
+1. Serviço instalado (acima) e atualizado: `scripts\Deploy-DevService.ps1 -StopOfficial`.
 2. No seu usuário: `dotnet run --project src\OpenWigi.Agent`. A tela fica com a sua cor e o seu nome.
 3. Win+L: a tela vira o relógio "Sessão bloqueada". Desbloqueie: volta a sua tela.
 4. Troque de usuário (sem sair do seu) e rode o agente no outro usuário: a tela muda de cor e de nome.
