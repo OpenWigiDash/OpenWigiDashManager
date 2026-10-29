@@ -72,6 +72,11 @@ O host nunca chama dois métodos da mesma instância ao mesmo tempo. Todos os ga
 `WidgetSettingsComponent<MinhaInstancia>`. O host renderiza com o parâmetro `Instance` e o
 `IWidgetContext` em cascata, já com MudBlazor carregado e com o tema do manager.
 
+O plugin não declara tema: os componentes Mud herdam as cores do manager e trocam entre claro e
+escuro junto com ele. Para seguir o tema, monte a tela com componentes Mud e, em CSS próprio, use as
+variáveis `--mud-palette-*` (ex.: `var(--mud-palette-text-secondary)`) no lugar de cores fixas.
+`WidgetTheme` (em `IWidgetContext.Theme`) é outra coisa: as cores para desenhar no visor do aparelho.
+
 ## Assemblies compartilhados
 
 O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Components*`,
