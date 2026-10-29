@@ -240,6 +240,21 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Catalogo_usa_a_previa_do_plugin_como_icone()
+    {
+        var host = await StartAsync();
+
+        var clock = await host.GetCatalogIconAsync(Clock);
+        Assert.NotNull(clock);
+        Assert.Equal(WidgetSize.Small.PixelSize, clock.Size);
+        Assert.Same(clock, await host.GetCatalogIconAsync(Clock));
+
+        // O contador não implementa GetPreviewAsync: a UI mostra o ícone genérico.
+        Assert.Null(await host.GetCatalogIconAsync(Counter));
+        Assert.Null(await host.GetCatalogIconAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task Tela_de_configuracoes_do_plugin_chega_ao_manager()
     {
         var host = await StartAsync();

@@ -37,6 +37,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     private readonly PluginCatalog _catalog;
     private readonly LayoutStore _store;
     private readonly Dictionary<Guid, WidgetRuntime> _runtimes = [];
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, Task<WidgetFrame?>> _icons = [];
     private readonly SemaphoreSlim _state = new(1, 1);
     private readonly CancellationTokenSource _stopping = new();
     private DashboardLayout _layout = new();
@@ -58,6 +59,30 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
     public IReadOnlyList<LoadedWidget> AvailableWidgets => _catalog.Widgets;
     public IReadOnlyList<PluginLoadError> PluginErrors => _catalog.Errors;
+
+    /// <summary>
+    /// Ícone do catálogo: a prévia do plugin no menor tamanho que ele suporta, pedida uma vez.
+    /// <c>null</c> = o plugin não tem prévia (ou ela falhou) e a UI usa um ícone genérico.
+    /// </summary>
+    public Task<WidgetFrame?> GetCatalogIconAsync(Guid widgetId) =>
+        _icons.GetOrAdd(widgetId, LoadCatalogIconAsync);
+
+    private async Task<WidgetFrame?> LoadCatalogIconAsync(Guid widgetId)
+    {
+        if (_catalog.Find(widgetId) is not { } widget)
+            return null;
+        var size = widget.Manifest.SupportedSizes.MinBy(s => s.Columns * s.Rows);
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            return await widget.Widget.GetPreviewAsync(size, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Prévia de {Name} falhou; o catálogo usa o ícone genérico", widget.Manifest.Name);
+            return null;
+        }
+    }
     public DashboardLayout Layout => _layout;
     public int CurrentPage { get; private set; }
 
