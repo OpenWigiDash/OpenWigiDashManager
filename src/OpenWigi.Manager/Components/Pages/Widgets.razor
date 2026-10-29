@@ -61,11 +61,22 @@
     <MudGrid>
         <MudItem xs="12" md="8">
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-1">
-                @* O nome da página é o próprio título: clicar e digitar renomeia. @key troca o campo junto com a página. *@
-                <MudTextField T="string" @key="_page" Value="CurrentPage?.Name" ValueChanged="RenamePage" DebounceInterval="400"
-                              Error="@(_pageNameError is not null)" ErrorText="@_pageNameError"
-                              Variant="Variant.Text" Underline="false" Class="owd-page-title" Placeholder="Nome da página"
-                              title="Clique para renomear a página" />
+                @* Nome da página: texto com caneta. Duplo clique ou a caneta abrem o campo; Enter ou ✓ salvam, Esc ou ✕ cancelam. *@
+                @if (_pageNameDraft is null)
+                {
+                    <div class="owd-page-title" title="Duplo clique para renomear" @ondblclick="StartRename">
+                        <MudText Typo="Typo.h6">@CurrentPage?.Name</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="StartRename" aria-label="Renomear página" />
+                    </div>
+                }
+                else
+                {
+                    <MudTextField T="string" @bind-Value="_pageNameDraft" Immediate="true" AutoFocus="true" OnKeyDown="PageNameKey"
+                                  Error="@(_pageNameError is not null)" ErrorText="@_pageNameError" Label="Nome da página"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="owd-page-title-edit" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Primary" Size="Size.Small" OnClick="SaveRename" aria-label="Salvar nome" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="CancelRename" aria-label="Cancelar" />
+                }
                 <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text" Size="Size.Small"
                            Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
                     Excluir página vazia
@@ -234,14 +245,14 @@
     {
         if (Selected is null)
             _selected = null;
-        _pageNameError = null;
+        CancelRename();
         StateHasChanged();
     });
 
     private async Task SelectPage(int page)
     {
         _selected = null;
-        _pageNameError = null;
+        CancelRename();
         await Dashboard.GoToPageAsync(page, OpenWigi.Device.Protocol.Transition.None);
     }
 
@@ -467,17 +478,42 @@
         await Dashboard.RemovePageAsync(_page);
     }
 
+    // Nome em edição; null = mostrando o título.
+    private string? _pageNameDraft;
     private string? _pageNameError;
 
-    // Nome vazio ou de outra página não grava: o campo mostra o motivo e fica com o texto para corrigir.
-    private async Task RenamePage(string name)
+    private void StartRename()
     {
+        _pageNameDraft = CurrentPage?.Name ?? string.Empty;
+        _pageNameError = null;
+    }
+
+    private void CancelRename()
+    {
+        _pageNameDraft = null;
+        _pageNameError = null;
+    }
+
+    // Nome vazio ou de outra página não grava: o campo fica aberto com o motivo para corrigir.
+    private async Task SaveRename()
+    {
+        var name = _pageNameDraft ?? string.Empty;
         if (string.IsNullOrWhiteSpace(name))
             _pageNameError = "A página precisa de um nome";
         else if (Dashboard.IsPageNameTaken(name, _page))
             _pageNameError = "Já existe uma página com esse nome";
+        else if (name.Trim() == CurrentPage?.Name || await Dashboard.RenamePageAsync(_page, name))
+            CancelRename();
         else
-            _pageNameError = await Dashboard.RenamePageAsync(_page, name) ? null : "Não deu para renomear";
+            _pageNameError = "Não deu para renomear";
+    }
+
+    private async Task PageNameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SaveRename();
+        else if (e.Key == "Escape")
+            CancelRename();
     }
 
     // Delete com um widget selecionado = "Tirar" (com a mesma confirmação).
