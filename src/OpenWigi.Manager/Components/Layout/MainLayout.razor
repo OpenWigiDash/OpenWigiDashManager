@@ -1,0 +1,56 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ManagerSettings Settings
+@inject AgentClient Agent
+@inject NavigationManager Navigation
+
+<MudThemeProvider Theme="_theme" IsDarkMode="Settings.DarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Dense="true">
+        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Color="Color.Primary" Class="mr-3" />
+        <MudText Typo="Typo.h6">OpenWigiDash Manager</MudText>
+        <MudSpacer />
+        <StatusChip />
+    </MudAppBar>
+    <MudDrawer Open="true" Variant="DrawerVariant.Persistent" Elevation="0" ClipMode="DrawerClipMode.Always">
+        <MudNavMenu Class="mt-2">
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Monitor">Painel</MudNavLink>
+            <MudNavLink Href="/widgets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Widgets e páginas</MudNavLink>
+            <MudNavLink Href="/ajustes" Icon="@Icons.Material.Filled.Tune">Ajustes</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private readonly MudTheme _theme = OpenWigi.Manager.Theming.OpenWigiDashTheme.Create();
+
+    protected override void OnInitialized()
+    {
+        Settings.Changed += Refresh;
+        Settings.NavigationRequested += Navigate;
+        if (Settings.PendingRoute is { } route)
+        {
+            Settings.PendingRoute = null;
+            Navigation.NavigateTo(route);
+        }
+    }
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    private void Navigate(string route) => InvokeAsync(() => Navigation.NavigateTo(route));
+
+    public void Dispose()
+    {
+        Settings.Changed -= Refresh;
+        Settings.NavigationRequested -= Navigate;
+    }
+}

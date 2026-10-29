@@ -1,0 +1,38 @@
+@page "/ajustes"
+@inject ManagerSettings Settings
+@inject AgentClient Agent
+
+<MudStack Spacing="4" Style="max-width: 720px">
+    <MudText Typo="Typo.h5">Ajustes</MudText>
+
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.overline" Color="Color.Secondary">Aparelho</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">Brilho da tela agora (não fica gravado no aparelho).</MudText>
+        <MudSlider T="int" Value="_brightness" ValueChanged="SetBrightness" Min="5" Max="100" Step="5"
+                   Disabled="@(Agent.Status != AgentStatus.Owner)" Color="Color.Primary">@_brightness%</MudSlider>
+        @if (Agent.Status != AgentStatus.Owner)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Disponível quando a tela estiver com você.</MudText>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.overline" Color="Color.Secondary">Este usuário</MudText>
+        <MudSwitch T="bool" Value="Settings.StartWithWindows" ValueChanged="v => Settings.StartWithWindows = v" Color="Color.Primary">
+            Abrir o OpenWigiDash ao entrar no Windows (no tray)
+        </MudSwitch>
+        <MudSwitch T="bool" Value="Settings.DarkMode" ValueChanged="v => Settings.DarkMode = v" Color="Color.Primary">
+            Tema escuro
+        </MudSwitch>
+    </MudPaper>
+</MudStack>
+
+@code {
+    private int _brightness = 100;
+
+    private async Task SetBrightness(int value)
+    {
+        _brightness = value;
+        await Agent.SendAsync(new OpenWigi.Ipc.SetBrightness(value));
+    }
+}

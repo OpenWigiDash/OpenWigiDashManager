@@ -1,0 +1,174 @@
+@page "/widgets"
+@implements IDisposable
+@inject AgentClient Agent
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudStack Spacing="4">
+    <div>
+        <MudText Typo="Typo.h5">Widgets e páginas</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
+        </MudText>
+    </div>
+
+    @if (Dashboard.PluginErrors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">
+            @Dashboard.PluginErrors.Count plugin(s) não carregaram:
+            @string.Join("; ", Dashboard.PluginErrors.Select(e => $"{System.IO.Path.GetFileName(e.PluginDirectory)}: {e.Reason}"))
+        </MudAlert>
+    }
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+        <MudChipSet T="int" SelectedValue="_page" SelectedValueChanged="SelectPage" SelectionMode="SelectionMode.SingleSelection" CheckMark="false">
+            @for (var i = 0; i < Dashboard.Layout.Pages.Count; i++)
+            {
+                var index = i;
+                <MudChip T="int" Value="index" Color="Color.Primary" Variant="Variant.Outlined">@Dashboard.Layout.Pages[index].Name</MudChip>
+            }
+        </MudChipSet>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="AddPage">Nova página</MudButton>
+        <MudSpacer />
+        <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
+        <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text"
+                   Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
+            Excluir página vazia
+        </MudButton>
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <div class="owd-grid">
+                @foreach (var cell in FreeCells())
+                {
+                    <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
+                         @onclick="() => MoveSelectedTo(cell.Column, cell.Row)"></div>
+                }
+                @foreach (var placement in CurrentPage?.Widgets ?? [])
+                {
+                    var p = placement;
+                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "")"
+                         style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
+                         @onclick="() => _selected = p.InstanceId">
+                        <MudText Typo="Typo.subtitle2">@(Dashboard.NameOf(p.InstanceId) ?? "Widget não instalado")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Size</MudText>
+                    </div>
+                }
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                Com um widget selecionado, clique numa célula vazia para movê-lo para lá.
+            </MudText>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            @if (Selected is { } selected)
+            {
+                <MudPaper Class="pa-4 mb-4" Outlined="true">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
+                    <MudText Typo="Typo.h6">@(Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Coluna @(selected.Column + 1), linha @(selected.Row + 1), tamanho @selected.Size</MudText>
+                    <MudStack Row="true" Class="mt-3">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings"
+                                   Disabled="@(Dashboard.GetSettings(selected.InstanceId) is null)"
+                                   OnClick="@(() => Navigation.NavigateTo($"/widgets/{selected.InstanceId}"))">Configurar</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Adicionar nesta página</MudText>
+                @if (Dashboard.AvailableWidgets.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Nenhum widget instalado. Copie a pasta do plugin para %LOCALAPPDATA%\OpenWigiDash\Widgets e reabra o manager.
+                    </MudText>
+                }
+                <MudList T="string" Dense="true">
+                    @foreach (var widget in Dashboard.AvailableWidgets)
+                    {
+                        var w = widget;
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.Widgets" OnClick="() => Add(w.Manifest.Id)">
+                            <MudText Typo="Typo.body2">@w.Manifest.Name</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @string.Join(", ", w.Manifest.SupportedSizes) · v@(w.Manifest.Version)
+                            </MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private int _page;
+    private Guid? _selected;
+
+    private DashboardHost Dashboard => Agent.Dashboard;
+    private LayoutPage? CurrentPage => Dashboard.Layout.Pages.ElementAtOrDefault(_page);
+    private WidgetPlacement? Selected => CurrentPage?.Widgets.FirstOrDefault(w => w.InstanceId == _selected);
+
+    protected override void OnInitialized()
+    {
+        _page = Dashboard.CurrentPage;
+        Dashboard.LayoutChanged += Refresh;
+    }
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    private async Task SelectPage(int page)
+    {
+        _page = page;
+        _selected = null;
+        await Dashboard.GoToPageAsync(page, OpenWigi.Device.Protocol.Transition.None);
+    }
+
+    private IEnumerable<(int Column, int Row)> FreeCells()
+    {
+        for (var row = 0; row < WidgetGrid.Rows; row++)
+            for (var column = 0; column < WidgetGrid.Columns; column++)
+                if (CurrentPage is null || !CurrentPage.Widgets.Any(w => w.Overlaps(column, row, WidgetSize.Small)))
+                    yield return (column, row);
+    }
+
+    private async Task Add(Guid widgetId)
+    {
+        var id = await Dashboard.AddWidgetAsync(widgetId, _page);
+        if (id is null)
+            Snackbar.Add("Não há espaço livre nesta página para esse tamanho.", Severity.Warning);
+        _selected = id;
+    }
+
+    private async Task Remove(Guid instanceId)
+    {
+        await Dashboard.RemoveWidgetAsync(instanceId);
+        _selected = null;
+    }
+
+    private async Task MoveSelectedTo(int column, int row)
+    {
+        if (_selected is { } id && !await Dashboard.MoveWidgetAsync(id, column, row))
+            Snackbar.Add("O widget não cabe a partir dessa célula.", Severity.Warning);
+    }
+
+    private async Task AddPage() =>
+        await SelectPage(await Dashboard.AddPageAsync($"Página {Dashboard.Layout.Pages.Count + 1}"));
+
+    private async Task RemovePage()
+    {
+        if (await Dashboard.RemovePageAsync(_page))
+            _page = Math.Min(_page, Dashboard.Layout.Pages.Count - 1);
+    }
+
+    private async Task RenamePage(string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+            await Dashboard.RenamePageAsync(_page, name.Trim());
+    }
+
+    public void Dispose() => Dashboard.LayoutChanged -= Refresh;
+}

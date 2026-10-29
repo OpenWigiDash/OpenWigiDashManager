@@ -163,6 +163,167 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         await target.CallAsync($"OnTouchAsync({kind})", (i, ct) => i.OnTouchAsync(touch, ct), cancellationToken);
     }
 
+    /// <summary>O layout mudou (widget adicionado, removido, movido; página nova). Para a UI se atualizar.</summary>
+    public event Action? LayoutChanged;
+
+    public bool IsActive => _active;
+
+    /// <summary>Nome do widget de uma instância do layout, ou null se o plugin não está instalado.</summary>
+    public string? NameOf(Guid instanceId) => _runtimes.GetValueOrDefault(instanceId)?.Name;
+
+    /// <summary>Tela de configurações da instância (componente Razor do plugin), se houver.</summary>
+    public (Type Component, IWidgetInstance Instance, IWidgetContext Context)? GetSettings(Guid instanceId) =>
+        _runtimes.GetValueOrDefault(instanceId) is { Instance: { SettingsComponent: { } type } instance } runtime
+            ? (type, instance, runtime.Context)
+            : null;
+
+    /// <summary>Põe um widget na primeira posição livre da página. Devolve o id da instância, ou null se não coube.</summary>
+    public async Task<Guid?> AddWidgetAsync(Guid widgetId, int page, WidgetSize? size = null, CancellationToken cancellationToken = default)
+    {
+        if (_catalog.Find(widgetId) is not { } widget || page < 0 || page >= _layout.Pages.Count)
+            return null;
+        var chosen = size is { } s && widget.Manifest.SupportedSizes.Contains(s) ? s : widget.Manifest.SupportedSizes[0];
+
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (_layout.Pages[page].FindFreeCell(chosen) is not { } cell)
+                return null;
+            var placement = new WidgetPlacement { WidgetId = widgetId, Column = cell.Column, Row = cell.Row, Size = chosen };
+            _layout.Pages[page].Widgets.Add(placement);
+            await CreateRuntimeAsync(placement, cancellationToken);
+            if (_runtimes.TryGetValue(placement.InstanceId, out var runtime))
+            {
+                var visible = _active && page == CurrentPage && _fullscreen is null;
+                runtime.Context.IsAsleep = !visible;
+                runtime.LastFrame = await runtime.RenderAsync(RenderReason.Initial, cancellationToken);
+                if (visible)
+                    await runtime.CallAsync("OnWakeAsync", (i, ct) => i.OnWakeAsync(ct), cancellationToken);
+                else
+                    await runtime.CallAsync("OnSleepAsync", (i, ct) => i.OnSleepAsync(ct), cancellationToken);
+            }
+            await CommitLayoutAsync(page, cancellationToken);
+            return placement.InstanceId;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>Tira o widget do layout: o plugin recebe OnRemovedAsync e os dados da instância são apagados.</summary>
+    public async Task RemoveWidgetAsync(Guid instanceId, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var page = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == instanceId));
+            if (page < 0)
+                return;
+            _layout.Pages[page].Widgets.RemoveAll(w => w.InstanceId == instanceId);
+            if (_runtimes.Remove(instanceId, out var runtime))
+            {
+                if (ReferenceEquals(_fullscreen, runtime))
+                    _fullscreen = null;
+                if (ReferenceEquals(_pressTarget, runtime))
+                    _pressTarget = null;
+                await runtime.CallAsync("OnRemovedAsync", (i, ct) => i.OnRemovedAsync(ct), cancellationToken);
+                await runtime.DisposeAsync();
+                runtime.Context.Storage.DeleteAll();
+            }
+            await CommitLayoutAsync(page, cancellationToken);
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>Move o widget para outra célula da mesma página. False se não couber ali.</summary>
+    public async Task<bool> MoveWidgetAsync(Guid instanceId, int column, int row, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var page = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == instanceId));
+            if (page < 0)
+                return false;
+            var placement = _layout.Pages[page].Widgets.First(w => w.InstanceId == instanceId);
+            if (column < 0 || row < 0 || column + placement.Size.Columns > WidgetGrid.Columns || row + placement.Size.Rows > WidgetGrid.Rows)
+                return false;
+            if (_layout.Pages[page].Widgets.Any(w => w != placement && w.Overlaps(column, row, placement.Size)))
+                return false;
+            placement.Column = column;
+            placement.Row = row;
+            await CommitLayoutAsync(page, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    public async Task<int> AddPageAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            _layout.Pages.Add(new LayoutPage { Name = name });
+            await CommitLayoutAsync(-1, cancellationToken);
+            return _layout.Pages.Count - 1;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>Remove uma página vazia (precisa sobrar pelo menos uma).</summary>
+    public async Task<bool> RemovePageAsync(int page, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (_layout.Pages.Count <= 1 || page < 0 || page >= _layout.Pages.Count || _layout.Pages[page].Widgets.Count > 0)
+                return false;
+            _layout.Pages.RemoveAt(page);
+            if (CurrentPage >= _layout.Pages.Count)
+                CurrentPage = _layout.Pages.Count - 1;
+            await CommitLayoutAsync(CurrentPage, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    public async Task RenamePageAsync(int page, string name, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (page < 0 || page >= _layout.Pages.Count)
+                return;
+            _layout.Pages[page].Name = name;
+            await CommitLayoutAsync(-1, cancellationToken);
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    // Grava o layout e, se a página mexida está na tela, redesenha.
+    private async Task CommitLayoutAsync(int changedPage, CancellationToken cancellationToken)
+    {
+        _store.Save(_layout);
+        if (_active && (changedPage == CurrentPage || changedPage < 0 && CurrentPage >= _layout.Pages.Count))
+            await ShowCurrentAsync(Transition.None, cancellationToken);
+        LayoutChanged?.Invoke();
+    }
+
     public async ValueTask DisposeAsync()
     {
         _stopping.Cancel();

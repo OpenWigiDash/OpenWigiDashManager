@@ -172,6 +172,44 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Editar_o_layout_grava_e_respeita_a_grade()
+    {
+        var host = await StartAsync();
+        var changes = 0;
+        host.LayoutChanged += () => changes++;
+
+        var added = await host.AddWidgetAsync(Counter, 0);
+        Assert.NotNull(added);
+        Assert.True(await host.MoveWidgetAsync(added.Value, 4, 3));
+        Assert.False(await host.MoveWidgetAsync(added.Value, 0, 0)); // ocupado pelo relógio
+        Assert.False(await host.MoveWidgetAsync(added.Value, 5, 0)); // fora da grade
+
+        await host.RemoveWidgetAsync(added.Value);
+        Assert.DoesNotContain(host.Layout.AllPlacements, p => p.InstanceId == added.Value);
+        Assert.False(Directory.Exists(Path.Combine(Data, "instances", added.Value.ToString("D"))));
+
+        var page = await host.AddPageAsync("Jogos");
+        await host.RenamePageAsync(page, "Música");
+        Assert.Equal("Música", new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[page].Name);
+        Assert.True(await host.RemovePageAsync(page));
+        Assert.False(await host.RemovePageAsync(0)); // página com widgets não sai
+        Assert.True(changes >= 6);
+    }
+
+    [Fact]
+    public async Task Tela_de_configuracoes_do_plugin_chega_ao_manager()
+    {
+        var host = await StartAsync();
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).InstanceId;
+        var clock = host.Layout.AllPlacements.Single(p => p.WidgetId == Clock).InstanceId;
+
+        var settings = host.GetSettings(counter);
+        Assert.NotNull(settings);
+        Assert.Equal("CounterSettings", settings.Value.Component.Name);
+        Assert.Null(host.GetSettings(clock));
+    }
+
+    [Fact]
     public void Plugin_sem_dll_de_entrada_vira_erro_e_nao_derruba_o_resto()
     {
         var broken = Path.Combine(Plugins, "Quebrado");

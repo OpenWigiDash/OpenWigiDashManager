@@ -1,0 +1,36 @@
+@implements IDisposable
+@inject AgentClient Agent
+
+<MudTooltip Text="@Agent.Reason">
+    <MudChip T="string" Size="Size.Small" Color="@ChipColor" Variant="Variant.Outlined" Icon="@ChipIcon">@Label</MudChip>
+</MudTooltip>
+
+@code {
+    private string Label => Agent.Status switch
+    {
+        AgentStatus.Owner => "Mostrando o seu painel",
+        AgentStatus.Waiting => "Tela em outra sessão",
+        AgentStatus.NoDevice => "Aparelho desconectado",
+        _ => "Serviço não encontrado",
+    };
+
+    private Color ChipColor => Agent.Status switch
+    {
+        AgentStatus.Owner => Color.Success,
+        AgentStatus.Waiting => Color.Secondary,
+        _ => Color.Warning,
+    };
+
+    private string ChipIcon => Agent.Status switch
+    {
+        AgentStatus.Owner => Icons.Material.Filled.CheckCircle,
+        AgentStatus.Waiting => Icons.Material.Filled.PauseCircle,
+        _ => Icons.Material.Filled.Warning,
+    };
+
+    protected override void OnInitialized() => Agent.Changed += Refresh;
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Agent.Changed -= Refresh;
+}
