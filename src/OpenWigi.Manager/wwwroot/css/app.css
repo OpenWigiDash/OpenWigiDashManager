@@ -269,8 +269,9 @@ html, body {
     transition: border-color 120ms ease;
 }
 
-.owd-page-thumb:hover {
-    border-color: #e5243b;
+/* Hover só clareia a borda: vermelho é só da selecionada, para nunca parecer que há duas. */
+.owd-page-thumb:hover:not(.selected) {
+    border-color: var(--mud-palette-text-secondary);
 }
 
 .owd-page-thumb.selected {

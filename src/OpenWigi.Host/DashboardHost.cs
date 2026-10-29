@@ -108,6 +108,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     {
         await _catalog.LoadAllAsync(_options.PluginsDirectory, this, cancellationToken);
         _layout = _store.Load();
+        if (FixDuplicatePageNames())
+            _store.Save(_layout);
         if (!_layout.AllPlacements.Any() && _catalog.Widgets.Count > 0)
             PlaceDefaults();
 
@@ -421,12 +423,14 @@ public event Action? LayoutChanged;
         }
     }
 
-    public async Task<int> AddPageAsync(string name, CancellationToken cancellationToken = default)
+    /// <summary>Nova página. Sem nome (ou com um já usado), ganha o primeiro "Página N" livre.</summary>
+    public async Task<int> AddPageAsync(string? name = null, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);
         try
         {
-            _layout.Pages.Add(new LayoutPage { Name = name });
+            name = name?.Trim();
+            _layout.Pages.Add(new LayoutPage { Name = string.IsNullOrEmpty(name) ? NextPageName() : UniquePageName(name) });
             await CommitLayoutAsync(-1, cancellationToken);
             return _layout.Pages.Count - 1;
         }
@@ -456,20 +460,60 @@ public event Action? LayoutChanged;
         }
     }
 
-    public async Task RenamePageAsync(int page, string name, CancellationToken cancellationToken = default)
+    /// <summary>Renomeia. Recusa (false) nome vazio ou já usado por outra página: não existem duas com o mesmo nome.</summary>
+    public async Task<bool> RenamePageAsync(int page, string name, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);
         try
         {
-            if (page < 0 || page >= _layout.Pages.Count)
-                return;
+            name = name.Trim();
+            if (page < 0 || page >= _layout.Pages.Count || name.Length == 0 || IsPageNameTaken(name, page))
+                return false;
             _layout.Pages[page].Name = name;
             await CommitLayoutAsync(-1, cancellationToken);
+            return true;
         }
         finally
         {
             _state.Release();
         }
+    }
+
+    public bool IsPageNameTaken(string name, int exceptPage = -1) =>
+        _layout.Pages.Where((_, i) => i != exceptPage).Any(p => string.Equals(p.Name.Trim(), name.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+    private string NextPageName()
+    {
+        for (var n = 1; ; n++)
+            if (!IsPageNameTaken($"Página {n}"))
+                return $"Página {n}";
+    }
+
+    private string UniquePageName(string name, int exceptPage = -1)
+    {
+        if (!IsPageNameTaken(name, exceptPage))
+            return name;
+        for (var n = 2; ; n++)
+            if (!IsPageNameTaken($"{name} {n}", exceptPage))
+                return $"{name} {n}";
+    }
+
+    // Layouts antigos podem ter nomes repetidos (o "Nova página" de antes gerava): a segunda em diante ganha número.
+    private bool FixDuplicatePageNames()
+    {
+        var changed = false;
+        for (var i = 1; i < _layout.Pages.Count; i++)
+        {
+            var page = _layout.Pages[i];
+            if (_layout.Pages.Take(i).Any(p => string.Equals(p.Name.Trim(), page.Name.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            {
+                var unique = UniquePageName(page.Name.Trim(), i);
+                _logger.LogInformation("Página repetida \"{Name}\" renomeada para \"{Unique}\"", page.Name, unique);
+                page.Name = unique;
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     // Grava o layout e avisa a UI na hora. O redesenho do aparelho (página inteira pelo USB) vai em

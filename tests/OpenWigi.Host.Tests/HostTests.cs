@@ -262,6 +262,29 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Null(host.FrameOf(Guid.NewGuid()));
     }
 
+[Fact]
+    public async Task Paginas_nunca_tem_nome_repetido()
+    {
+        // Layout antigo com nome repetido: ao carregar, a segunda ganha número.
+        Directory.CreateDirectory(Data);
+        new LayoutStore(Path.Combine(Data, "layout.json")).Save(new DashboardLayout
+        {
+            Pages = [new LayoutPage { Name = "Página 1" }, new LayoutPage { Name = "Página 3" }, new LayoutPage { Name = "página 3" }],
+        });
+        var host = await StartAsync();
+        Assert.Equal(["Página 1", "Página 3", "página 3 2"], host.Layout.Pages.Select(p => p.Name));
+
+        // Nova página sem nome pega o primeiro "Página N" livre; com nome usado, ganha número.
+        Assert.Equal("Página 2", host.Layout.Pages[await host.AddPageAsync()].Name);
+        Assert.Equal("Página 1 2", host.Layout.Pages[await host.AddPageAsync("Página 1")].Name);
+
+        // Renomear para o nome de outra (sem diferenciar maiúsculas) é recusado; para o próprio, não.
+        Assert.False(await host.RenamePageAsync(0, " página 3 "));
+        Assert.Equal("Página 1", host.Layout.Pages[0].Name);
+        Assert.True(await host.RenamePageAsync(0, "PÁGINA 1"));
+        Assert.False(await host.RenamePageAsync(0, "  "));
+    }
+
     [Fact]
     public async Task Catalogo_usa_a_previa_do_plugin_como_icone()
     {
