@@ -40,7 +40,7 @@
 
     <MudGrid>
         <MudItem xs="12" md="8">
-            <div class="owd-grid">
+            <div class="owd-grid @(_dragging is null ? "" : "dragging")">
                 @foreach (var cell in FreeCells())
                 {
                     <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
@@ -49,16 +49,44 @@
                 @foreach (var placement in CurrentPage?.Widgets ?? [])
                 {
                     var p = placement;
-                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "")"
+                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
                          style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
+                         draggable="true" @ondragstart="() => StartDrag(p)" @ondragend="EndDrag"
                          @onclick="() => _selected = p.InstanceId">
+                        @* Sub-grade invisível: diz em qual célula do widget a pessoa pegou, para o encaixe seguir o mouse. *@
+                        <div class="owd-grab" style="grid-template-columns: repeat(@p.Size.Columns, 1fr); grid-template-rows: repeat(@p.Size.Rows, 1fr)">
+                            @for (var i = 0; i < p.Size.Columns * p.Size.Rows; i++)
+                            {
+                                var dc = i % p.Size.Columns;
+                                var dr = i / p.Size.Columns;
+                                <div @onpointerdown="() => _grab = (dc, dr)"></div>
+                            }
+                        </div>
                         <MudText Typo="Typo.subtitle2">@(Dashboard.NameOf(p.InstanceId) ?? "Widget não instalado")</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Size</MudText>
                     </div>
                 }
+
+                @if (_dragging is { } dragged)
+                {
+                    if (_hover is { } target)
+                    {
+                        <div class="owd-drop @(Fits(dragged, target) ? "ok" : "bad")"
+                             style="grid-column: @(Math.Max(0, target.Column) + 1) / span @dragged.Size.Columns; grid-row: @(Math.Max(0, target.Row) + 1) / span @dragged.Size.Rows"></div>
+                    }
+                    @* Camada de alvos por cima de tudo enquanto arrasta: cada célula diz onde o widget cairia. *@
+                    @for (var i = 0; i < WidgetGrid.Columns * WidgetGrid.Rows; i++)
+                    {
+                        var column = i % WidgetGrid.Columns;
+                        var row = i / WidgetGrid.Columns;
+                        <div class="owd-drop-target" style="grid-column: @(column + 1); grid-row: @(row + 1)"
+                             @ondragenter="() => Hover(column, row)" @ondragover:preventDefault="true"
+                             @ondrop="Drop" @ondrop:preventDefault="true"></div>
+                    }
+                }
             </div>
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
-                Com um widget selecionado, clique numa célula vazia para movê-lo para lá.
+                Arraste um widget para outra posição: a área verde mostra onde ele encaixa (vermelha = não cabe).
             </MudText>
         </MudItem>
 
@@ -147,6 +175,41 @@
     {
         await Dashboard.RemoveWidgetAsync(instanceId);
         _selected = null;
+    }
+
+    // --- arrastar
+
+    private WidgetPlacement? _dragging;
+    private (int Column, int Row) _grab;
+    private (int Column, int Row)? _hover;
+
+    private void StartDrag(WidgetPlacement placement)
+    {
+        _dragging = placement;
+        _selected = placement.InstanceId;
+        _hover = (placement.Column, placement.Row);
+    }
+
+    private void EndDrag()
+    {
+        _dragging = null;
+        _hover = null;
+    }
+
+    // A célula sob o mouse menos a célula do widget onde a pessoa pegou = canto do encaixe.
+    private void Hover(int column, int row) => _hover = (column - _grab.Column, row - _grab.Row);
+
+    private bool Fits(WidgetPlacement placement, (int Column, int Row) at) =>
+        at.Column >= 0 && at.Row >= 0 &&
+        at.Column + placement.Size.Columns <= WidgetGrid.Columns && at.Row + placement.Size.Rows <= WidgetGrid.Rows &&
+        CurrentPage?.Widgets.Any(w => w != placement && w.Overlaps(at.Column, at.Row, placement.Size)) != true;
+
+    private async Task Drop()
+    {
+        if (_dragging is { } placement && _hover is { } at && Fits(placement, at)
+            && (at.Column, at.Row) != (placement.Column, placement.Row))
+            await Dashboard.MoveWidgetAsync(placement.InstanceId, at.Column, at.Row);
+        EndDrag();
     }
 
     private async Task MoveSelectedTo(int column, int row)

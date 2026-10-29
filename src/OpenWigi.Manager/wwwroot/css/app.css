@@ -82,6 +82,66 @@ html, body {
     cursor: pointer;
 }
 
+.owd-widget {
+    position: relative;
+    user-select: none;
+    transition: opacity 120ms ease;
+}
+
+.owd-widget[draggable="true"] {
+    cursor: grab;
+}
+
+/* O widget arrastado fica translúcido no lugar de origem. */
+.owd-widget.ghost {
+    opacity: 0.35;
+}
+
+/* Por cima do texto do widget (transparente), para o pointerdown cair numa das células. */
+.owd-grab {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    z-index: 1;
+}
+
+.owd-grid {
+    position: relative;
+}
+
+/* Alvos invisíveis por cima de tudo enquanto arrasta. */
+.owd-drop-target {
+    z-index: 3;
+}
+
+.owd-grid.dragging .owd-cell-empty {
+    border-color: #3a3e4a;
+}
+
+/* Prévia do encaixe: do tamanho do widget, pulsando. */
+.owd-drop {
+    z-index: 2;
+    pointer-events: none;
+    border-radius: 6px;
+    border: 2px dashed;
+    animation: owd-pulse 900ms ease-in-out infinite alternate;
+}
+
+.owd-drop.ok {
+    border-color: #3dd68c;
+    background: rgba(61, 214, 140, 0.18);
+}
+
+.owd-drop.bad {
+    border-color: #ff6b57;
+    background: rgba(255, 107, 87, 0.16);
+}
+
+@keyframes owd-pulse {
+    from { opacity: 0.65; }
+    to { opacity: 1; }
+}
+
 .owd-widget.selected {
     border-color: #e5243b;
     box-shadow: 0 0 0 1px #e5243b;

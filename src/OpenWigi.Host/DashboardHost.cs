@@ -315,13 +315,36 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
 
-    // Grava o layout e, se a página mexida está na tela, redesenha.
-    private async Task CommitLayoutAsync(int changedPage, CancellationToken cancellationToken)
+    // Grava o layout e avisa a UI na hora. O redesenho do aparelho (página inteira pelo USB) vai em
+    // segundo plano: quem editou não espera por ele, e edições seguidas viram um redesenho só.
+    private Task CommitLayoutAsync(int changedPage, CancellationToken cancellationToken)
     {
         _store.Save(_layout);
-        if (_active && (changedPage == CurrentPage || changedPage < 0 && CurrentPage >= _layout.Pages.Count))
-            await ShowCurrentAsync(Transition.None, cancellationToken);
         LayoutChanged?.Invoke();
+        if (_active && changedPage == CurrentPage && Interlocked.Exchange(ref _redrawPending, 1) == 0)
+            _ = Task.Run(() => RedrawAsync(_stopping.Token), CancellationToken.None);
+        return Task.CompletedTask;
+    }
+
+    private int _redrawPending;
+
+    private async Task RedrawAsync(CancellationToken cancellationToken)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            Interlocked.Exchange(ref _redrawPending, 0);
+            if (_active)
+                await ShowCurrentAsync(Transition.None, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException)
+        {
+            _logger.LogDebug("Redesenho depois de editar o layout falhou: {Message}", ex.Message);
+        }
+        finally
+        {
+            _state.Release();
+        }
     }
 
     public async ValueTask DisposeAsync()
