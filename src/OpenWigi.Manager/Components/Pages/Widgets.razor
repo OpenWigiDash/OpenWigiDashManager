@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IDialogService Dialogs
 
 <MudStack Spacing="4">
     <div>
@@ -30,6 +31,9 @@
             }
         </MudChipSet>
         <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="AddPage">Nova página</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
+            Adicionar widget
+        </MudButton>
         <MudSpacer />
         <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
                       Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
@@ -43,7 +47,7 @@
         <MudItem xs="12" md="8">
             @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
                de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
-            <div class="owd-grid @(_dragging is null ? "" : "dragging")" @ref="_grid"
+            <div class="owd-grid @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
                  @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                 @foreach (var cell in FreeCells())
                 {
@@ -57,8 +61,23 @@
                          style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
                          @onpointerdown="e => Press(p, e)"
                          @onclick="() => _selected = p.InstanceId">
-                        <MudText Typo="Typo.subtitle2">@(Dashboard.NameOf(p.InstanceId) ?? "Widget não instalado")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Size</MudText>
+                        <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
+                        @if (SizesOf(p.WidgetId).Count > 1)
+                        {
+                            @* Alça do canto: puxar redimensiona, como uma janela. *@
+                            <div class="owd-resize" title="Arraste para mudar o tamanho"
+                                 @onpointerdown="e => StartResize(p, e)" @onpointerdown:stopPropagation="true"
+                                 @onclick:stopPropagation="true"></div>
+                        }
+                    </div>
+                }
+
+                @if (_resizing is { } resized && _resizeTo is { } newSize)
+                {
+                    <div class="owd-drop @(ResizeAllowed(resized, newSize) ? "ok" : "bad")"
+                         style="grid-column: @(resized.Column + 1) / span @newSize.Columns; grid-row: @(resized.Row + 1) / span @newSize.Rows">
+                        <span class="owd-drop-label">@newSize</span>
                     </div>
                 }
 
@@ -74,7 +93,8 @@
                 }
             </div>
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
-                Arraste um widget para outra posição: a área verde mostra onde ele encaixa (vermelha = não cabe).
+                Arraste um widget para outra posição, ou puxe o canto inferior direito para mudar o tamanho:
+                a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
             </MudText>
         </MudItem>
 
@@ -83,8 +103,26 @@
             {
                 <MudPaper Class="pa-4 mb-4" Outlined="true">
                     <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
-                    <MudText Typo="Typo.h6">@(Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado")</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Coluna @(selected.Column + 1), linha @(selected.Row + 1), tamanho @selected.Size</MudText>
+                    @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@
+                    <MudTextField T="string" @key="selected.InstanceId" Value="@Dashboard.DisplayNameOf(selected.InstanceId)"
+                                  ValueChanged="name => Dashboard.RenameWidgetAsync(selected.InstanceId, name)" DebounceInterval="500"
+                                  Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1"
+                                  HelperText="@($"{Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado"} · coluna {selected.Column + 1}, linha {selected.Row + 1}, {selected.Size}")" />
+                    @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
+                    {
+                        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var size in sizes)
+                            {
+                                var s = size;
+                                var fits = FitsAt(selected, selected.Column, selected.Row, s);
+                                <MudChip T="string" Size="Size.Small" Variant="@(s == selected.Size ? Variant.Filled : Variant.Outlined)"
+                                         Color="@(s == selected.Size ? Color.Primary : Color.Default)" Disabled="@(!fits && s != selected.Size)"
+                                         OnClick="() => Resize(selected.InstanceId, s)">@s</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
+                    }
                     <MudStack Row="true" Class="mt-3">
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings"
                                    Disabled="@(Dashboard.GetSettings(selected.InstanceId) is null)"
@@ -95,27 +133,15 @@
                 </MudPaper>
             }
 
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudText Typo="Typo.overline" Color="Color.Secondary">Adicionar nesta página</MudText>
-                @if (Dashboard.AvailableWidgets.Count == 0)
-                {
+            else
+            {
+                <MudPaper Class="pa-4" Outlined="true">
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Nenhum widget instalado. Copie a pasta do plugin para %LOCALAPPDATA%\OpenWigiDash\Widgets e reabra o manager.
+                        Clique num widget da grade para configurar, mudar o tamanho ou tirar.
+                        Para pôr um novo, use "Adicionar widget".
                     </MudText>
-                }
-                <MudList T="string" Dense="true">
-                    @foreach (var widget in Dashboard.AvailableWidgets)
-                    {
-                        var w = widget;
-                        <MudListItem T="string" Icon="@Icons.Material.Filled.Widgets" OnClick="() => Add(w.Manifest.Id)">
-                            <MudText Typo="Typo.body2">@w.Manifest.Name</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @string.Join(", ", w.Manifest.SupportedSizes) · v@(w.Manifest.Version)
-                            </MudText>
-                        </MudListItem>
-                    }
-                </MudList>
-            </MudPaper>
+                </MudPaper>
+            }
         </MudItem>
     </MudGrid>
 </MudStack>
@@ -151,16 +177,49 @@
                     yield return (column, row);
     }
 
-    private async Task Add(Guid widgetId)
+    private async Task OpenAddWidget()
     {
-        var id = await Dashboard.AddWidgetAsync(widgetId, _page);
-        if (id is null)
-            Snackbar.Add("Não há espaço livre nesta página para esse tamanho.", Severity.Warning);
-        _selected = id;
+        if (CurrentPage is not { } page)
+            return;
+        var parameters = new DialogParameters<AddWidgetDialog>
+        {
+            { d => d.Widgets, Dashboard.AvailableWidgets },
+            { d => d.Page, page },
+            { d => d.NameOf, id => Dashboard.DisplayNameOf(id) },
+        };
+        var dialog = await Dialogs.ShowAsync<AddWidgetDialog>("Adicionar widget", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true });
+        if (await dialog.Result is { Canceled: false, Data: AddWidgetDialog.Choice choice })
+        {
+            var id = await Dashboard.AddWidgetAsync(choice.WidgetId, _page, choice.Size, at: (choice.Column, choice.Row));
+            if (id is null)
+                Snackbar.Add("O widget não coube no lugar escolhido.", Severity.Warning);
+            _selected = id;
+        }
     }
 
+    private IReadOnlyList<WidgetSize> SizesOf(Guid widgetId) =>
+        Dashboard.AvailableWidgets.FirstOrDefault(w => w.Manifest.Id == widgetId)?.Manifest.SupportedSizes ?? [];
+
+    private bool FitsAt(WidgetPlacement placement, int column, int row, WidgetSize size) =>
+        column + size.Columns <= WidgetGrid.Columns && row + size.Rows <= WidgetGrid.Rows &&
+        CurrentPage?.Widgets.Any(w => w != placement && w.Overlaps(column, row, size)) != true;
+
+    private async Task Resize(Guid instanceId, WidgetSize size)
+    {
+        if (!await Dashboard.ResizeWidgetAsync(instanceId, size))
+            Snackbar.Add("Esse tamanho não cabe a partir da posição atual.", Severity.Warning);
+    }
+
+    // Tirar apaga as configurações e os arquivos da instância: sempre pergunta antes.
     private async Task Remove(Guid instanceId)
     {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Tirar widget",
+            $"Tirar \"{Dashboard.DisplayNameOf(instanceId)}\" desta página? As configurações dele serão apagadas.",
+            yesText: "Tirar", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
         await Dashboard.RemoveWidgetAsync(instanceId);
         _selected = null;
     }
@@ -195,9 +254,56 @@
         _render = false;
     }
 
+    // --- redimensionar pela alça do canto
+
+    private WidgetPlacement? _resizing;
+    private WidgetSize? _resizeTo;
+
+    private async Task StartResize(WidgetPlacement placement, PointerEventArgs e)
+    {
+        if (e.Button != 0)
+            return;
+        _gridRect = await JS.InvokeAsync<double[]>("owd.rect", _grid);
+        _resizing = placement;
+        _resizeTo = placement.Size;
+        _selected = placement.InstanceId;
+    }
+
+    // O canto vai até a célula sob o ponteiro; o tamanho é contado a partir do canto superior esquerdo.
+    private void ResizeMove(PointerEventArgs e)
+    {
+        var placement = _resizing!;
+        var (column, row) = CellAt(e.ClientX, e.ClientY);
+        var size = new WidgetSize(Math.Max(1, column - placement.Column + 1), Math.Max(1, row - placement.Row + 1));
+        _render = _resizeTo != size;
+        _resizeTo = size;
+    }
+
+    private bool ResizeAllowed(WidgetPlacement placement, WidgetSize size) =>
+        SizesOf(placement.WidgetId).Contains(size) && FitsAt(placement, placement.Column, placement.Row, size);
+
+    private async Task ResizeRelease()
+    {
+        var (placement, size) = (_resizing!, _resizeTo);
+        _resizing = null;
+        _resizeTo = null;
+        if (size is { } s && s != placement.Size)
+        {
+            if (ResizeAllowed(placement, s))
+                await Dashboard.ResizeWidgetAsync(placement.InstanceId, s);
+            else
+                Snackbar.Add($"O widget não tem o tamanho {s} ou ele não cabe ali.", Severity.Warning);
+        }
+    }
+
     private void Move(PointerEventArgs e)
     {
         _render = false;
+        if (_resizing is not null)
+        {
+            ResizeMove(e);
+            return;
+        }
         if (_pressed is null)
             return;
 
@@ -224,6 +330,11 @@
 
     private async Task Release(PointerEventArgs e)
     {
+        if (_resizing is not null)
+        {
+            await ResizeRelease();
+            return;
+        }
         var wasDragging = _dragging is not null;
         await Drop();
         _pressed = null;
@@ -232,7 +343,9 @@
 
     private void Cancel()
     {
-        _render = _dragging is not null;
+        _render = _dragging is not null || _resizing is not null;
+        _resizing = null;
+        _resizeTo = null;
         _pressed = null;
         EndDrag();
     }

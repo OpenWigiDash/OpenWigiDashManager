@@ -33,13 +33,18 @@ public sealed class WidgetPlacement
 {
     public Guid InstanceId { get; set; } = Guid.NewGuid();
     public Guid WidgetId { get; set; }
+
+    /// <summary>Nome desta instância, para distinguir dois do mesmo widget. Vazio = o nome do widget.</summary>
+    public string? Name { get; set; }
+
     public int Column { get; set; }
     public int Row { get; set; }
 
     [JsonConverter(typeof(WidgetSizeJsonConverter))]
     public WidgetSize Size { get; set; } = WidgetSize.Small;
 
-    /// <summary>Retângulo na tela, em pixels.</summary>
+    /// <summary>Retângulo na tela, em pixels. Calculado: não vai para o layout.json.</summary>
+    [JsonIgnore]
     public PixelRect Bounds
     {
         get
@@ -90,3 +95,4 @@ public sealed class LayoutStore(string path)
         File.Move(temp, Path, overwrite: true);
     }
 }
+

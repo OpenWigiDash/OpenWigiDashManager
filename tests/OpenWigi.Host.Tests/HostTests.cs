@@ -197,6 +197,49 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Redimensionar_recria_a_instancia_e_mantem_as_configuracoes()
+    {
+        var host = await StartAsync();
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var id = counter.InstanceId;
+        await host.ActivateAsync(true);
+        var bounds = counter.Bounds;
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, bounds.X + 5, bounds.Y + 5, TimeSpan.Zero)); // conta 1
+
+        Assert.False(await host.ResizeWidgetAsync(id, WidgetSize.Large)); // contador não suporta 2x2
+        var free = host.Layout.Pages[0].FindFreeCell(WidgetSize.Wide)!.Value;
+        Assert.True(await host.MoveWidgetAsync(id, free.Column, free.Row));
+        Assert.True(await host.ResizeWidgetAsync(id, WidgetSize.Wide));
+
+        var resized = host.Layout.AllPlacements.Single(p => p.InstanceId == id);
+        Assert.Equal(WidgetSize.Wide, resized.Size);
+        var settings = Directory.GetFiles(Path.Combine(Data, "instances", id.ToString("D")), "settings.json");
+        Assert.Contains("\"value\": \"1\"", File.ReadAllText(Assert.Single(settings)));
+        Assert.Equal(WidgetSize.Wide.PixelSize, host.GetSettings(id)!.Value.Context.PixelSize);
+    }
+
+    [Fact]
+    public async Task Instancias_do_mesmo_widget_ganham_nomes_distintos_e_editaveis()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Outra");
+        var first = await host.AddWidgetAsync(Counter, page);
+        var second = await host.AddWidgetAsync(Counter, page);
+
+        // A primeira execução já pôs um contador no layout: estes são o 2 e o 3.
+        Assert.Equal("Contador (exemplo) 2", host.DisplayNameOf(first!.Value));
+        Assert.Equal("Contador (exemplo) 3", host.DisplayNameOf(second!.Value));
+
+        await host.RenameWidgetAsync(second.Value, "  Contador do café ");
+        Assert.Equal("Contador do café", host.DisplayNameOf(second.Value));
+        Assert.Equal("Contador do café", new LayoutStore(Path.Combine(Data, "layout.json")).Load()
+            .AllPlacements.Single(p => p.InstanceId == second.Value).Name);
+
+        await host.RenameWidgetAsync(second.Value, "");
+        Assert.Equal("Contador (exemplo)", host.DisplayNameOf(second.Value));
+    }
+
+    [Fact]
     public async Task Tela_de_configuracoes_do_plugin_chega_ao_manager()
     {
         var host = await StartAsync();

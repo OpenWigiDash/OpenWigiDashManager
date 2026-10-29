@@ -168,8 +168,45 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
     public bool IsActive => _active;
 
-    /// <summary>Nome do widget de uma instância do layout, ou null se o plugin não está instalado.</summary>
+    /// <summary>Nome do widget (o tipo) de uma instância do layout, ou null se o plugin não está instalado.</summary>
     public string? NameOf(Guid instanceId) => _runtimes.GetValueOrDefault(instanceId)?.Name;
+
+    /// <summary>Nome que a pessoa vê: o da instância, ou o do widget se ela não deu um.</summary>
+    public string DisplayNameOf(Guid instanceId)
+    {
+        var placement = _layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId);
+        return placement?.Name is { Length: > 0 } name ? name
+            : NameOf(instanceId) ?? _catalog.Find(placement?.WidgetId ?? Guid.Empty)?.Manifest.Name ?? "Widget não instalado";
+    }
+
+    /// <summary>Muda o nome da instância (vazio volta ao nome do widget).</summary>
+    public async Task RenameWidgetAsync(Guid instanceId, string? name, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (_layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId) is not { } placement)
+                return;
+            placement.Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+            _store.Save(_layout);
+            LayoutChanged?.Invoke();
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    // "Relógio", e se já houver um, "Relógio 2", "Relógio 3"...
+    private string SuggestName(string widgetName)
+    {
+        var used = _layout.AllPlacements.Select(p => DisplayNameOf(p.InstanceId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!used.Contains(widgetName))
+            return widgetName;
+        for (var n = 2; ; n++)
+            if (!used.Contains($"{widgetName} {n}"))
+                return $"{widgetName} {n}";
+    }
 
     /// <summary>Tela de configurações da instância (componente Razor do plugin), se houver.</summary>
     public (Type Component, IWidgetInstance Instance, IWidgetContext Context)? GetSettings(Guid instanceId) =>
@@ -177,8 +214,12 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             ? (type, instance, runtime.Context)
             : null;
 
-    /// <summary>Põe um widget na primeira posição livre da página. Devolve o id da instância, ou null se não coube.</summary>
-    public async Task<Guid?> AddWidgetAsync(Guid widgetId, int page, WidgetSize? size = null, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Põe um widget na página, em <paramref name="at"/> ou, sem posição, na primeira livre. Devolve o id
+    /// da instância, ou null se não coube.
+    /// </summary>
+    public async Task<Guid?> AddWidgetAsync(Guid widgetId, int page, WidgetSize? size = null, CancellationToken cancellationToken = default,
+        (int Column, int Row)? at = null)
     {
         if (_catalog.Find(widgetId) is not { } widget || page < 0 || page >= _layout.Pages.Count)
             return null;
@@ -187,9 +228,21 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         await _state.WaitAsync(cancellationToken);
         try
         {
-            if (_layout.Pages[page].FindFreeCell(chosen) is not { } cell)
+            var target = _layout.Pages[page];
+            (int Column, int Row)? cell = at is { } p
+                ? p.Column >= 0 && p.Row >= 0 && p.Column + chosen.Columns <= WidgetGrid.Columns && p.Row + chosen.Rows <= WidgetGrid.Rows
+                  && !target.Widgets.Any(w => w.Overlaps(p.Column, p.Row, chosen)) ? p : null
+                : target.FindFreeCell(chosen);
+            if (cell is not { } free)
                 return null;
-            var placement = new WidgetPlacement { WidgetId = widgetId, Column = cell.Column, Row = cell.Row, Size = chosen };
+            var placement = new WidgetPlacement
+            {
+                WidgetId = widgetId,
+                Name = SuggestName(widget.Manifest.Name),
+                Column = free.Column,
+                Row = free.Row,
+                Size = chosen,
+            };
             _layout.Pages[page].Widgets.Add(placement);
             await CreateRuntimeAsync(placement, cancellationToken);
             if (_runtimes.TryGetValue(placement.InstanceId, out var runtime))
@@ -255,6 +308,59 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
                 return false;
             placement.Column = column;
             placement.Row = row;
+            await CommitLayoutAsync(page, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>
+    /// Muda o tamanho de um widget no lugar onde ele está. A instância é recriada no tamanho novo
+    /// (o contrato fixa o tamanho por instância), mas mantém o id, as configurações e os arquivos.
+    /// False se o widget não suporta o tamanho ou se ele não cabe ali.
+    /// </summary>
+    public async Task<bool> ResizeWidgetAsync(Guid instanceId, WidgetSize size, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var page = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == instanceId));
+            if (page < 0)
+                return false;
+            var placement = _layout.Pages[page].Widgets.First(w => w.InstanceId == instanceId);
+            if (placement.Size == size)
+                return true;
+            if (_catalog.Find(placement.WidgetId) is not { } widget || !widget.Manifest.SupportedSizes.Contains(size))
+                return false;
+            if (placement.Column + size.Columns > WidgetGrid.Columns || placement.Row + size.Rows > WidgetGrid.Rows)
+                return false;
+            if (_layout.Pages[page].Widgets.Any(w => w != placement && w.Overlaps(placement.Column, placement.Row, size)))
+                return false;
+
+            if (_runtimes.Remove(instanceId, out var old))
+            {
+                if (ReferenceEquals(_fullscreen, old))
+                    _fullscreen = null;
+                if (ReferenceEquals(_pressTarget, old))
+                    _pressTarget = null;
+                await old.DisposeAsync(); // sem OnRemovedAsync: os dados da instância ficam
+            }
+
+            placement.Size = size;
+            await CreateRuntimeAsync(placement, cancellationToken);
+            if (_runtimes.TryGetValue(instanceId, out var runtime))
+            {
+                var visible = _active && page == CurrentPage && _fullscreen is null;
+                runtime.Context.IsAsleep = !visible;
+                runtime.LastFrame = await runtime.RenderAsync(RenderReason.Initial, cancellationToken);
+                if (visible)
+                    await runtime.CallAsync("OnWakeAsync", (i, ct) => i.OnWakeAsync(ct), cancellationToken);
+                else
+                    await runtime.CallAsync("OnSleepAsync", (i, ct) => i.OnSleepAsync(ct), cancellationToken);
+            }
             await CommitLayoutAsync(page, cancellationToken);
             return true;
         }
