@@ -49,7 +49,9 @@ $acl = Get-Acl $ServiceDir
 $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
 $none = [Security.AccessControl.PropagationFlags]::None
 $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($User, 'Modify', $inherit, $none, 'Allow')))
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule('NT AUTHORITY\LOCAL SERVICE', 'ReadAndExecute', $inherit, $none, 'Allow')))
+# Pelo SID (S-1-5-19): o nome da conta muda com o idioma do Windows ("AUTORIDADE NT\SERVIÇO LOCAL").
+$localService = New-Object Security.Principal.SecurityIdentifier('S-1-5-19')
+$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($localService, 'ReadAndExecute', $inherit, $none, 'Allow')))
 Set-Acl $ServiceDir $acl
 
 # Um executável provisório: o serviço só precisa existir; o deploy de dev põe o real.
