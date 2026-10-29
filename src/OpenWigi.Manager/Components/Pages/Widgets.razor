@@ -3,6 +3,7 @@
 @inject AgentClient Agent
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <MudStack Spacing="4">
     <div>
@@ -40,7 +41,10 @@
 
     <MudGrid>
         <MudItem xs="12" md="8">
-            <div class="owd-grid">
+            @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
+               de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
+            <div class="owd-grid @(_dragging is null ? "" : "dragging")" @ref="_grid"
+                 @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                 @foreach (var cell in FreeCells())
                 {
                     <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
@@ -49,16 +53,28 @@
                 @foreach (var placement in CurrentPage?.Widgets ?? [])
                 {
                     var p = placement;
-                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "")"
+                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
                          style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
+                         @onpointerdown="e => Press(p, e)"
                          @onclick="() => _selected = p.InstanceId">
                         <MudText Typo="Typo.subtitle2">@(Dashboard.NameOf(p.InstanceId) ?? "Widget não instalado")</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Size</MudText>
                     </div>
                 }
+
+                @if (_dragging is { } dragged)
+                {
+                    if (_hover is { } target)
+                    {
+                        var c = Math.Clamp(target.Column, 0, WidgetGrid.Columns - dragged.Size.Columns);
+                        var r = Math.Clamp(target.Row, 0, WidgetGrid.Rows - dragged.Size.Rows);
+                        <div class="owd-drop @(Fits(dragged, target) ? "ok" : "bad")"
+                             style="grid-column: @(c + 1) / span @dragged.Size.Columns; grid-row: @(r + 1) / span @dragged.Size.Rows"></div>
+                    }
+                }
             </div>
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
-                Com um widget selecionado, clique numa célula vazia para movê-lo para lá.
+                Arraste um widget para outra posição: a área verde mostra onde ele encaixa (vermelha = não cabe).
             </MudText>
         </MudItem>
 
@@ -147,6 +163,104 @@
     {
         await Dashboard.RemoveWidgetAsync(instanceId);
         _selected = null;
+    }
+
+    // --- arrastar
+
+    private const double DragThreshold = 6; // px antes de virar arraste; menos que isso é clique
+    private ElementReference _grid;
+    private WidgetPlacement? _pressed;
+    private WidgetPlacement? _dragging;
+    private (double X, double Y) _pressAt;
+    private double[] _gridRect = [0, 0, 1, 1];
+    private (int Column, int Row) _grab;
+    private (int Column, int Row)? _hover;
+    private bool _render = true;
+
+    // Só redesenha quando algo visível mudou (o pointermove chega muitas vezes por segundo).
+    protected override bool ShouldRender()
+    {
+        var render = _render;
+        _render = true;
+        return render;
+    }
+
+    private async Task Press(WidgetPlacement placement, PointerEventArgs e)
+    {
+        if (e.Button != 0)
+            return;
+        _pressed = placement;
+        _pressAt = (e.ClientX, e.ClientY);
+        _gridRect = await JS.InvokeAsync<double[]>("owd.rect", _grid);
+        _render = false;
+    }
+
+    private void Move(PointerEventArgs e)
+    {
+        _render = false;
+        if (_pressed is null)
+            return;
+
+        if (_dragging is null)
+        {
+            if (Math.Abs(e.ClientX - _pressAt.X) < DragThreshold && Math.Abs(e.ClientY - _pressAt.Y) < DragThreshold)
+                return;
+            _dragging = _pressed;
+            _selected = _pressed.InstanceId;
+            var (pressColumn, pressRow) = CellAt(_pressAt.X, _pressAt.Y);
+            _grab = (pressColumn - _pressed.Column, pressRow - _pressed.Row);
+            _render = true;
+        }
+
+        // A célula sob o mouse menos a célula do widget onde a pessoa pegou = canto do encaixe.
+        var (column, row) = CellAt(e.ClientX, e.ClientY);
+        var hover = (column - _grab.Column, row - _grab.Row);
+        if (_hover != hover)
+        {
+            _hover = hover;
+            _render = true;
+        }
+    }
+
+    private async Task Release(PointerEventArgs e)
+    {
+        var wasDragging = _dragging is not null;
+        await Drop();
+        _pressed = null;
+        _render = wasDragging;
+    }
+
+    private void Cancel()
+    {
+        _render = _dragging is not null;
+        _pressed = null;
+        EndDrag();
+    }
+
+    private (int Column, int Row) CellAt(double clientX, double clientY)
+    {
+        var (x, y, width, height) = (_gridRect[0], _gridRect[1], Math.Max(1, _gridRect[2]), Math.Max(1, _gridRect[3]));
+        return (Math.Clamp((int)((clientX - x) / (width / WidgetGrid.Columns)), 0, WidgetGrid.Columns - 1),
+            Math.Clamp((int)((clientY - y) / (height / WidgetGrid.Rows)), 0, WidgetGrid.Rows - 1));
+    }
+
+    private void EndDrag()
+    {
+        _dragging = null;
+        _hover = null;
+    }
+
+    private bool Fits(WidgetPlacement placement, (int Column, int Row) at) =>
+        at.Column >= 0 && at.Row >= 0 &&
+        at.Column + placement.Size.Columns <= WidgetGrid.Columns && at.Row + placement.Size.Rows <= WidgetGrid.Rows &&
+        CurrentPage?.Widgets.Any(w => w != placement && w.Overlaps(at.Column, at.Row, placement.Size)) != true;
+
+    private async Task Drop()
+    {
+        if (_dragging is { } placement && _hover is { } at && Fits(placement, at)
+            && (at.Column, at.Row) != (placement.Column, placement.Row))
+            await Dashboard.MoveWidgetAsync(placement.InstanceId, at.Column, at.Row);
+        EndDrag();
     }
 
     private async Task MoveSelectedTo(int column, int row)

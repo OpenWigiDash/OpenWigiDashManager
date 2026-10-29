@@ -429,3 +429,5 @@ FodyWeavers.xsd
 
 # Saída das checagens no aparelho (scripts/Test-Device.ps1)
 .diagnostics/
+
+tests/ui/node_modules/
