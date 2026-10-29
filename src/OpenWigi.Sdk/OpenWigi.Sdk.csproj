@@ -12,8 +12,12 @@
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <PackageId>OpenWigi.Sdk</PackageId>
-    <Version>2.0.0-alpha.1</Version>
+    <PackageId>victorperez2911.OpenWigi.Sdk</PackageId>
+    <!-- A versão publicada vem da tag sdk-vX.Y.Z (workflow sdk-publish.yml). -->
+    <Version>2.0.0-preview.1</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/victorperez2911/OpenWigiDashManager</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <Authors>Victor Perez</Authors>
     <Product>OpenWigiDashManager</Product>
     <Description>Contratos para escrever widgets do OpenWigiDashManager (.NET 10): widget, instância assíncrona que entrega quadros, toques ricos, contexto do host e tela de configurações em Razor.</Description>
@@ -30,7 +34,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\docs\sdk.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="OpenWigi.Sdk.Tests" />
   </ItemGroup>
 
 </Project>
+
