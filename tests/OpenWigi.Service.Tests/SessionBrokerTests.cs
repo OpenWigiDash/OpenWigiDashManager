@@ -41,6 +41,16 @@ public class SessionBrokerTests
     }
 
     [Fact]
+    public async Task Quem_ganha_a_posse_recebe_o_brilho_real_do_aparelho()
+    {
+        _sessions.Console = 1;
+        _display.Brightness = 50; // padrão de fábrica ao ligar
+        var (_, channel) = await ConnectAsync(1, "victor");
+
+        Assert.Equal(new BrightnessReport(50), Assert.Single(channel.Sent.OfType<BrightnessReport>()));
+    }
+
+    [Fact]
     public async Task Troca_de_usuario_avisa_os_dois_lados()
     {
         _sessions.Console = 1;
@@ -218,7 +228,15 @@ public class SessionBrokerTests
             return true;
         }
 
-        public bool SetBrightness(int percent) => true;
+        public int Brightness { get; set; } = 50;
+
+        public bool SetBrightness(int percent)
+        {
+            Brightness = percent;
+            return true;
+        }
+
+        public int? GetBrightness() => Brightness;
         public bool Wake() => true;
         public bool Sleep() => true;
 

@@ -130,6 +130,9 @@ public sealed class SessionBroker : BackgroundService
                 {
                     _logger.LogInformation("Posse do WigiDash: {Agent} ({Reason})", winner, decision.Reason);
                     await TrySendAsync(winner, new Ownership(true, decision.Reason), cancellationToken);
+                    // O aparelho liga no brilho padrão dele; o manager mostra o que está valendo, não o que supõe.
+                    if (_display.GetBrightness() is { } brightness)
+                        await TrySendAsync(winner, new BrightnessReport(brightness), cancellationToken);
                     _mirror.MarkDirty();
                 }
             }

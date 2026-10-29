@@ -1,5 +1,5 @@
 @page "/widgets"
-@implements IDisposable
+@implements IAsyncDisposable
 @inject AgentClient Agent
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
@@ -398,5 +398,40 @@
             await Dashboard.RenamePageAsync(_page, name.Trim());
     }
 
-    public void Dispose() => Dashboard.LayoutChanged -= Refresh;
+    // Delete com um widget selecionado = "Tirar" (com a mesma confirmação).
+    private DotNetObjectReference<Widgets>? _self;
+    private IJSObjectReference? _deleteKey;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _deleteKey = await JS.InvokeAsync<IJSObjectReference>("owd.onDeleteKey", _self);
+        }
+    }
+
+    [JSInvokable]
+    public async Task DeletePressed()
+    {
+        if (Selected is { } selected && _dragging is null)
+            await Remove(selected.InstanceId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Dashboard.LayoutChanged -= Refresh;
+        try
+        {
+            if (_deleteKey is not null)
+            {
+                await _deleteKey.InvokeVoidAsync("dispose");
+                await _deleteKey.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        _self?.Dispose();
+    }
 }

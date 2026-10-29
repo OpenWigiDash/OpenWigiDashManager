@@ -15,6 +15,9 @@ public interface IDisplay
     bool WriteFrame(int page, byte[] pixels, int byteOffset);
     bool ShowPage(int page, Transition transition);
     bool SetBrightness(int percent);
+
+    /// <summary>Brilho atual lido do aparelho; null se ele não está ligado.</summary>
+    int? GetBrightness();
     bool Wake();
     bool Sleep();
     bool InjectTouch(TouchContact contact, int x, int y);
@@ -41,6 +44,13 @@ internal sealed class DeviceHostDisplay(DeviceHost host) : IDisplay
 
     public bool ShowPage(int page, Transition transition) => host.TryUse(d => d.ShowPage(page, transition));
     public bool SetBrightness(int percent) => host.TryUse(d => d.SetBrightness(percent));
+
+    public int? GetBrightness()
+    {
+        int? percent = null;
+        return host.TryUse(d => percent = d.GetBrightness()) ? percent : null;
+    }
+
     public bool Wake() => host.TryUse(d => d.Wake());
     public bool Sleep() => host.TryUse(d => d.Sleep());
     public bool InjectTouch(TouchContact contact, int x, int y) => host.TryUse(d => d.InjectTouch(contact, x, y));
