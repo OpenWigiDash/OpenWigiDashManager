@@ -2,14 +2,21 @@
 @implements IDisposable
 @inject AgentClient Agent
 @inject IJSRuntime JS
+@inject ManagerSettings Settings
 
 <MudStack Spacing="4">
-    <div>
-        <MudText Typo="Typo.h5">Painel</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            O que está no WigiDash agora. Clique para tocar, segure para long-press e arraste para trocar de página.
-        </MudText>
-    </div>
+    <MudStack Row="true" AlignItems="AlignItems.Start">
+        <div>
+            <MudText Typo="Typo.h5">Painel</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                O que está no WigiDash agora. Clique para tocar, segure para long-press e arraste para trocar de página.
+            </MudText>
+        </div>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.OpenInNew" OnClick="Settings.RequestPreviewWindow">
+            Destacar prévia
+        </MudButton>
+    </MudStack>
 
     <MudGrid>
         <MudItem xs="12" md="8">

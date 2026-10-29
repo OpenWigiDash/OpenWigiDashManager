@@ -49,6 +49,7 @@ esconde; o painel continua rodando. Ele precisa do serviço `OpenWigiDash` rodan
 | `--tray` | Começa só no tray. É o que o "Abrir ao entrar no Windows" usa |
 | `--open /widgets` | Abre direto numa tela |
 | `--plugins <pasta>` | Pasta de plugins alternativa |
+| `--preview` | Abre a prévia destacada |
 
 As telas:
 - **Painel:** prévia ao vivo do aparelho. O mouse vira toque: clique, segurar e arrastar.

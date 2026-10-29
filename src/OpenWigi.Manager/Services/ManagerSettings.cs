@@ -65,6 +65,11 @@ public sealed class ManagerSettings
     /// <summary>O tray pediu para abrir numa tela específica.</summary>
     public event Action<string>? NavigationRequested;
 
+    /// <summary>A UI pediu a prévia numa janela própria (o app abre, na thread do WPF).</summary>
+    public event Action? PreviewDetachRequested;
+
+    public void RequestPreviewWindow() => PreviewDetachRequested?.Invoke();
+
     /// <summary>Rota pedida antes de a janela terminar de carregar; o layout consome ao iniciar.</summary>
     public string? PendingRoute { get; set; }
 

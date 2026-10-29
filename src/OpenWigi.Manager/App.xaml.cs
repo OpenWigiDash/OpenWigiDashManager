@@ -19,6 +19,7 @@ namespace OpenWigi.Manager;
 ///   --tray      começa só no ícone (é o que o início com o Windows usa)
 ///   --plugins   pasta de plugins alternativa
 ///   --open      abre a janela numa tela (ex.: /widgets)
+///   --preview   abre a prévia destacada
 /// </summary>
 public partial class App : System.Windows.Application
 {
@@ -50,12 +51,16 @@ public partial class App : System.Windows.Application
         await dashboard.StartAsync();
         agent.Start();
 
-        _tray = new TrayIcon(agent, a => Dispatcher.BeginInvoke(a), ShowMainWindow, () => ShowMainWindow("/"), ExitApp);
+        _services.GetRequiredService<ManagerSettings>().PreviewDetachRequested +=
+            () => Dispatcher.BeginInvoke(new Action(ShowPreviewWindow));
+        _tray = new TrayIcon(agent, a => Dispatcher.BeginInvoke(a), ShowMainWindow, ShowPreviewWindow, ExitApp);
         if (!e.Args.Contains("--tray"))
         {
             var open = Array.IndexOf(e.Args, "--open");
             ShowMainWindow(open >= 0 && open + 1 < e.Args.Length ? e.Args[open + 1] : null);
         }
+        if (e.Args.Contains("--preview"))
+            ShowPreviewWindow();
     }
 
     private ServiceProvider BuildServices(string[] args)
@@ -102,6 +107,21 @@ public partial class App : System.Windows.Application
             _window.Navigate(route);
     }
 
+    private PreviewWindow? _preview;
+
+    private void ShowPreviewWindow()
+    {
+        if (_preview is null)
+        {
+            _preview = new PreviewWindow(_services!.GetRequiredService<AgentClient>());
+            _preview.Closed += (_, _) => _preview = null;
+            _preview.Show();
+        }
+        if (_preview.WindowState == WindowState.Minimized)
+            _preview.WindowState = WindowState.Normal;
+        _preview.Activate();
+    }
+
     private void WaitForShowSignal()
     {
         while (_showSignal!.WaitOne())
@@ -111,6 +131,7 @@ public partial class App : System.Windows.Application
     private async void ExitApp()
     {
         _tray?.Dispose();
+        _preview?.Close();
         _window?.CloseForExit();
         if (_services is not null)
         {
