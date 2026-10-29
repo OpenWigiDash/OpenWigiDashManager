@@ -19,6 +19,8 @@ public sealed class WigiDashDevice : IDisposable
     private readonly TimeProvider _time;
     private CancellationTokenSource? _pollCts;
     private Thread? _pollThread;
+    private readonly Lock _injectLock = new();
+    private (TouchContact Contact, int X, int Y)? _injected;
     private int _lastScreen = -1;
     private bool? _lastSleeping;
 
@@ -99,6 +101,16 @@ public sealed class WigiDashDevice : IDisposable
         }
     }
 
+    /// <summary>
+    /// Toque emulado (mouse numa prévia, testes). Vale nas próximas leituras como se viesse do
+    /// aparelho: um Down fica valendo até chegar um Up. Toque real no vidro tem prioridade.
+    /// </summary>
+    public void InjectTouch(TouchContact contact, int x, int y)
+    {
+        lock (_injectLock)
+            _injected = contact == TouchContact.None ? null : (contact, x, y);
+    }
+
     /// <summary>Começa a ler o toque a cada <paramref name="interval"/> (padrão 33 ms) numa thread própria.</summary>
     public void StartPolling(TimeSpan? interval = null)
     {
@@ -165,6 +177,19 @@ public sealed class WigiDashDevice : IDisposable
 
     private void Publish(TouchSample sample)
     {
+        if (sample.Contact == TouchContact.None)
+        {
+            lock (_injectLock)
+            {
+                if (_injected is { } injected)
+                {
+                    sample = sample with { Contact = injected.Contact, X = injected.X, Y = injected.Y };
+                    if (injected.Contact == TouchContact.Up)
+                        _injected = null; // o Up vale uma leitura só
+                }
+            }
+        }
+
         if (sample.Contact != TouchContact.None)
             RawTouch?.Invoke(sample);
 

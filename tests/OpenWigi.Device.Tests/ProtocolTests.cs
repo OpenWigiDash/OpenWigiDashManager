@@ -111,6 +111,37 @@ public class ProtocolTests
     }
 
     [Fact]
+    public void Toque_emulado_entra_no_reconhecedor_como_toque_real()
+    {
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        _usb.Responses[0x00] = "WD\0"u8.ToArray();
+        _usb.Responses[0x33] = new byte[8]; // vidro sem contato
+        using var device = new WigiDashDevice(_usb, new Gestures.GestureOptions { ReportProgress = false }, time);
+        var gestures = new List<Gestures.GestureKind>();
+        device.Gesture += g => gestures.Add(g.Kind);
+
+        device.StartPolling(TimeSpan.FromMilliseconds(33));
+        void Tick(int times)
+        {
+            for (var i = 0; i < times; i++)
+            {
+                time.Advance(TimeSpan.FromMilliseconds(33));
+                Thread.Sleep(5);
+            }
+        }
+
+        Tick(3);
+        device.InjectTouch(TouchContact.Down, 100, 100);
+        Tick(25); // ~800 ms segurando
+        device.InjectTouch(TouchContact.Up, 100, 100);
+        Tick(3);
+        device.StopPolling();
+
+        Assert.Contains(Gestures.GestureKind.LongPress, gestures);
+        Assert.DoesNotContain(Gestures.GestureKind.Tap, gestures);
+    }
+
+    [Fact]
     public void Brilho_e_limitado_a_0_100()
     {
         _protocol.SetBrightness(150);

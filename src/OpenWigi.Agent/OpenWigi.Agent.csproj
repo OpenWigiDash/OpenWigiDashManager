@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>OpenWigi.Agent</RootNamespace>
+    <AssemblyName>OpenWigiAgent</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenWigi.Ipc\OpenWigi.Ipc.csproj" />
+  </ItemGroup>
+
+</Project>
