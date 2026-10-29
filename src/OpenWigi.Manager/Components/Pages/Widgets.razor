@@ -61,7 +61,14 @@
     <MudGrid>
         <MudItem xs="12" md="8">
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-1">
-                <MudText Typo="Typo.subtitle1">@CurrentPage?.Name</MudText>
+                @* O nome da página é o próprio título: clicar e digitar renomeia. @key troca o campo junto com a página. *@
+                <MudTextField T="string" @key="_page" Value="CurrentPage?.Name" ValueChanged="RenamePage" DebounceInterval="400"
+                              Variant="Variant.Text" Underline="false" Class="owd-page-title" Placeholder="Nome da página"
+                              title="Clique para renomear a página" />
+                <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text" Size="Size.Small"
+                           Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
+                    Excluir página vazia
+                </MudButton>
                 <MudSpacer />
                 <MudSwitch T="bool" Value="Settings.ShowWidgetNames" ValueChanged="v => Settings.ShowWidgetNames = v"
                            Color="Color.Primary" Size="Size.Small">Mostrar nomes</MudSwitch>
@@ -153,14 +160,6 @@
                     <span class="owd-page-name">Nova página</span>
                 </button>
             </div>
-            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2">
-                <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
-                              Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
-                <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text"
-                           Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
-                    Excluir página vazia
-                </MudButton>
-            </MudStack>
         </MudItem>
 
         <MudItem xs="12" md="4">
@@ -212,7 +211,8 @@
 </MudStack>
 
 @code {
-    private int _page;
+    // A página do editor é a do aparelho: escolher aqui troca lá, e swipe lá (ou na prévia) troca aqui.
+    private int _page => Dashboard.CurrentPage;
     private Guid? _selected;
 
     private DashboardHost Dashboard => Agent.Dashboard;
@@ -221,17 +221,23 @@
 
     protected override void OnInitialized()
     {
-        _page = Dashboard.CurrentPage;
         Dashboard.LayoutChanged += Refresh;
+        Dashboard.PageChanged += OnPageChanged;
         Agent.Changed += Refresh;
         Settings.Changed += Refresh;
     }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
 
+    private void OnPageChanged() => InvokeAsync(() =>
+    {
+        if (Selected is null)
+            _selected = null;
+        StateHasChanged();
+    });
+
     private async Task SelectPage(int page)
     {
-        _page = page;
         _selected = null;
         await Dashboard.GoToPageAsync(page, OpenWigi.Device.Protocol.Transition.None);
     }
@@ -455,8 +461,7 @@
 
     private async Task RemovePage()
     {
-        if (await Dashboard.RemovePageAsync(_page))
-            _page = Math.Min(_page, Dashboard.Layout.Pages.Count - 1);
+        await Dashboard.RemovePageAsync(_page);
     }
 
     private async Task RenamePage(string name)
@@ -488,6 +493,7 @@
     public async ValueTask DisposeAsync()
     {
         Dashboard.LayoutChanged -= Refresh;
+        Dashboard.PageChanged -= OnPageChanged;
         Agent.Changed -= Refresh;
         Settings.Changed -= Refresh;
         try

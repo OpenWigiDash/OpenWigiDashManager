@@ -84,7 +84,24 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
     public DashboardLayout Layout => _layout;
-    public int CurrentPage { get; private set; }
+
+    /// <summary>Página do layout que está (ou estaria) no aparelho. É a mesma no editor e na prévia.</summary>
+    public int CurrentPage
+    {
+        get => _currentPage;
+        private set
+        {
+            if (_currentPage == value)
+                return;
+            _currentPage = value;
+            PageChanged?.Invoke();
+        }
+    }
+
+    /// <summary>A página atual mudou: pelo editor, por swipe no aparelho ou na prévia, ou por exclusão de página.</summary>
+    public event Action? PageChanged;
+
+    private int _currentPage;
 
     /// <summary>Carrega plugins e layout, cria as instâncias. Ainda não desenha: isso vem com <see cref="ActivateAsync"/>.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)

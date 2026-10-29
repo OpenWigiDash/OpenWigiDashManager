@@ -315,3 +315,25 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Nome da página como título editável: parece texto, vira campo ao clicar. */
+.owd-page-title {
+    flex: 0 1 260px;
+    margin-top: 0 !important;
+}
+
+.owd-page-title input {
+    font-size: 1.05rem;
+    font-weight: 500;
+    padding: 4px 6px !important;
+    border-radius: 4px;
+}
+
+.owd-page-title input:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.owd-page-title input:focus {
+    background: var(--mud-palette-background-gray);
+    outline: 1px solid #e5243b;
+}

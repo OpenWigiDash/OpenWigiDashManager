@@ -149,10 +149,14 @@ public sealed class HostTests : IAsyncLifetime
         var host = await StartAsync();
         await host.ActivateAsync(true);
         var first = _sink.Shown.Last();
+        var pageChanges = 0;
+        host.PageChanged += () => pageChanges++;
 
         await host.HandleGestureAsync(new GestureEvent(GestureKind.SwipeLeft, 500, 300, TimeSpan.FromMilliseconds(200)));
 
+        // O editor e a prévia acompanham pela notificação.
         Assert.Equal(1, host.CurrentPage);
+        Assert.Equal(1, pageChanges);
         Assert.NotEqual(first, _sink.Shown.Last());
         Assert.Equal(Transition.WipeWest, _sink.Transitions.Last());
     }
