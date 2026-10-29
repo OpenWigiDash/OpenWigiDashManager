@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Repete o essencial do Directory.Build.props do repo para o pacote compilar sozinho. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>OpenWigi.Sdk</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>OpenWigi.Sdk</PackageId>
+    <Version>2.0.0-alpha.1</Version>
+    <Authors>Victor Perez</Authors>
+    <Product>OpenWigiDashManager</Product>
+    <Description>Contratos para escrever widgets do OpenWigiDashManager (.NET 10): widget, instância assíncrona que entrega quadros, toques ricos, contexto do host e tela de configurações em Razor.</Description>
+    <PackageTags>wigidash;openwigi;widget;sdk</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Nem todo membro ou parâmetro óbvio precisa de comentário XML. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Os dois chegam ao plugin pelo host (contexto compartilhado); ver OpenWigiSdk.SharedAssemblies. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenWigi.Sdk.Tests" />
+  </ItemGroup>
+
+</Project>
