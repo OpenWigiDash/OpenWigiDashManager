@@ -8,6 +8,12 @@ on:
       - 'sdk-v*'
   workflow_dispatch:
 
+# Trusted Publishing do nuget.org (OIDC): sem API key guardada. A política no nuget.org aponta para
+# victorperez2911/OpenWigiDashManager + sdk-publish.yml; NUGET_USER (variável do repo) é o perfil lá.
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish:
     runs-on: windows-latest
@@ -31,6 +37,13 @@ jobs:
       - name: Pack
         run: dotnet pack src/OpenWigi.Sdk --configuration Release --output nupkgs /p:Version=${{ env.VERSION }}
 
+      - name: Login no nuget.org (chave temporária via OIDC)
+        if: github.ref_type == 'tag'
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push
         if: github.ref_type == 'tag'
-        run: dotnet nuget push nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push nupkgs/*.nupkg --api-key ${{ steps.nuget.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
