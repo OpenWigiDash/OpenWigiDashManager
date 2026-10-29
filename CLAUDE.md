@@ -22,3 +22,12 @@ branch do #20).
 - No texto de cada PR da pilha, diga de qual PR ele depende.
 
 Referência: [About stacked PRs](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs).
+
+## Issues e PRs (ligação no board)
+
+Todo PR diz quais issues ele entrega com palavra de fechamento, uma por issue:
+`Closes #12, closes #13` (com "closes" repetido; `Closes #12, #13` só liga a primeira). Assim a issue
+aparece ligada ao PR no GitHub Projects e fecha sozinha no merge. Não feche issue à mão.
+
+- Issue que o PR só avança, sem terminar (ex.: falta teste manual no aparelho): `Refs #N`.
+- Se uma issue precisou ser fechada sem PR, comente nela o PR ou commit que entregou.
