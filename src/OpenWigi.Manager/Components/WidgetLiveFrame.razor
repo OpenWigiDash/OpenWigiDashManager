@@ -1,0 +1,60 @@
+@* Prévia ao vivo de uma instância no tile do editor: o mesmo quadro que vai (ou iria) para o aparelho. *@
+@using System.Threading
+@implements IDisposable
+
+@if (_src is not null)
+{
+    <img class="owd-live" src="@_src" alt="" draggable="false" />
+}
+
+@code {
+    [Parameter, EditorRequired] public DashboardHost Dashboard { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid InstanceId { get; set; }
+
+    // Junta os quadros: no máximo 5 imagens por segundo por tile. É para ver, não para espelhar vídeo.
+    private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(200);
+
+    private string? _src;
+    private int _pending;
+    private bool _disposed;
+
+    protected override void OnInitialized()
+    {
+        Dashboard.FrameChanged += OnFrame;
+        OnFrame(InstanceId);
+    }
+
+    private void OnFrame(Guid instanceId)
+    {
+        if (instanceId != InstanceId || Interlocked.Exchange(ref _pending, 1) == 1)
+            return;
+
+        // O PNG sai fora da thread da UI; só a troca da imagem passa por ela.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (_src is not null)
+                    await Task.Delay(Interval);
+                Interlocked.Exchange(ref _pending, 0);
+                if (_disposed || Dashboard.FrameOf(InstanceId) is not { } frame)
+                    return;
+                var src = PreviewImage.ToDataUrl(frame);
+                await InvokeAsync(() =>
+                {
+                    _src = src;
+                    StateHasChanged();
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Dashboard.FrameChanged -= OnFrame;
+    }
+}

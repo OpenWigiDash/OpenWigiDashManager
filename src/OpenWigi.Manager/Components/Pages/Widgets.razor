@@ -57,12 +57,16 @@
                 @foreach (var placement in CurrentPage?.Widgets ?? [])
                 {
                     var p = placement;
-                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
+                    <div @key="p.InstanceId" class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
                          style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
                          @onpointerdown="e => Press(p, e)"
                          @onclick="() => _selected = p.InstanceId">
-                        <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
+                        @* O tile mostra o que o widget desenha, como vai aparecer no aparelho. *@
+                        <WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" />
+                        <div class="owd-widget-label">
+                            <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
+                            <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
+                        </div>
                         @if (SizesOf(p.WidgetId).Count > 1)
                         {
                             @* Alça do canto: puxar redimensiona, como uma janela. *@

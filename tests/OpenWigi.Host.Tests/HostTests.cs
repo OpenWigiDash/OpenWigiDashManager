@@ -240,6 +240,25 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Quadro_de_cada_instancia_fica_disponivel_para_o_editor()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Outra");
+        var changed = new List<Guid>();
+        host.FrameChanged += id => { lock (changed) changed.Add(id); };
+
+        var id = (await host.AddWidgetAsync(Counter, page))!.Value;
+
+        // Mesmo numa página que não está no aparelho, o editor já tem o quadro do tamanho do widget.
+        var frame = host.FrameOf(id);
+        Assert.NotNull(frame);
+        Assert.Equal(WidgetSize.Small.PixelSize, frame.Size);
+        lock (changed)
+            Assert.Contains(id, changed);
+        Assert.Null(host.FrameOf(Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task Catalogo_usa_a_previa_do_plugin_como_icone()
     {
         var host = await StartAsync();

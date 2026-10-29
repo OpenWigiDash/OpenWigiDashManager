@@ -103,6 +103,44 @@ html, body {
     opacity: 0.35;
 }
 
+/* Prévia ao vivo: o quadro do widget ocupa o tile inteiro, na mesma proporção do aparelho. */
+.owd-live {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Nome por cima da prévia, discreto; o tipo e o tamanho só ao passar o mouse ou selecionado. */
+.owd-widget-label {
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(14, 15, 19, 0.72);
+    color: #e8e9ee;
+    pointer-events: none;
+}
+
+.owd-widget-label .owd-widget-caption {
+    display: none;
+    color: #a9adbb;
+}
+
+.owd-widget:hover .owd-widget-caption,
+.owd-widget.selected .owd-widget-caption {
+    display: block;
+}
+
+.owd-widget .owd-resize {
+    z-index: 2;
+}
+
 .owd-grid {
     position: relative;
     user-select: none;

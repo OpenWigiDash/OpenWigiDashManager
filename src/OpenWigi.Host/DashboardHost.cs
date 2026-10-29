@@ -189,7 +189,16 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     }
 
     /// <summary>O layout mudou (widget adicionado, removido, movido; página nova). Para a UI se atualizar.</summary>
-    public event Action? LayoutChanged;
+public event Action? LayoutChanged;
+
+    /// <summary>
+    /// Uma instância tem quadro novo (de qualquer página, com ou sem a tela do aparelho). Vem da thread
+    /// do widget e pode vir muitas vezes por segundo: quem desenha deve juntar os avisos.
+    /// </summary>
+    public event Action<Guid>? FrameChanged;
+
+    /// <summary>Último quadro da instância, o mesmo que vai (ou iria) para o aparelho; null antes do primeiro.</summary>
+    public WidgetFrame? FrameOf(Guid instanceId) => _runtimes.GetValueOrDefault(instanceId)?.LastFrame;
 
     public bool IsActive => _active;
 
@@ -637,7 +646,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         var context = new WidgetContext(placement.InstanceId, placement.Size,
             new WidgetHostInfo(widget.PluginDirectory, _loggerFactory, _time, _options.Theme),
             storage, new LoggingActions(logger), logger, this);
-        var runtime = new WidgetRuntime(widget, placement, context, logger);
+        var runtime = new WidgetRuntime(widget, placement, context, logger) { FrameChanged = id => FrameChanged?.Invoke(id) };
         if (await runtime.CreateAsync(cancellationToken))
             _runtimes[placement.InstanceId] = runtime;
     }
