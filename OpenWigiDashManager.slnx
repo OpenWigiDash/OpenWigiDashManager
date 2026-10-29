@@ -2,8 +2,10 @@
   <Folder Name="/src/">
     <Project Path="src/OpenWigi.Cli/OpenWigi.Cli.csproj" />
     <Project Path="src/OpenWigi.Device/OpenWigi.Device.csproj" />
+    <Project Path="src/OpenWigi.Sdk/OpenWigi.Sdk.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/OpenWigi.Device.Tests/OpenWigi.Device.Tests.csproj" />
+    <Project Path="tests/OpenWigi.Sdk.Tests/OpenWigi.Sdk.Tests.csproj" />
   </Folder>
 </Solution>
