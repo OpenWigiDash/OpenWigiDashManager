@@ -264,6 +264,59 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
 
+    /// <summary>
+    /// Muda o tamanho de um widget no lugar onde ele está. A instância é recriada no tamanho novo
+    /// (o contrato fixa o tamanho por instância), mas mantém o id, as configurações e os arquivos.
+    /// False se o widget não suporta o tamanho ou se ele não cabe ali.
+    /// </summary>
+    public async Task<bool> ResizeWidgetAsync(Guid instanceId, WidgetSize size, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var page = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == instanceId));
+            if (page < 0)
+                return false;
+            var placement = _layout.Pages[page].Widgets.First(w => w.InstanceId == instanceId);
+            if (placement.Size == size)
+                return true;
+            if (_catalog.Find(placement.WidgetId) is not { } widget || !widget.Manifest.SupportedSizes.Contains(size))
+                return false;
+            if (placement.Column + size.Columns > WidgetGrid.Columns || placement.Row + size.Rows > WidgetGrid.Rows)
+                return false;
+            if (_layout.Pages[page].Widgets.Any(w => w != placement && w.Overlaps(placement.Column, placement.Row, size)))
+                return false;
+
+            if (_runtimes.Remove(instanceId, out var old))
+            {
+                if (ReferenceEquals(_fullscreen, old))
+                    _fullscreen = null;
+                if (ReferenceEquals(_pressTarget, old))
+                    _pressTarget = null;
+                await old.DisposeAsync(); // sem OnRemovedAsync: os dados da instância ficam
+            }
+
+            placement.Size = size;
+            await CreateRuntimeAsync(placement, cancellationToken);
+            if (_runtimes.TryGetValue(instanceId, out var runtime))
+            {
+                var visible = _active && page == CurrentPage && _fullscreen is null;
+                runtime.Context.IsAsleep = !visible;
+                runtime.LastFrame = await runtime.RenderAsync(RenderReason.Initial, cancellationToken);
+                if (visible)
+                    await runtime.CallAsync("OnWakeAsync", (i, ct) => i.OnWakeAsync(ct), cancellationToken);
+                else
+                    await runtime.CallAsync("OnSleepAsync", (i, ct) => i.OnSleepAsync(ct), cancellationToken);
+            }
+            await CommitLayoutAsync(page, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
     public async Task<int> AddPageAsync(string name, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);

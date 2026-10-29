@@ -197,6 +197,28 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Redimensionar_recria_a_instancia_e_mantem_as_configuracoes()
+    {
+        var host = await StartAsync();
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var id = counter.InstanceId;
+        await host.ActivateAsync(true);
+        var bounds = counter.Bounds;
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, bounds.X + 5, bounds.Y + 5, TimeSpan.Zero)); // conta 1
+
+        Assert.False(await host.ResizeWidgetAsync(id, WidgetSize.Large)); // contador não suporta 2x2
+        var free = host.Layout.Pages[0].FindFreeCell(WidgetSize.Wide)!.Value;
+        Assert.True(await host.MoveWidgetAsync(id, free.Column, free.Row));
+        Assert.True(await host.ResizeWidgetAsync(id, WidgetSize.Wide));
+
+        var resized = host.Layout.AllPlacements.Single(p => p.InstanceId == id);
+        Assert.Equal(WidgetSize.Wide, resized.Size);
+        var settings = Directory.GetFiles(Path.Combine(Data, "instances", id.ToString("D")), "settings.json");
+        Assert.Contains("\"value\": \"1\"", File.ReadAllText(Assert.Single(settings)));
+        Assert.Equal(WidgetSize.Wide.PixelSize, host.GetSettings(id)!.Value.Context.PixelSize);
+    }
+
+    [Fact]
     public async Task Tela_de_configuracoes_do_plugin_chega_ao_manager()
     {
         var host = await StartAsync();

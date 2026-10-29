@@ -85,6 +85,21 @@
                     <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
                     <MudText Typo="Typo.h6">@(Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado")</MudText>
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Coluna @(selected.Column + 1), linha @(selected.Row + 1), tamanho @selected.Size</MudText>
+                    @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
+                    {
+                        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var size in sizes)
+                            {
+                                var s = size;
+                                var fits = FitsAt(selected, selected.Column, selected.Row, s);
+                                <MudChip T="string" Size="Size.Small" Variant="@(s == selected.Size ? Variant.Filled : Variant.Outlined)"
+                                         Color="@(s == selected.Size ? Color.Primary : Color.Default)" Disabled="@(!fits && s != selected.Size)"
+                                         OnClick="() => Resize(selected.InstanceId, s)">@s</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
+                    }
                     <MudStack Row="true" Class="mt-3">
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings"
                                    Disabled="@(Dashboard.GetSettings(selected.InstanceId) is null)"
@@ -103,18 +118,30 @@
                         Nenhum widget instalado. Copie a pasta do plugin para %LOCALAPPDATA%\OpenWigiDash\Widgets e reabra o manager.
                     </MudText>
                 }
-                <MudList T="string" Dense="true">
-                    @foreach (var widget in Dashboard.AvailableWidgets)
-                    {
-                        var w = widget;
-                        <MudListItem T="string" Icon="@Icons.Material.Filled.Widgets" OnClick="() => Add(w.Manifest.Id)">
+                @* Um botão por tamanho que o widget suporta; apagado quando não há espaço livre para ele nesta página. *@
+                @foreach (var widget in Dashboard.AvailableWidgets)
+                {
+                    var w = widget;
+                    <div class="mt-3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Small" Color="Color.Secondary" />
                             <MudText Typo="Typo.body2">@w.Manifest.Name</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @string.Join(", ", w.Manifest.SupportedSizes) · v@(w.Manifest.Version)
-                            </MudText>
-                        </MudListItem>
-                    }
-                </MudList>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">v@(w.Manifest.Version)</MudText>
+                        </MudStack>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            @foreach (var size in w.Manifest.SupportedSizes)
+                            {
+                                var s = size;
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                         Disabled="@(CurrentPage?.FindFreeCell(s) is null)" Icon="@Icons.Material.Filled.Add"
+                                         OnClick="() => Add(w.Manifest.Id, s)">@s</MudChip>
+                            }
+                        </div>
+                    </div>
+                }
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3 d-block">
+                    Clique no tamanho (colunas × linhas) para pôr o widget na primeira posição livre; depois arraste para onde quiser.
+                </MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -151,12 +178,25 @@
                     yield return (column, row);
     }
 
-    private async Task Add(Guid widgetId)
+    private async Task Add(Guid widgetId, WidgetSize size)
     {
-        var id = await Dashboard.AddWidgetAsync(widgetId, _page);
+        var id = await Dashboard.AddWidgetAsync(widgetId, _page, size);
         if (id is null)
             Snackbar.Add("Não há espaço livre nesta página para esse tamanho.", Severity.Warning);
         _selected = id;
+    }
+
+    private IReadOnlyList<WidgetSize> SizesOf(Guid widgetId) =>
+        Dashboard.AvailableWidgets.FirstOrDefault(w => w.Manifest.Id == widgetId)?.Manifest.SupportedSizes ?? [];
+
+    private bool FitsAt(WidgetPlacement placement, int column, int row, WidgetSize size) =>
+        column + size.Columns <= WidgetGrid.Columns && row + size.Rows <= WidgetGrid.Rows &&
+        CurrentPage?.Widgets.Any(w => w != placement && w.Overlaps(column, row, size)) != true;
+
+    private async Task Resize(Guid instanceId, WidgetSize size)
+    {
+        if (!await Dashboard.ResizeWidgetAsync(instanceId, size))
+            Snackbar.Add("Esse tamanho não cabe a partir da posição atual.", Severity.Warning);
     }
 
     private async Task Remove(Guid instanceId)
