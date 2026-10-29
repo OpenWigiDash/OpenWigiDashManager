@@ -17,6 +17,7 @@ public interface IDisplay
     bool SetBrightness(int percent);
     bool Wake();
     bool Sleep();
+    bool InjectTouch(TouchContact contact, int x, int y);
 }
 
 internal sealed class DeviceHostDisplay(DeviceHost host) : IDisplay
@@ -42,4 +43,5 @@ internal sealed class DeviceHostDisplay(DeviceHost host) : IDisplay
     public bool SetBrightness(int percent) => host.TryUse(d => d.SetBrightness(percent));
     public bool Wake() => host.TryUse(d => d.Wake());
     public bool Sleep() => host.TryUse(d => d.Sleep());
+    public bool InjectTouch(TouchContact contact, int x, int y) => host.TryUse(d => d.InjectTouch(contact, x, y));
 }

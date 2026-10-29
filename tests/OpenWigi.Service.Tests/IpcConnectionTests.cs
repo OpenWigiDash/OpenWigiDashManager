@@ -19,6 +19,8 @@ public class IpcConnectionTests
         DeviceStatus.Disconnected,
         new Gesture(new GestureEvent(GestureKind.LongPress, 10, 20, TimeSpan.FromMilliseconds(600), 1)),
         new IpcError("falhou"),
+        new SubscribePreview(true),
+        new EmulatedTouch(TouchContact.Down, 500, 300),
     ];
 
     [Theory]

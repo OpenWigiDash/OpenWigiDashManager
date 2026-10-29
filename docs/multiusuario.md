@@ -35,3 +35,11 @@ declara. Formato das mensagens em `src/OpenWigi.Ipc/IpcConnection.cs`.
 6. Toque, arraste e segure na tela: os gestos aparecem no console do agente do usuário ativo.
 
 Para remover: `scripts\Install-Service.ps1 -Uninstall`.
+
+## Prévia e toque emulado (útil pelo RDP)
+
+`OpenWigiAgent --preview` abre uma janela com a página que está no aparelho, a cópia que o serviço
+guarda do que escreveu (o WigiDash não devolve a imagem). O mouse na janela vira toque e passa
+pelo mesmo reconhecedor de gestos: clicar dá tap, segurar o botão dá long-press e arrastar dá swipe.
+A prévia e o toque emulado só valem para o dono da tela, então outro usuário não vê nem mexe na
+tela de quem está no console. Pelo RDP, rode o serviço com `--OpenWigi:AllowRemoteSessions=true`.

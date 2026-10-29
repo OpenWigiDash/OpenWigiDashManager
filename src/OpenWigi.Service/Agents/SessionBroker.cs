@@ -23,6 +23,7 @@ public sealed class SessionBroker : BackgroundService
     private readonly ConcurrentDictionary<Guid, AgentSession> _agents = new();
     private readonly SemaphoreSlim _evaluate = new(1, 1);
     private readonly SemaphoreSlim _wakeUp = new(0, int.MaxValue);
+    private readonly FrameMirror _mirror = new();
 
     private Guid? _owner;
     private string _reason = string.Empty;
@@ -76,10 +77,19 @@ public sealed class SessionBroker : BackgroundService
         switch (message)
         {
             case Frame frame when frame.Page != ServiceOptions.ServicePage:
-                _display.WriteFrame(frame.Page, frame.Pixels, frame.ByteOffset);
+                if (_display.WriteFrame(frame.Page, frame.Pixels, frame.ByteOffset))
+                    _mirror.Write(frame.Page, frame.Pixels, frame.ByteOffset);
                 break;
             case ShowPage show when show.Page != ServiceOptions.ServicePage:
-                _display.ShowPage(show.Page, show.Transition);
+                if (_display.ShowPage(show.Page, show.Transition))
+                    _mirror.Show(show.Page);
+                break;
+            case SubscribePreview subscribe:
+                agent.WantsPreview = subscribe.Enabled;
+                _mirror.MarkDirty();
+                break;
+            case EmulatedTouch touch:
+                _display.InjectTouch(touch.Contact, touch.X, touch.Y);
                 break;
             case SetBrightness brightness:
                 _display.SetBrightness(brightness.Percent);
@@ -120,6 +130,7 @@ public sealed class SessionBroker : BackgroundService
                 {
                     _logger.LogInformation("Posse do WigiDash: {Agent} ({Reason})", winner, decision.Reason);
                     await TrySendAsync(winner, new Ownership(true, decision.Reason), cancellationToken);
+                    _mirror.MarkDirty();
                 }
             }
             else if (_display.Status.Connected)
@@ -136,8 +147,18 @@ public sealed class SessionBroker : BackgroundService
         }
     }
 
+    /// <summary>Manda ao dono, se ele pediu, a página que está no aparelho quando ela muda.</summary>
+    public async Task PublishPreviewAsync(CancellationToken cancellationToken = default)
+    {
+        if (_owner is not { } owner || !_agents.TryGetValue(owner, out var agent) || !agent.WantsPreview)
+            return;
+        if (_mirror.TakeIfChanged() is { } shown)
+            await TrySendAsync(agent, new PreviewFrame(shown.Page, shown.Pixels), cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _ = Task.Run(() => PreviewLoopAsync(stoppingToken), stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -156,6 +177,20 @@ public sealed class SessionBroker : BackgroundService
         }
     }
 
+    // No máximo 10 prévias por segundo: é para conferir, não para espelhar vídeo.
+    private async Task PreviewLoopAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100), _time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+                await PublishPreviewAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
     private void DrawServiceScreen(bool force)
     {
         // Redesenha ao mudar de estado e a cada minuto, por causa do relógio.
@@ -166,9 +201,14 @@ public sealed class SessionBroker : BackgroundService
 
         if (force)
             _logger.LogInformation("Sem dono; tela do serviço: {Reason}", _reason);
-        if (_display.WriteFrame(ServiceOptions.ServicePage, ServiceScreen.Render(_reason, now.DateTime), 0)
+        var frame = ServiceScreen.Render(_reason, now.DateTime);
+        if (_display.WriteFrame(ServiceOptions.ServicePage, frame, 0)
             && _display.ShowPage(ServiceOptions.ServicePage, Transition.None))
+        {
+            _mirror.Write(ServiceOptions.ServicePage, frame, 0);
+            _mirror.Show(ServiceOptions.ServicePage);
             _screenDrawnFor = minute;
+        }
     }
 
     private void OnGesture(GestureEvent gesture)

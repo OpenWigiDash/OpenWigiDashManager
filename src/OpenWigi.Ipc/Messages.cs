@@ -25,6 +25,15 @@ public sealed record WakeDisplay : IpcMessage;
 
 public sealed record SleepDisplay : IpcMessage;
 
+/// <summary>Liga ou desliga o envio de <see cref="PreviewFrame"/>. Só o dono recebe a prévia.</summary>
+public sealed record SubscribePreview(bool Enabled) : IpcMessage;
+
+/// <summary>
+/// Toque emulado (ex.: mouse na janela de prévia), em pixels da tela. Entra no mesmo reconhecedor
+/// de gestos do toque real: mande Down repetido enquanto segura e um Up ao soltar. Só vale do dono.
+/// </summary>
+public sealed record EmulatedTouch(TouchContact Contact, int X, int Y) : IpcMessage;
+
 // Serviço -> agente
 
 public sealed record Welcome(int SessionId, DeviceStatus Device) : IpcMessage;
@@ -41,5 +50,8 @@ public sealed record DeviceStatus(bool Connected, Guid DeviceId, string Firmware
 }
 
 public sealed record Gesture(GestureEvent Event) : IpcMessage;
+
+/// <summary>Cópia do que está na tela do aparelho: a página mostrada, em RGB565.</summary>
+public sealed record PreviewFrame(int Page, byte[] Pixels) : IpcMessage;
 
 public sealed record IpcError(string Message) : IpcMessage;

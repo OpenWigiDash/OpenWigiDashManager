@@ -128,6 +128,52 @@ public class SessionBrokerTests
         Assert.Equal([ServiceOptions.ServicePage], _display.Shown);
     }
 
+    [Fact]
+    public async Task Previa_vai_para_o_dono_que_pediu_com_a_pagina_na_tela()
+    {
+        _sessions.Console = 1;
+        var (victor, channel) = await ConnectAsync(1, "victor");
+        _broker.Handle(victor, new SubscribePreview(true));
+
+        var pixels = new byte[WigiDashProtocol.FrameBytes];
+        pixels[0] = 0xAB;
+        _broker.Handle(victor, new Frame(0, 0, pixels));
+        _broker.Handle(victor, new ShowPage(0, Transition.None));
+        await _broker.PublishPreviewAsync();
+
+        var preview = Assert.Single(channel.Sent.OfType<PreviewFrame>());
+        Assert.Equal(0, preview.Page);
+        Assert.Equal(0xAB, preview.Pixels[0]);
+
+        await _broker.PublishPreviewAsync(); // nada mudou: não reenvia
+        Assert.Single(channel.Sent.OfType<PreviewFrame>());
+    }
+
+    [Fact]
+    public async Task Previa_nao_vaza_para_outra_sessao()
+    {
+        _sessions.Console = 1;
+        await ConnectAsync(1, "victor");
+        var (filha, channel) = await ConnectAsync(4, "filha");
+        _broker.Handle(filha, new SubscribePreview(true));
+
+        await _broker.PublishPreviewAsync();
+        Assert.DoesNotContain(channel.Sent, m => m is PreviewFrame);
+    }
+
+    [Fact]
+    public async Task Toque_emulado_so_vale_do_dono()
+    {
+        _sessions.Console = 1;
+        var (victor, _) = await ConnectAsync(1, "victor");
+        var (filha, _) = await ConnectAsync(4, "filha");
+
+        _broker.Handle(filha, new EmulatedTouch(TouchContact.Down, 1, 1));
+        _broker.Handle(victor, new EmulatedTouch(TouchContact.Down, 100, 200));
+
+        Assert.Equal([(TouchContact.Down, 100, 200)], _display.Injected);
+    }
+
     private sealed class FakeChannel : IAgentChannel
     {
         public List<IpcMessage> Sent { get; } = [];
@@ -175,6 +221,14 @@ public class SessionBrokerTests
         public bool SetBrightness(int percent) => true;
         public bool Wake() => true;
         public bool Sleep() => true;
+
+        public List<(TouchContact Contact, int X, int Y)> Injected { get; } = [];
+
+        public bool InjectTouch(TouchContact contact, int x, int y)
+        {
+            Injected.Add((contact, x, y));
+            return true;
+        }
 
         public void RaiseGesture(GestureEvent gesture) => Gesture?.Invoke(gesture);
 

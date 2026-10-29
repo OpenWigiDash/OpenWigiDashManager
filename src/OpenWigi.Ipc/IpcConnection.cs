@@ -26,10 +26,13 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         SetBrightness = 4,
         Wake = 5,
         Sleep = 6,
+        SubscribePreview = 7,
+        EmulatedTouch = 8,
         Welcome = 64,
         Ownership = 65,
         DeviceStatus = 66,
         Gesture = 67,
+        PreviewFrame = 68,
         Error = 127,
     }
 
@@ -108,6 +111,22 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
             case SleepDisplay:
                 w.Write((byte)Kind.Sleep);
                 break;
+            case SubscribePreview m:
+                w.Write((byte)Kind.SubscribePreview);
+                w.Write(m.Enabled);
+                break;
+            case EmulatedTouch m:
+                w.Write((byte)Kind.EmulatedTouch);
+                w.Write((byte)m.Contact);
+                w.Write(m.X);
+                w.Write(m.Y);
+                break;
+            case PreviewFrame m:
+                w.Write((byte)Kind.PreviewFrame);
+                w.Write((byte)m.Page);
+                w.Write(m.Pixels.Length);
+                w.Write(m.Pixels);
+                break;
             case Welcome m:
                 w.Write((byte)Kind.Welcome);
                 w.Write(m.SessionId);
@@ -153,6 +172,9 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
             Kind.SetBrightness => new SetBrightness(r.ReadInt32()),
             Kind.Wake => new WakeDisplay(),
             Kind.Sleep => new SleepDisplay(),
+            Kind.SubscribePreview => new SubscribePreview(r.ReadBoolean()),
+            Kind.EmulatedTouch => new EmulatedTouch((TouchContact)r.ReadByte(), r.ReadInt32(), r.ReadInt32()),
+            Kind.PreviewFrame => new PreviewFrame(r.ReadByte(), r.ReadBytes(r.ReadInt32())),
             Kind.Welcome => new Welcome(r.ReadInt32(), ReadStatus(r)),
             Kind.Ownership => new Ownership(r.ReadBoolean(), r.ReadString()),
             Kind.DeviceStatus => ReadStatus(r),

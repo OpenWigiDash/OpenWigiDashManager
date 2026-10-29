@@ -3,20 +3,33 @@ using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using OpenWigi.Agent;
 using OpenWigi.Device.Display;
 using OpenWigi.Device.Protocol;
 using OpenWigi.Ipc;
 
 // Agente mínimo da fase 3: prova a troca de dono entre sessões. Pinta a tela com uma cor por
 // usuário, mostra o nome, a hora e o último gesto. A UI de verdade (WPF + Blazor) chega na fase 5.
+// Com --preview abre uma janela com o que está no aparelho; o mouse nela vira toque.
 
 const int Page = 0;
 var user = Environment.UserName;
 var background = ColorFor(user);
 var lastGesture = "toque na tela";
 var isOwner = false;
+IpcConnection? current = null;
 var stop = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+
+var preview = args.Contains("--preview") ? OpenPreview($"OpenWigiDash — prévia ({user})", stop) : null;
+if (preview is not null)
+{
+    preview.Touch += (contact, x, y) =>
+    {
+        if (isOwner && current is { } connection)
+            _ = connection.SendAsync(new EmulatedTouch(contact, x, y));
+    };
+}
 
 while (!stop.IsCancellationRequested)
 {
@@ -50,6 +63,9 @@ async Task RunAsync(CancellationToken cancellationToken)
     await pipe.ConnectAsync(TimeSpan.FromSeconds(5), cancellationToken);
     await using var connection = new IpcConnection(pipe);
     await connection.SendAsync(new Hello(IpcConnection.ProtocolVersion, user), cancellationToken);
+    if (preview is not null)
+        await connection.SendAsync(new SubscribePreview(true), cancellationToken);
+    current = connection;
 
     using var refresh = new PeriodicTimer(TimeSpan.FromSeconds(10));
     _ = Task.Run(async () =>
@@ -69,6 +85,9 @@ async Task RunAsync(CancellationToken cancellationToken)
             case Ownership ownership:
                 isOwner = ownership.IsOwner;
                 Log(ownership.IsOwner ? $"ganhei a tela ({ownership.Reason})" : $"perdi a tela ({ownership.Reason})");
+                preview?.SetStatus(ownership.IsOwner
+                    ? $"OpenWigiDash — prévia ({user}): com a tela"
+                    : $"OpenWigiDash — prévia ({user}): sem a tela — {ownership.Reason}");
                 if (isOwner)
                     await DrawAsync(connection, cancellationToken, show: true);
                 break;
@@ -76,6 +95,9 @@ async Task RunAsync(CancellationToken cancellationToken)
                 lastGesture = $"{gesture.Event.Kind} em {gesture.Event.X},{gesture.Event.Y} ({gesture.Event.Duration.TotalMilliseconds:F0} ms)";
                 Log(lastGesture);
                 await DrawAsync(connection, cancellationToken);
+                break;
+            case PreviewFrame frame:
+                preview?.ShowFrame(frame.Pixels);
                 break;
             case DeviceStatus status:
                 Log(status.Connected ? $"aparelho conectado ({status.Firmware})" : "aparelho desconectado");
@@ -132,6 +154,24 @@ static Color ColorFor(string name)
     Color[] palette = [Color.FromArgb(30, 90, 160), Color.FromArgb(150, 50, 90), Color.FromArgb(40, 120, 70),
         Color.FromArgb(130, 80, 20), Color.FromArgb(90, 60, 150), Color.FromArgb(20, 110, 120)];
     return palette[Math.Abs(hash % palette.Length)];
+}
+
+static PreviewWindow OpenPreview(string title, CancellationTokenSource stop)
+{
+    PreviewWindow? window = null;
+    using var ready = new ManualResetEventSlim();
+    var ui = new Thread(() =>
+    {
+        Application.EnableVisualStyles();
+        window = new PreviewWindow(title);
+        window.HandleCreated += (_, _) => ready.Set();
+        window.FormClosed += (_, _) => stop.Cancel();
+        Application.Run(window);
+    }) { IsBackground = true, Name = "Prévia" };
+    ui.SetApartmentState(ApartmentState.STA);
+    ui.Start();
+    ready.Wait();
+    return window!;
 }
 
 static void Log(string text) => Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff} {text}");

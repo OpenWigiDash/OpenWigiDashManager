@@ -11,6 +11,9 @@ public sealed class AgentSession(int sessionId, IAgentChannel channel, DateTimeO
     public DateTimeOffset ConnectedAt { get; } = connectedAt;
     public IAgentChannel Channel { get; } = channel;
 
+    /// <summary>Pediu a prévia do que está no aparelho (só é enviada enquanto ele for o dono).</summary>
+    public bool WantsPreview { get; set; }
+
     public override string ToString() => $"{UserName} (sessão {SessionId})";
 }
 
