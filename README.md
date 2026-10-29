@@ -30,6 +30,14 @@ dotnet run --project src/OpenWigi.Cli -- touch --long 600
 
 `owd` sem argumentos lista todos os comandos.
 
+## Inner loop
+
+`scripts/Test-Device.ps1` compila, libera o aparelho do manager oficial (`-StopOfficial`), roda o
+`owd` no hardware e guarda o log em `.diagnostics/device-check/`. Com `-Touch` registra os toques por
+alguns segundos; com `-RestoreOfficial` religa o manager oficial no fim. No VS Code: tarefas
+`device check`, `device check + touch` e `device check & restore official`, e o launch
+`owd touch (aparelho real)` para depurar.
+
 ## Build
 
 ```powershell
