@@ -43,7 +43,7 @@
         <MudItem xs="12" md="8">
             @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
                de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
-            <div class="owd-grid @(_dragging is null ? "" : "dragging")" @ref="_grid"
+            <div class="owd-grid @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
                  @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                 @foreach (var cell in FreeCells())
                 {
@@ -59,6 +59,21 @@
                          @onclick="() => _selected = p.InstanceId">
                         <MudText Typo="Typo.subtitle2">@(Dashboard.NameOf(p.InstanceId) ?? "Widget não instalado")</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Size</MudText>
+                        @if (SizesOf(p.WidgetId).Count > 1)
+                        {
+                            @* Alça do canto: puxar redimensiona, como uma janela. *@
+                            <div class="owd-resize" title="Arraste para mudar o tamanho"
+                                 @onpointerdown="e => StartResize(p, e)" @onpointerdown:stopPropagation="true"
+                                 @onclick:stopPropagation="true"></div>
+                        }
+                    </div>
+                }
+
+                @if (_resizing is { } resized && _resizeTo is { } newSize)
+                {
+                    <div class="owd-drop @(ResizeAllowed(resized, newSize) ? "ok" : "bad")"
+                         style="grid-column: @(resized.Column + 1) / span @newSize.Columns; grid-row: @(resized.Row + 1) / span @newSize.Rows">
+                        <span class="owd-drop-label">@newSize</span>
                     </div>
                 }
 
@@ -74,7 +89,8 @@
                 }
             </div>
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
-                Arraste um widget para outra posição: a área verde mostra onde ele encaixa (vermelha = não cabe).
+                Arraste um widget para outra posição, ou puxe o canto inferior direito para mudar o tamanho:
+                a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
             </MudText>
         </MudItem>
 
@@ -235,9 +251,56 @@
         _render = false;
     }
 
+    // --- redimensionar pela alça do canto
+
+    private WidgetPlacement? _resizing;
+    private WidgetSize? _resizeTo;
+
+    private async Task StartResize(WidgetPlacement placement, PointerEventArgs e)
+    {
+        if (e.Button != 0)
+            return;
+        _gridRect = await JS.InvokeAsync<double[]>("owd.rect", _grid);
+        _resizing = placement;
+        _resizeTo = placement.Size;
+        _selected = placement.InstanceId;
+    }
+
+    // O canto vai até a célula sob o ponteiro; o tamanho é contado a partir do canto superior esquerdo.
+    private void ResizeMove(PointerEventArgs e)
+    {
+        var placement = _resizing!;
+        var (column, row) = CellAt(e.ClientX, e.ClientY);
+        var size = new WidgetSize(Math.Max(1, column - placement.Column + 1), Math.Max(1, row - placement.Row + 1));
+        _render = _resizeTo != size;
+        _resizeTo = size;
+    }
+
+    private bool ResizeAllowed(WidgetPlacement placement, WidgetSize size) =>
+        SizesOf(placement.WidgetId).Contains(size) && FitsAt(placement, placement.Column, placement.Row, size);
+
+    private async Task ResizeRelease()
+    {
+        var (placement, size) = (_resizing!, _resizeTo);
+        _resizing = null;
+        _resizeTo = null;
+        if (size is { } s && s != placement.Size)
+        {
+            if (ResizeAllowed(placement, s))
+                await Dashboard.ResizeWidgetAsync(placement.InstanceId, s);
+            else
+                Snackbar.Add($"O widget não tem o tamanho {s} ou ele não cabe ali.", Severity.Warning);
+        }
+    }
+
     private void Move(PointerEventArgs e)
     {
         _render = false;
+        if (_resizing is not null)
+        {
+            ResizeMove(e);
+            return;
+        }
         if (_pressed is null)
             return;
 
@@ -264,6 +327,11 @@
 
     private async Task Release(PointerEventArgs e)
     {
+        if (_resizing is not null)
+        {
+            await ResizeRelease();
+            return;
+        }
         var wasDragging = _dragging is not null;
         await Drop();
         _pressed = null;
@@ -272,7 +340,9 @@
 
     private void Cancel()
     {
-        _render = _dragging is not null;
+        _render = _dragging is not null || _resizing is not null;
+        _resizing = null;
+        _resizeTo = null;
         _pressed = null;
         EndDrag();
     }

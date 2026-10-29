@@ -131,6 +131,42 @@ html, body {
     background: rgba(255, 107, 87, 0.16);
 }
 
+/* Alça de redimensionar no canto inferior direito do widget. */
+.owd-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, #8b93a7 50%, #8b93a7 60%, transparent 60%, transparent 70%, #8b93a7 70%, #8b93a7 80%, transparent 80%);
+    opacity: 0.6;
+    z-index: 1;
+}
+
+.owd-widget:hover .owd-resize,
+.owd-widget.selected .owd-resize {
+    opacity: 1;
+}
+
+.owd-grid.resizing,
+.owd-grid.resizing .owd-widget {
+    cursor: nwse-resize;
+}
+
+.owd-drop {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+.owd-drop-label {
+    margin: 4px 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #e8e9ed;
+}
+
 @keyframes owd-pulse {
     from { opacity: 0.65; }
     to { opacity: 1; }

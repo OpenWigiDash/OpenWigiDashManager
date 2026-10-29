@@ -39,7 +39,8 @@ public sealed class WidgetPlacement
     [JsonConverter(typeof(WidgetSizeJsonConverter))]
     public WidgetSize Size { get; set; } = WidgetSize.Small;
 
-    /// <summary>Retângulo na tela, em pixels.</summary>
+    /// <summary>Retângulo na tela, em pixels. Calculado: não vai para o layout.json.</summary>
+    [JsonIgnore]
     public PixelRect Bounds
     {
         get
@@ -90,3 +91,4 @@ public sealed class LayoutStore(string path)
         File.Move(temp, Path, overwrite: true);
     }
 }
+

@@ -1,6 +1,7 @@
 # OpenWigiDashManager - testes da UI do manager pelo WebView2 (Playwright via CDP)
 # Abre o manager com a porta de depuração do WebView2 e roda os scripts de tests/ui contra ele.
 # Precisa do serviço rodando e de widgets instalados (scripts\Deploy-Widget.ps1).
+# Atenção: o teste arrasta o contador de exemplo de verdade, ou seja, mexe no layout do usuário.
 
 param([int]$Port = 9333)
 
@@ -27,3 +28,4 @@ New-Item -ItemType Directory (Split-Path $shot) -Force | Out-Null
 node (Join-Path $ui 'drag-and-drop.mjs') $shot
 if ($LASTEXITCODE -ne 0) { throw 'Teste de arrastar falhou.' }
 Write-Host "Captura do arraste: $shot" -ForegroundColor Cyan
+
