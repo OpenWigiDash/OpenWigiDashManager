@@ -34,7 +34,13 @@ public sealed class AgentClient : IAsyncDisposable
     private IpcConnection? _connection;
     private Task? _loop;
 
-    public AgentClient(ILoggerFactory loggerFactory) => _logger = loggerFactory.CreateLogger<AgentClient>();
+    private readonly ManagerSettings _settings;
+
+    public AgentClient(ILoggerFactory loggerFactory, ManagerSettings settings)
+    {
+        _logger = loggerFactory.CreateLogger<AgentClient>();
+        _settings = settings;
+    }
 
     /// <summary>O painel de widgets. Ligado depois de criado, porque ele usa o <see cref="Sink"/> deste cliente.</summary>
     public DashboardHost Dashboard { get; private set; } = null!;
@@ -48,9 +54,11 @@ public sealed class AgentClient : IAsyncDisposable
     /// <summary>Brilho do aparelho em %: o que o serviço leu ao dar a posse, depois o último que a UI mandou.</summary>
     public int? Brightness { get; private set; }
 
+    /// <summary>Muda o brilho agora e guarda a escolha, para reaplicar quando a tela voltar para este usuário.</summary>
     public async Task SetBrightnessAsync(int percent)
     {
         Brightness = percent;
+        _settings.Brightness = percent;
         await SendAsync(new SetBrightness(percent));
     }
 
@@ -163,7 +171,17 @@ public sealed class AgentClient : IAsyncDisposable
                     _ = Dashboard.HandleGestureAsync(gesture.Event, cancellationToken);
                     break;
                 case BrightnessReport brightness:
-                    Brightness = brightness.Percent;
+                    // O aparelho pode ter voltado ao padrão dele (religado, outro usuário mexeu): vale a escolha deste usuário.
+                    if (_settings.Brightness is { } chosen && chosen != brightness.Percent)
+                    {
+                        _logger.LogInformation("Brilho do aparelho em {Device}%; reaplicando os {Chosen}% escolhidos", brightness.Percent, chosen);
+                        await connection.SendAsync(new SetBrightness(chosen), cancellationToken);
+                        Brightness = chosen;
+                    }
+                    else
+                    {
+                        Brightness = brightness.Percent;
+                    }
                     Changed?.Invoke();
                     break;
                 case PreviewFrame frame:
