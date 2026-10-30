@@ -125,7 +125,28 @@ public partial class App : System.Windows.Application
             _window.Closed += (_, _) => _window = null;
         }
         var window = _window;
-        window.Show();
+        try
+        {
+            window.Show();
+        }
+        catch (Exception ex)
+        {
+            // Um Show() que falha no meio deixa a janela quebrada: reaproveitada, o próximo Show() dá
+            // "O Visual raiz de um VisualTarget não pode ter um pai". Ela sai, e a próxima abertura cria
+            // outra. O agente segue rodando no tray.
+            if (_window == window)
+                _window = null;
+            try
+            {
+                window.CloseForExit();
+            }
+            catch (Exception)
+            {
+                // Sem HWND não há o que fechar.
+            }
+            _tray?.ShowBalloon($"Não foi possível abrir a janela: {ex.Message}");
+            return;
+        }
         if (_window is null)
             return; // o WebView2 não conseguiu abrir (ver DispatcherUnhandledException)
         if (window.WindowState == WindowState.Minimized)
