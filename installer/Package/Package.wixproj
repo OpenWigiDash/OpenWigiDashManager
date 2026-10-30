@@ -1,0 +1,17 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+
+  <!-- O MSI: serviço, manager, widgets que vêm junto, atalho e início com o Windows. -->
+  <PropertyGroup>
+    <OutputName>OpenWigiDash</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>Version=$(Version);PublishRoot=$(PublishRoot);BrandingDir=$(BrandingDir)</DefineConstants>
+    <!-- ICE43/ICE57 tratam o menu Iniciar como perfil do usuário e pedem chave em HKCU para o atalho.
+         Com Scope="perMachine" ele vai para o menu Iniciar de todos os usuários: falso positivo. -->
+    <SuppressIces>ICE43;ICE57</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
+  </ItemGroup>
+
+</Project>

@@ -63,6 +63,12 @@ alguns segundos; com `-RestoreOfficial` religa o manager oficial no fim. No VS C
 `device check`, `device check + touch` e `device check & restore official`, e o launch
 `owd touch (aparelho real)` para depurar.
 
+## Instalador
+
+`scripts\Build-Installer.ps1` gera o `OpenWigiDash-Setup.exe` (WiX), e cada tag `vX.Y.Z` publica uma
+Release com ele. O que ele instala, como atualizar e como alternar com o serviço de dev no mesmo PC
+estão em [docs/instalador.md](docs/instalador.md).
+
 ## Build
 
 ```powershell

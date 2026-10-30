@@ -16,7 +16,7 @@ public sealed class ManagerSettings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash", "manager.json");
     private Stored _stored;
 
-    private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true);
+    private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true, bool StartWithWindows = true);
 
     public ManagerSettings()
     {
@@ -69,23 +69,73 @@ public sealed class ManagerSettings
         }
     }
 
-    /// <summary>Abre com o login do Windows, direto no tray (chave Run do usuário, sem admin).</summary>
+    /// <summary>
+    /// Abre com o login do Windows, direto no tray. Instalado, o instalador já põe a entrada Run da
+    /// máquina (<c>--autostart</c>) para todos os usuários, e aqui só se guarda se este usuário quer;
+    /// sem ela (dev), vale a chave Run do usuário, sem admin.
+    /// </summary>
     public bool StartWithWindows
     {
         get
         {
+            if (MachineAutostart)
+                return _stored.StartWithWindows;
             using var key = Registry.CurrentUser.OpenSubKey(RunKey);
             return key?.GetValue(RunValue) is string;
         }
         set
         {
-            using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-            if (value)
-                key.SetValue(RunValue, $"\"{Environment.ProcessPath}\" --tray");
+            if (MachineAutostart)
+            {
+                _stored = _stored with { StartWithWindows = value };
+                Save();
+                RemoveUserRunEntry();
+            }
             else
-                key.DeleteValue(RunValue, throwOnMissingValue: false);
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(RunKey);
+                if (value)
+                    key.SetValue(RunValue, $"\"{Environment.ProcessPath}\" --tray");
+                else
+                    key.DeleteValue(RunValue, throwOnMissingValue: false);
+            }
             Changed?.Invoke();
         }
+    }
+
+    /// <summary>O instalador registrou o início com o Windows para todos os usuários (HKLM).</summary>
+    public static bool MachineAutostart
+    {
+        get
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(RunKey);
+            return key?.GetValue(RunValue) is string;
+        }
+    }
+
+    /// <summary>
+    /// Com a entrada da máquina, a do usuário (de antes do instalador, às vezes apontando para uma
+    /// build de dev) abriria uma segunda cópia no login. Ela sai, e a escolha dela vira a preferência.
+    /// </summary>
+    public void AdoptMachineAutostart()
+    {
+        if (!MachineAutostart)
+            return;
+        using var key = Registry.CurrentUser.OpenSubKey(RunKey);
+        if (key?.GetValue(RunValue) is not string)
+            return;
+        RemoveUserRunEntry();
+        if (!_stored.StartWithWindows)
+        {
+            _stored = _stored with { StartWithWindows = true };
+            Save();
+        }
+    }
+
+    private static void RemoveUserRunEntry()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+        key?.DeleteValue(RunValue, throwOnMissingValue: false);
     }
 
     public event Action? Changed;

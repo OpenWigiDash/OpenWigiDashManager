@@ -18,6 +18,11 @@ $staging = Join-Path $root '.diagnostics\service-publish'
 $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if (-not $service) { throw 'Serviço de dev não instalado. Rode scripts\Setup-DevService.ps1 uma vez como admin.' }
 if (-not (Test-Path -LiteralPath $ServiceDir)) { throw "Pasta do serviço não encontrada: $ServiceDir" }
+# Com o instalador, o serviço de mesmo nome roda de Program Files: trocar os arquivos aqui não mudaria nada.
+$image = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName").ImagePath.Trim('"')
+if (-not $image.StartsWith($ServiceDir, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "O serviço $serviceName roda de $image, não do serviço de dev. Se é o instalado, desinstale-o e rode scripts\Setup-DevService.ps1 (docs\instalador.md)."
+}
 
 Write-Host "=== OpenWigiDash - deploy do serviço de dev ===" -ForegroundColor Cyan
 

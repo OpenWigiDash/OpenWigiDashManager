@@ -39,6 +39,9 @@ para o serviço, troca os arquivos e inicia de novo. Os ajustes da máquina fica
 `appsettings.local.json` na pasta do serviço. Os logs vão para o Log de Eventos, em Aplicativo,
 origem `OpenWigiDash`.
 
+Com o OpenWigiDash instalado pelo instalador, o serviço de dev não pode existir junto (mesmo nome):
+ver [instalador.md](instalador.md#no-pc-de-desenvolvimento).
+
 `scripts\Install-Service.ps1` continua existindo para instalar como LocalSystem em Program Files,
 mais perto do que o instalador vai fazer. Mas cada atualização com ele pede admin.
 

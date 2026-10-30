@@ -30,16 +30,32 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
 
     public LoadedWidget? Find(Guid widgetId) => Widgets.FirstOrDefault(w => w.Manifest.Id == widgetId);
 
-    public async Task LoadAllAsync(string root, IWidgetHostFactory hosts, CancellationToken cancellationToken = default)
-    {
-        if (!Directory.Exists(root))
-        {
-            _logger.LogInformation("Pasta de plugins não existe: {Root}", root);
-            return;
-        }
+    public Task LoadAllAsync(string root, IWidgetHostFactory hosts, CancellationToken cancellationToken = default) =>
+        LoadAllAsync([root], hosts, cancellationToken);
 
-        foreach (var directory in Directory.GetDirectories(root).Order(StringComparer.OrdinalIgnoreCase))
-            await LoadAsync(directory, hosts, cancellationToken);
+    /// <summary>
+    /// Carrega várias raízes. Um plugin com o mesmo nome de pasta numa raiz anterior ganha: assim a cópia
+    /// do usuário substitui a que veio com o instalador, sem erro de id repetido.
+    /// </summary>
+    public async Task LoadAllAsync(IEnumerable<string> roots, IWidgetHostFactory hosts, CancellationToken cancellationToken = default)
+    {
+        var loaded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root))
+            {
+                _logger.LogInformation("Pasta de plugins não existe: {Root}", root);
+                continue;
+            }
+
+            foreach (var directory in Directory.GetDirectories(root).Order(StringComparer.OrdinalIgnoreCase))
+            {
+                if (loaded.Add(Path.GetFileName(directory)))
+                    await LoadAsync(directory, hosts, cancellationToken);
+                else
+                    _logger.LogInformation("Plugin {Directory} ignorado: já carregado de outra pasta", directory);
+            }
+        }
     }
 
     public async Task LoadAsync(string pluginDirectory, IWidgetHostFactory hosts, CancellationToken cancellationToken = default)

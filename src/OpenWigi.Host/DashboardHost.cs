@@ -14,6 +14,9 @@ public sealed record DashboardOptions
     /// <summary>Pasta com uma subpasta por plugin.</summary>
     public required string PluginsDirectory { get; init; }
 
+    /// <summary>Widgets que vêm com o instalador (só leitura). Um plugin de mesmo nome em <see cref="PluginsDirectory"/> ganha.</summary>
+    public string? BundledPluginsDirectory { get; init; }
+
     /// <summary>Layout e dados das instâncias (por usuário do Windows).</summary>
     public required string DataDirectory { get; init; }
 
@@ -111,7 +114,10 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     /// <summary>Carrega plugins e layout, cria as instâncias. Ainda não desenha: isso vem com <see cref="ActivateAsync"/>.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        await _catalog.LoadAllAsync(_options.PluginsDirectory, this, cancellationToken);
+        string[] roots = _options.BundledPluginsDirectory is { } bundled
+            ? [_options.PluginsDirectory, bundled]
+            : [_options.PluginsDirectory];
+        await _catalog.LoadAllAsync(roots, this, cancellationToken);
         _layout = _store.Load();
         if (FixDuplicatePageNames())
             _store.Save(_layout);

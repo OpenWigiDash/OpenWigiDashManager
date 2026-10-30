@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+
+  <!-- O .exe da release: instala o WebView2 Runtime se faltar e depois o MSI. -->
+  <PropertyGroup>
+    <OutputType>Bundle</OutputType>
+    <OutputName>OpenWigiDash-Setup</OutputName>
+    <WebView2Bootstrapper Condition="'$(WebView2Bootstrapper)' == ''">$(PublishRoot)..\MicrosoftEdgeWebview2Setup.exe</WebView2Bootstrapper>
+    <DefineConstants>Version=$(Version);BrandingDir=$(BrandingDir);WebView2Bootstrapper=$(WebView2Bootstrapper)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
+    <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Package\Package.wixproj" />
+  </ItemGroup>
+
+</Project>
