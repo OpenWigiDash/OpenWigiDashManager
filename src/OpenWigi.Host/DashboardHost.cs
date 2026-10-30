@@ -123,6 +123,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             _store.Save(_layout);
         if (!_layout.AllPlacements.Any() && _catalog.Widgets.Count > 0)
             PlaceDefaults();
+        // Volta na página em que o aparelho estava; se ela não existe mais, na primeira.
+        _currentPage = Math.Max(0, _layout.Pages.FindIndex(p => p.Id == _layout.CurrentPageId));
 
         foreach (var placement in _layout.AllPlacements.ToList())
             await CreateRuntimeAsync(placement, cancellationToken);
@@ -364,6 +366,31 @@ public event Action? LayoutChanged;
                 return false;
             placement.Column = column;
             placement.Row = row;
+            await CommitLayoutAsync(page, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>
+    /// Troca dois widgets do mesmo tamanho e da mesma página de lugar: cada um vai para a posição do outro.
+    /// False se não estão na mesma página ou têm tamanhos diferentes.
+    /// </summary>
+    public async Task<bool> SwapWidgetsAsync(Guid first, Guid second, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var page = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == first));
+            if (page < 0 || first == second)
+                return false;
+            var a = _layout.Pages[page].Widgets.First(w => w.InstanceId == first);
+            if (_layout.Pages[page].Widgets.FirstOrDefault(w => w.InstanceId == second) is not { } b || a.Size != b.Size)
+                return false;
+            (a.Column, a.Row, b.Column, b.Row) = (b.Column, b.Row, a.Column, a.Row);
             await CommitLayoutAsync(page, cancellationToken);
             return true;
         }
@@ -709,6 +736,8 @@ public event Action? LayoutChanged;
         foreach (var runtime in RuntimesOn(CurrentPage))
             await SleepAsync(runtime, cancellationToken);
         CurrentPage = page;
+        _layout.CurrentPageId = _layout.Pages[page].Id;
+        _store.Save(_layout);
         if (_active)
         {
             await WakePageAsync(page, cancellationToken);

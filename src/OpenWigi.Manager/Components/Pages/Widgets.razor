@@ -12,7 +12,7 @@
         <div class="flex-grow-1">
             <MudText Typo="Typo.h5">Widgets e páginas</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
+                Monte cada página na grade 5x4 do WigiDash. Arraste um widget para movê-lo; selecione para configurar ou tirar.
             </MudText>
         </div>
         <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Outlined" OnClick="Settings.RequestPreviewWindow">
@@ -69,8 +69,7 @@
                      @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                     @foreach (var cell in FreeCells())
                     {
-                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
-                             @onclick="() => MoveSelectedTo(cell.Column, cell.Row)"></div>
+                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"></div>
                     }
                     @foreach (var placement in CurrentPage?.Widgets ?? [])
                     {
@@ -105,7 +104,15 @@
     
                     @if (_dragging is { } dragged)
                     {
-                        if (_hover is { } target)
+                        if (_hover is { } over && !Fits(dragged, over) && SwapTarget(dragged, over) is { } other)
+                        {
+                            @* Em cima de outro do mesmo tamanho: os dois trocam de lugar. *@
+                            <div class="owd-drop ok"
+                                 style="grid-column: @(other.Column + 1) / span @dragged.Size.Columns; grid-row: @(other.Row + 1) / span @dragged.Size.Rows">
+                                <span class="owd-drop-label">Trocar</span>
+                            </div>
+                        }
+                        else if (_hover is { } target)
                         {
                             var c = Math.Clamp(target.Column, 0, WidgetGrid.Columns - dragged.Size.Columns);
                             var r = Math.Clamp(target.Row, 0, WidgetGrid.Rows - dragged.Size.Rows);
@@ -115,7 +122,8 @@
                     }
                 </div>
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
-                    Arraste um widget para outra posição, ou puxe o canto inferior direito para mudar o tamanho:
+                    Arraste um widget para outra posição (em cima de outro do mesmo tamanho, os dois trocam de lugar),
+                    ou puxe o canto inferior direito para mudar o tamanho:
                     a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
                 </MudText>
             </MudPaper>
@@ -487,18 +495,25 @@
         at.Column + placement.Size.Columns <= WidgetGrid.Columns && at.Row + placement.Size.Rows <= WidgetGrid.Rows &&
         CurrentPage?.Widgets.Any(w => w != placement && w.Overlaps(at.Column, at.Row, placement.Size)) != true;
 
-    private async Task Drop()
+    // Solto em cima de um único widget do mesmo tamanho (o resto da área livre): troca com ele.
+    private WidgetPlacement? SwapTarget(WidgetPlacement placement, (int Column, int Row) at)
     {
-        if (_dragging is { } placement && _hover is { } at && Fits(placement, at)
-            && (at.Column, at.Row) != (placement.Column, placement.Row))
-            await Dashboard.MoveWidgetAsync(placement.InstanceId, at.Column, at.Row);
-        EndDrag();
+        var column = Math.Clamp(at.Column, 0, WidgetGrid.Columns - placement.Size.Columns);
+        var row = Math.Clamp(at.Row, 0, WidgetGrid.Rows - placement.Size.Rows);
+        var under = CurrentPage?.Widgets.Where(w => w != placement && w.Overlaps(column, row, placement.Size)).ToList();
+        return under is [var other] && other.Size == placement.Size ? other : null;
     }
 
-    private async Task MoveSelectedTo(int column, int row)
+    private async Task Drop()
     {
-        if (_selected is { } id && !await Dashboard.MoveWidgetAsync(id, column, row))
-            Snackbar.Add("O widget não cabe a partir dessa célula.", Severity.Warning);
+        if (_dragging is { } placement && _hover is { } at)
+        {
+            if (Fits(placement, at) && (at.Column, at.Row) != (placement.Column, placement.Row))
+                await Dashboard.MoveWidgetAsync(placement.InstanceId, at.Column, at.Row);
+            else if (!Fits(placement, at) && SwapTarget(placement, at) is { } other)
+                await Dashboard.SwapWidgetsAsync(placement.InstanceId, other.InstanceId);
+        }
+        EndDrag();
     }
 
     private async Task AddPage() =>

@@ -9,6 +9,9 @@ public sealed class DashboardLayout
 {
     public List<LayoutPage> Pages { get; set; } = [new LayoutPage { Name = "Página 1" }];
 
+    /// <summary>Página que estava no aparelho: o manager volta nela ao abrir. Pelo Id, para sobreviver a mover páginas.</summary>
+    public Guid? CurrentPageId { get; set; }
+
     public IEnumerable<WidgetPlacement> AllPlacements => Pages.SelectMany(p => p.Widgets);
 }
 
