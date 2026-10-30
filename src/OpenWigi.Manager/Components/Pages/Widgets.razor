@@ -577,6 +577,7 @@
     // Delete com um widget selecionado = "Tirar" (com a mesma confirmação).
     private DotNetObjectReference<Widgets>? _self;
     private IJSObjectReference? _deleteKey;
+    private IJSObjectReference? _fitCanvas;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -584,6 +585,7 @@
         {
             _self = DotNetObjectReference.Create(this);
             _deleteKey = await JS.InvokeAsync<IJSObjectReference>("owd.onDeleteKey", _self);
+            _fitCanvas = await JS.InvokeAsync<IJSObjectReference>("owd.fitCanvas", _grid);
         }
     }
 
@@ -606,6 +608,11 @@
             {
                 await _deleteKey.InvokeVoidAsync("dispose");
                 await _deleteKey.DisposeAsync();
+            }
+            if (_fitCanvas is not null)
+            {
+                await _fitCanvas.InvokeVoidAsync("dispose");
+                await _fitCanvas.DisposeAsync();
             }
         }
         catch (JSDisconnectedException)
