@@ -12,7 +12,7 @@
         <div class="flex-grow-1">
             <MudText Typo="Typo.h5">Widgets e páginas</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
+                Monte cada página na grade 5x4 do WigiDash. Arraste um widget para movê-lo; selecione para configurar ou tirar.
             </MudText>
         </div>
         <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Outlined" OnClick="Settings.RequestPreviewWindow">
@@ -69,8 +69,7 @@
                      @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                     @foreach (var cell in FreeCells())
                     {
-                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
-                             @onclick="() => MoveSelectedTo(cell.Column, cell.Row)"></div>
+                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"></div>
                     }
                     @foreach (var placement in CurrentPage?.Widgets ?? [])
                     {
@@ -493,12 +492,6 @@
             && (at.Column, at.Row) != (placement.Column, placement.Row))
             await Dashboard.MoveWidgetAsync(placement.InstanceId, at.Column, at.Row);
         EndDrag();
-    }
-
-    private async Task MoveSelectedTo(int column, int row)
-    {
-        if (_selected is { } id && !await Dashboard.MoveWidgetAsync(id, column, row))
-            Snackbar.Add("O widget não cabe a partir dessa célula.", Severity.Warning);
     }
 
     private async Task AddPage() =>

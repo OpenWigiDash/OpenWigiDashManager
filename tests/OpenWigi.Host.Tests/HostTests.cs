@@ -358,6 +358,29 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Ao_abrir_de_novo_volta_na_pagina_em_que_estava()
+    {
+        var host = await StartAsync();
+        await host.AddPageAsync("B");
+        await host.AddPageAsync("C");
+        await host.GoToPageAsync(2, Transition.None);
+        Assert.True(await host.MovePageAsync(2, 1)); // a ordem muda, a página continua "C"
+        await host.DisposeAsync();
+
+        host = await StartAsync();
+        Assert.Equal("C", host.Layout.Pages[host.CurrentPage].Name);
+
+        // Página gravada que não existe mais: abre na primeira.
+        await host.DisposeAsync();
+        var store = new LayoutStore(Path.Combine(Data, "layout.json"));
+        var layout = store.Load();
+        layout.CurrentPageId = Guid.NewGuid();
+        store.Save(layout);
+        host = await StartAsync();
+        Assert.Equal(0, host.CurrentPage);
+    }
+
+    [Fact]
     public async Task Catalogo_usa_a_previa_do_plugin_como_icone()
     {
         var host = await StartAsync();

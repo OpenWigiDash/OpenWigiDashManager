@@ -123,6 +123,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             _store.Save(_layout);
         if (!_layout.AllPlacements.Any() && _catalog.Widgets.Count > 0)
             PlaceDefaults();
+        // Volta na página em que o aparelho estava; se ela não existe mais, na primeira.
+        _currentPage = Math.Max(0, _layout.Pages.FindIndex(p => p.Id == _layout.CurrentPageId));
 
         foreach (var placement in _layout.AllPlacements.ToList())
             await CreateRuntimeAsync(placement, cancellationToken);
@@ -709,6 +711,8 @@ public event Action? LayoutChanged;
         foreach (var runtime in RuntimesOn(CurrentPage))
             await SleepAsync(runtime, cancellationToken);
         CurrentPage = page;
+        _layout.CurrentPageId = _layout.Pages[page].Id;
+        _store.Save(_layout);
         if (_active)
         {
             await WakePageAsync(page, cancellationToken);
