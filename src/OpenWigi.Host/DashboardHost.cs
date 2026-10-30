@@ -37,7 +37,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     private readonly PluginCatalog _catalog;
     private readonly LayoutStore _store;
     private readonly Dictionary<Guid, WidgetRuntime> _runtimes = [];
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, Task<WidgetFrame?>> _icons = [];
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Guid WidgetId, WidgetSize Size), Task<WidgetFrame?>> _icons = [];
     private readonly SemaphoreSlim _state = new(1, 1);
     private readonly CancellationTokenSource _stopping = new();
     private DashboardLayout _layout = new();
@@ -65,32 +65,56 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     /// <c>null</c> = o plugin não tem prévia (ou ela falhou) e a UI usa um ícone genérico.
     /// </summary>
     public Task<WidgetFrame?> GetCatalogIconAsync(Guid widgetId) =>
-        _icons.GetOrAdd(widgetId, LoadCatalogIconAsync);
+        _catalog.Find(widgetId) is { } widget
+            ? GetWidgetPreviewAsync(widgetId, widget.Manifest.SupportedSizes.MinBy(s => s.Columns * s.Rows))
+            : Task.FromResult<WidgetFrame?>(null);
 
-    private async Task<WidgetFrame?> LoadCatalogIconAsync(Guid widgetId)
+    /// <summary>Prévia do widget num tamanho (assistente de adicionar), pedida uma vez por tamanho. null = sem prévia.</summary>
+    public Task<WidgetFrame?> GetWidgetPreviewAsync(Guid widgetId, WidgetSize size) =>
+        _icons.GetOrAdd((widgetId, size), key => LoadPreviewAsync(key.WidgetId, key.Size));
+
+    private async Task<WidgetFrame?> LoadPreviewAsync(Guid widgetId, WidgetSize size)
     {
-        if (_catalog.Find(widgetId) is not { } widget)
+        if (_catalog.Find(widgetId) is not { } widget || !widget.Manifest.SupportedSizes.Contains(size))
             return null;
-        var size = widget.Manifest.SupportedSizes.MinBy(s => s.Columns * s.Rows);
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            return await widget.Widget.GetPreviewAsync(size, timeout.Token);
+            return await widget.Widget.GetPreviewAsync(size, timeout.Token) is { } frame && frame.Size == size.PixelSize ? frame : null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Prévia de {Name} falhou; o catálogo usa o ícone genérico", widget.Manifest.Name);
+            _logger.LogWarning(ex, "Prévia de {Name} em {Size} falhou; a UI usa o ícone genérico", widget.Manifest.Name, size);
             return null;
         }
     }
     public DashboardLayout Layout => _layout;
-    public int CurrentPage { get; private set; }
+
+    /// <summary>Página do layout que está (ou estaria) no aparelho. É a mesma no editor e na prévia.</summary>
+    public int CurrentPage
+    {
+        get => _currentPage;
+        private set
+        {
+            if (_currentPage == value)
+                return;
+            _currentPage = value;
+            PageChanged?.Invoke();
+        }
+    }
+
+    /// <summary>A página atual mudou: pelo editor, por swipe no aparelho ou na prévia, ou por exclusão de página.</summary>
+    public event Action? PageChanged;
+
+    private int _currentPage;
 
     /// <summary>Carrega plugins e layout, cria as instâncias. Ainda não desenha: isso vem com <see cref="ActivateAsync"/>.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         await _catalog.LoadAllAsync(_options.PluginsDirectory, this, cancellationToken);
         _layout = _store.Load();
+        if (FixDuplicatePageNames())
+            _store.Save(_layout);
         if (!_layout.AllPlacements.Any() && _catalog.Widgets.Count > 0)
             PlaceDefaults();
 
@@ -163,7 +187,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
                 // Swipe horizontal fora de tela cheia troca de página, como no manager antigo.
                 var count = _layout.Pages.Count;
                 var next = kind == TouchKind.SwipeLeft ? (CurrentPage + 1) % count : (CurrentPage - 1 + count) % count;
-                await GoToPageUnlockedAsync(next, kind == TouchKind.SwipeLeft ? Transition.WipeWest : Transition.WipeEast, cancellationToken);
+                // Mesma animação do manager antigo: próxima página (swipe para a esquerda) entra com WipeEast.
+                await GoToPageUnlockedAsync(next, kind == TouchKind.SwipeLeft ? Transition.WipeEast : Transition.WipeWest, cancellationToken);
                 _pressTarget = null;
                 return;
             }
@@ -189,7 +214,16 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     }
 
     /// <summary>O layout mudou (widget adicionado, removido, movido; página nova). Para a UI se atualizar.</summary>
-    public event Action? LayoutChanged;
+public event Action? LayoutChanged;
+
+    /// <summary>
+    /// Uma instância tem quadro novo (de qualquer página, com ou sem a tela do aparelho). Vem da thread
+    /// do widget e pode vir muitas vezes por segundo: quem desenha deve juntar os avisos.
+    /// </summary>
+    public event Action<Guid>? FrameChanged;
+
+    /// <summary>Último quadro da instância, o mesmo que vai (ou iria) para o aparelho; null antes do primeiro.</summary>
+    public WidgetFrame? FrameOf(Guid instanceId) => _runtimes.GetValueOrDefault(instanceId)?.LastFrame;
 
     public bool IsActive => _active;
 
@@ -299,16 +333,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             if (page < 0)
                 return;
             _layout.Pages[page].Widgets.RemoveAll(w => w.InstanceId == instanceId);
-            if (_runtimes.Remove(instanceId, out var runtime))
-            {
-                if (ReferenceEquals(_fullscreen, runtime))
-                    _fullscreen = null;
-                if (ReferenceEquals(_pressTarget, runtime))
-                    _pressTarget = null;
-                await runtime.CallAsync("OnRemovedAsync", (i, ct) => i.OnRemovedAsync(ct), cancellationToken);
-                await runtime.DisposeAsync();
-                runtime.Context.Storage.DeleteAll();
-            }
+            await DestroyRuntimeAsync(instanceId, cancellationToken);
             await CommitLayoutAsync(page, cancellationToken);
         }
         finally
@@ -395,12 +420,14 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
 
-    public async Task<int> AddPageAsync(string name, CancellationToken cancellationToken = default)
+    /// <summary>Nova página. Sem nome (ou com um já usado), ganha o primeiro "Página N" livre.</summary>
+    public async Task<int> AddPageAsync(string? name = null, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);
         try
         {
-            _layout.Pages.Add(new LayoutPage { Name = name });
+            name = name?.Trim();
+            _layout.Pages.Add(new LayoutPage { Name = string.IsNullOrEmpty(name) ? NextPageName() : UniquePageName(name) });
             await CommitLayoutAsync(-1, cancellationToken);
             return _layout.Pages.Count - 1;
         }
@@ -410,18 +437,24 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
 
-    /// <summary>Remove uma página vazia (precisa sobrar pelo menos uma).</summary>
-    public async Task<bool> RemovePageAsync(int page, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Muda a página de lugar na ordem (a do swipe e das miniaturas). A página atual continua a mesma,
+    /// só o número dela muda; widgets e configurações vão junto.
+    /// </summary>
+    public async Task<bool> MovePageAsync(int from, int to, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);
         try
         {
-            if (_layout.Pages.Count <= 1 || page < 0 || page >= _layout.Pages.Count || _layout.Pages[page].Widgets.Count > 0)
+            var count = _layout.Pages.Count;
+            if (from < 0 || from >= count || to < 0 || to >= count || from == to)
                 return false;
-            _layout.Pages.RemoveAt(page);
-            if (CurrentPage >= _layout.Pages.Count)
-                CurrentPage = _layout.Pages.Count - 1;
-            await CommitLayoutAsync(CurrentPage, cancellationToken);
+            var current = _layout.Pages[CurrentPage];
+            var page = _layout.Pages[from];
+            _layout.Pages.RemoveAt(from);
+            _layout.Pages.Insert(to, page);
+            CurrentPage = _layout.Pages.IndexOf(current);
+            await CommitLayoutAsync(-1, cancellationToken);
             return true;
         }
         finally
@@ -430,20 +463,104 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
 
-    public async Task RenamePageAsync(int page, string name, CancellationToken cancellationToken = default)
+    /// <summary>Remove uma página (precisa sobrar pelo menos uma). Com widgets, só se <paramref name="withWidgets"/>: eles são apagados.</summary>
+    public async Task<bool> RemovePageAsync(int page, bool withWidgets = false, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);
         try
         {
-            if (page < 0 || page >= _layout.Pages.Count)
-                return;
-            _layout.Pages[page].Name = name;
+            if (_layout.Pages.Count <= 1 || page < 0 || page >= _layout.Pages.Count)
+                return false;
+            var removed = _layout.Pages[page];
+            if (removed.Widgets.Count > 0 && !withWidgets)
+                return false;
+
+            // Saindo da página que está no aparelho: mostra a vizinha antes de apagar.
+            if (page == CurrentPage)
+                await GoToPageUnlockedAsync(page == 0 ? 1 : page - 1, Transition.None, cancellationToken);
+            foreach (var placement in removed.Widgets.ToList())
+                await DestroyRuntimeAsync(placement.InstanceId, cancellationToken);
+
+            var current = _layout.Pages[CurrentPage];
+            _layout.Pages.Remove(removed);
+            CurrentPage = _layout.Pages.IndexOf(current);
             await CommitLayoutAsync(-1, cancellationToken);
+            return true;
         }
         finally
         {
             _state.Release();
         }
+    }
+
+    // Tira a instância de vez: avisa o plugin, descarta e apaga configurações e arquivos dela.
+    private async Task DestroyRuntimeAsync(Guid instanceId, CancellationToken cancellationToken)
+    {
+        if (!_runtimes.Remove(instanceId, out var runtime))
+            return;
+        if (ReferenceEquals(_fullscreen, runtime))
+            _fullscreen = null;
+        if (ReferenceEquals(_pressTarget, runtime))
+            _pressTarget = null;
+        await runtime.CallAsync("OnRemovedAsync", (i, ct) => i.OnRemovedAsync(ct), cancellationToken);
+        await runtime.DisposeAsync();
+        runtime.Context.Storage.DeleteAll();
+    }
+
+    /// <summary>Renomeia. Recusa (false) nome vazio ou já usado por outra página: não existem duas com o mesmo nome.</summary>
+    public async Task<bool> RenamePageAsync(int page, string name, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            name = name.Trim();
+            if (page < 0 || page >= _layout.Pages.Count || name.Length == 0 || IsPageNameTaken(name, page))
+                return false;
+            _layout.Pages[page].Name = name;
+            await CommitLayoutAsync(-1, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    public bool IsPageNameTaken(string name, int exceptPage = -1) =>
+        _layout.Pages.Where((_, i) => i != exceptPage).Any(p => string.Equals(p.Name.Trim(), name.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+    private string NextPageName()
+    {
+        for (var n = 1; ; n++)
+            if (!IsPageNameTaken($"Página {n}"))
+                return $"Página {n}";
+    }
+
+    private string UniquePageName(string name, int exceptPage = -1)
+    {
+        if (!IsPageNameTaken(name, exceptPage))
+            return name;
+        for (var n = 2; ; n++)
+            if (!IsPageNameTaken($"{name} {n}", exceptPage))
+                return $"{name} {n}";
+    }
+
+    // Layouts antigos podem ter nomes repetidos (o "Nova página" de antes gerava): a segunda em diante ganha número.
+    private bool FixDuplicatePageNames()
+    {
+        var changed = false;
+        for (var i = 1; i < _layout.Pages.Count; i++)
+        {
+            var page = _layout.Pages[i];
+            if (_layout.Pages.Take(i).Any(p => string.Equals(p.Name.Trim(), page.Name.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            {
+                var unique = UniquePageName(page.Name.Trim(), i);
+                _logger.LogInformation("Página repetida \"{Name}\" renomeada para \"{Unique}\"", page.Name, unique);
+                page.Name = unique;
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     // Grava o layout e avisa a UI na hora. O redesenho do aparelho (página inteira pelo USB) vai em
@@ -637,7 +754,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         var context = new WidgetContext(placement.InstanceId, placement.Size,
             new WidgetHostInfo(widget.PluginDirectory, _loggerFactory, _time, _options.Theme),
             storage, new LoggingActions(logger), logger, this);
-        var runtime = new WidgetRuntime(widget, placement, context, logger);
+        var runtime = new WidgetRuntime(widget, placement, context, logger) { FrameChanged = id => FrameChanged?.Invoke(id) };
         if (await runtime.CreateAsync(cancellationToken))
             _runtimes[placement.InstanceId] = runtime;
     }

@@ -1,19 +1,48 @@
+@page "/"
 @page "/widgets"
 @implements IAsyncDisposable
 @inject AgentClient Agent
+@inject ManagerSettings Settings
 @inject ISnackbar Snackbar
-@inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IDialogService Dialogs
 
-<MudStack Spacing="4">
-    <div>
-        <MudText Typo="Typo.h5">Widgets e páginas</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
-        </MudText>
-    </div>
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2">
+        <div class="flex-grow-1">
+            <MudText Typo="Typo.h5">Widgets e páginas</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Monte cada página na grade 5x4 do WigiDash. Selecione um widget para movê-lo, configurar ou tirar.
+            </MudText>
+        </div>
+        <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Outlined" OnClick="Settings.RequestPreviewWindow">
+            Destacar prévia
+        </MudButton>
+    </MudStack>
 
+    @* O que era o Painel: estado do aparelho e da tela, numa faixa compacta. *@
+    <MudPaper Class="px-3 py-2" Outlined="true">
+        <MudGrid Spacing="1">
+            <MudItem xs="12" sm="4" Class="owd-ellipsis">
+                <MudText Typo="Typo.body2" Class="owd-ellipsis">
+                    <span class="owd-muted">Aparelho </span>@(Agent.Device.Connected ? "WigiDash conectado" : "Desconectado")
+                    @if (Agent.Device.Connected)
+                    {
+                        <span class="owd-muted" title="Firmware @Agent.Device.Firmware"> · @Agent.Device.Firmware</span>
+                    }
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.body2" Class="owd-ellipsis"><span class="owd-muted">Tela </span>@Agent.Reason</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.body2" Class="owd-ellipsis">
+                    <span class="owd-muted">No aparelho </span>Página @(Dashboard.CurrentPage + 1) de @Dashboard.Layout.Pages.Count
+                    — @Dashboard.Layout.Pages.ElementAtOrDefault(Dashboard.CurrentPage)?.Name
+                </MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
     @if (Dashboard.PluginErrors.Count > 0)
     {
         <MudAlert Severity="Severity.Warning" Dense="true">
@@ -22,133 +51,213 @@
         </MudAlert>
     }
 
-    <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-        <MudChipSet T="int" SelectedValue="_page" SelectedValueChanged="SelectPage" SelectionMode="SelectionMode.SingleSelection" CheckMark="false">
-            @for (var i = 0; i < Dashboard.Layout.Pages.Count; i++)
-            {
-                var index = i;
-                <MudChip T="int" Value="index" Color="Color.Primary" Variant="Variant.Outlined">@Dashboard.Layout.Pages[index].Name</MudChip>
-            }
-        </MudChipSet>
-        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="AddPage">Nova página</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
-            Adicionar widget
-        </MudButton>
-        <MudSpacer />
-        <MudTextField T="string" Value="CurrentPage?.Name" ValueChanged="RenamePage" Label="Nome da página" Variant="Variant.Outlined"
-                      Margin="Margin.Dense" Style="max-width: 240px" DebounceInterval="400" />
-        <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text"
-                   Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
-            Excluir página vazia
-        </MudButton>
-    </MudStack>
-
-    <MudGrid>
+    <MudGrid Spacing="3">
         <MudItem xs="12" md="8">
-            @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
-               de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
-            <div class="owd-grid @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
-                 @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
-                @foreach (var cell in FreeCells())
-                {
-                    <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
-                         @onclick="() => MoveSelectedTo(cell.Column, cell.Row)"></div>
-                }
-                @foreach (var placement in CurrentPage?.Widgets ?? [])
-                {
-                    var p = placement;
-                    <div class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
-                         style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
-                         @onpointerdown="e => Press(p, e)"
-                         @onclick="() => _selected = p.InstanceId">
-                        <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
-                        @if (SizesOf(p.WidgetId).Count > 1)
-                        {
-                            @* Alça do canto: puxar redimensiona, como uma janela. *@
-                            <div class="owd-resize" title="Arraste para mudar o tamanho"
-                                 @onpointerdown="e => StartResize(p, e)" @onpointerdown:stopPropagation="true"
-                                 @onclick:stopPropagation="true"></div>
-                        }
-                    </div>
-                }
-
-                @if (_resizing is { } resized && _resizeTo is { } newSize)
-                {
-                    <div class="owd-drop @(ResizeAllowed(resized, newSize) ? "ok" : "bad")"
-                         style="grid-column: @(resized.Column + 1) / span @newSize.Columns; grid-row: @(resized.Row + 1) / span @newSize.Rows">
-                        <span class="owd-drop-label">@newSize</span>
-                    </div>
-                }
-
-                @if (_dragging is { } dragged)
-                {
-                    if (_hover is { } target)
+            <MudPaper Class="pa-3" Outlined="true">
+                @* Barra do Canvas: a página que está nele, nomes por cima da prévia e o "Adicionar widget". *@
+                <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2" Class="mb-2">
+                    <MudText Typo="Typo.h6" Class="flex-grow-1 owd-ellipsis">@CurrentPage?.Name</MudText>
+                    <MudSwitch T="bool" Value="Settings.ShowWidgetNames" ValueChanged="v => Settings.ShowWidgetNames = v"
+                               Color="Color.Primary" Size="Size.Small">Mostrar nomes</MudSwitch>
+                    <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
+                        Adicionar widget
+                    </MudButton>
+                </MudStack>
+                @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
+                   de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
+                <div class="owd-grid owd-canvas @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
+                     @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
+                    @foreach (var cell in FreeCells())
                     {
-                        var c = Math.Clamp(target.Column, 0, WidgetGrid.Columns - dragged.Size.Columns);
-                        var r = Math.Clamp(target.Row, 0, WidgetGrid.Rows - dragged.Size.Rows);
-                        <div class="owd-drop @(Fits(dragged, target) ? "ok" : "bad")"
-                             style="grid-column: @(c + 1) / span @dragged.Size.Columns; grid-row: @(r + 1) / span @dragged.Size.Rows"></div>
+                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"
+                             @onclick="() => MoveSelectedTo(cell.Column, cell.Row)"></div>
                     }
-                }
-            </div>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
-                Arraste um widget para outra posição, ou puxe o canto inferior direito para mudar o tamanho:
-                a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
-            </MudText>
-        </MudItem>
-
-        <MudItem xs="12" md="4">
-            @if (Selected is { } selected)
-            {
-                <MudPaper Class="pa-4 mb-4" Outlined="true">
-                    <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
-                    @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@
-                    <MudTextField T="string" @key="selected.InstanceId" Value="@Dashboard.DisplayNameOf(selected.InstanceId)"
-                                  ValueChanged="name => Dashboard.RenameWidgetAsync(selected.InstanceId, name)" DebounceInterval="500"
-                                  Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1"
-                                  HelperText="@($"{Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado"} · coluna {selected.Column + 1}, linha {selected.Row + 1}, {selected.Size}")" />
-                    @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
+                    @foreach (var placement in CurrentPage?.Widgets ?? [])
                     {
-                        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
-                        <div class="d-flex flex-wrap gap-1">
-                            @foreach (var size in sizes)
+                        var p = placement;
+                        <div @key="p.InstanceId" class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
+                             style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
+                             @onpointerdown="e => Press(p, e)"
+                             @onclick="() => _selected = p.InstanceId">
+                            @* O tile mostra o que o widget desenha, como vai aparecer no aparelho. *@
+                            <WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" />
+                            <div class="owd-widget-label @(Settings.ShowWidgetNames || p.InstanceId == _selected ? "" : "hidden")">
+                                <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
+                                <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
+                            </div>
+                            @if (SizesOf(p.WidgetId).Count > 1)
                             {
-                                var s = size;
-                                var fits = FitsAt(selected, selected.Column, selected.Row, s);
-                                <MudChip T="string" Size="Size.Small" Variant="@(s == selected.Size ? Variant.Filled : Variant.Outlined)"
-                                         Color="@(s == selected.Size ? Color.Primary : Color.Default)" Disabled="@(!fits && s != selected.Size)"
-                                         OnClick="() => Resize(selected.InstanceId, s)">@s</MudChip>
+                                @* Alça do canto: puxar redimensiona, como uma janela. *@
+                                <div class="owd-resize" title="Arraste para mudar o tamanho"
+                                     @onpointerdown="e => StartResize(p, e)" @onpointerdown:stopPropagation="true"
+                                     @onclick:stopPropagation="true"></div>
                             }
                         </div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
                     }
-                    <MudStack Row="true" Class="mt-3">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings"
-                                   Disabled="@(Dashboard.GetSettings(selected.InstanceId) is null)"
-                                   OnClick="@(() => Navigation.NavigateTo($"/widgets/{selected.InstanceId}"))">Configurar</MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
-                                   OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
-                    </MudStack>
-                </MudPaper>
-            }
+    
+                    @if (_resizing is { } resized && _resizeTo is { } newSize)
+                    {
+                        <div class="owd-drop @(ResizeAllowed(resized, newSize) ? "ok" : "bad")"
+                             style="grid-column: @(resized.Column + 1) / span @newSize.Columns; grid-row: @(resized.Row + 1) / span @newSize.Rows">
+                            <span class="owd-drop-label">@newSize</span>
+                        </div>
+                    }
+    
+                    @if (_dragging is { } dragged)
+                    {
+                        if (_hover is { } target)
+                        {
+                            var c = Math.Clamp(target.Column, 0, WidgetGrid.Columns - dragged.Size.Columns);
+                            var r = Math.Clamp(target.Row, 0, WidgetGrid.Rows - dragged.Size.Rows);
+                            <div class="owd-drop @(Fits(dragged, target) ? "ok" : "bad")"
+                                 style="grid-column: @(c + 1) / span @dragged.Size.Columns; grid-row: @(r + 1) / span @dragged.Size.Rows"></div>
+                        }
+                    }
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                    Arraste um widget para outra posição, ou puxe o canto inferior direito para mudar o tamanho:
+                    a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
+                </MudText>
+            </MudPaper>
+        </MudItem>
 
-            else
-            {
-                <MudPaper Class="pa-4" Outlined="true">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Clique num widget da grade para configurar, mudar o tamanho ou tirar.
-                        Para pôr um novo, use "Adicionar widget".
-                    </MudText>
-                </MudPaper>
-            }
+        @* Painel do widget: acompanha a rolagem e rola por dentro, para plugin com muitos campos não quebrar a tela. *@
+        <MudItem xs="12" md="4">
+            <div class="owd-side">
+                @if (Selected is { } selected)
+                {
+                    var settings = Dashboard.GetSettings(selected.InstanceId);
+                    <MudPaper Class="pa-3 mb-4" Outlined="true">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
+                        <MudText Typo="Typo.h6" Class="owd-ellipsis">@Dashboard.DisplayNameOf(selected.InstanceId)</MudText>
+                        @* Abas: o que todo widget tem (Geral) e as configurações do plugin, quando ele tem. *@
+                        <MudTabs @bind-ActivePanelIndex="_sideTab" Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3" MinimumTabWidth="0px"
+                                 Class="owd-side-tabs">
+                            <MudTabPanel Text="Geral">
+                                @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@
+                                <MudTextField T="string" @key="selected.InstanceId" Value="@Dashboard.DisplayNameOf(selected.InstanceId)"
+                                              ValueChanged="name => Dashboard.RenameWidgetAsync(selected.InstanceId, name)" DebounceInterval="500"
+                                              Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                              HelperText="@($"{Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado"} · coluna {selected.Column + 1}, linha {selected.Row + 1}, {selected.Size}")" />
+                                @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
+                                {
+                                    <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var size in sizes)
+                                        {
+                                            var s = size;
+                                            var fits = FitsAt(selected, selected.Column, selected.Row, s);
+                                            <MudChip T="string" Size="Size.Small" Variant="@(s == selected.Size ? Variant.Filled : Variant.Outlined)"
+                                                     Color="@(s == selected.Size ? Color.Primary : Color.Default)" Disabled="@(!fits && s != selected.Size)"
+                                                     OnClick="() => Resize(selected.InstanceId, s)">@s</MudChip>
+                                        }
+                                    </div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
+                                }
+                                <MudStack Row="true" Class="mt-3">
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                               OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
+                                </MudStack>
+                            </MudTabPanel>
+                            <MudTabPanel Text="Configurações" Disabled="@(settings is null)"
+                                         ToolTip="@(settings is null ? "Este widget não tem configurações" : null)">
+                                @* Configurações do próprio plugin: o que mudar aqui já aparece no tile. *@
+                                @if (settings is { } plugin)
+                                {
+                                    <div @key="@($"settings-{selected.InstanceId}")" class="owd-widget-settings">
+                                        <CascadingValue Value="plugin.Context">
+                                            <DynamicComponent Type="plugin.Component" Parameters="@(new Dictionary<string, object> { ["Instance"] = plugin.Instance })" />
+                                        </CascadingValue>
+                                    </div>
+                                }
+                            </MudTabPanel>
+                        </MudTabs>
+                    </MudPaper>
+                }
+    
+                else
+                {
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Clique num widget da grade para configurar, mudar o tamanho ou tirar.
+                            Para pôr um novo, use "Adicionar widget".
+                        </MudText>
+                    </MudPaper>
+                }
+            </div>
+        </MudItem>
+
+        @* Linha das páginas: largura toda, embaixo do Canvas e do painel do widget. *@
+        <MudItem xs="12">
+            <MudPaper Class="pa-3" Outlined="true">
+                @* Páginas: miniaturas ao vivo; em cada uma, renomear no rótulo, mudar de lugar e excluir. *@
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Páginas</MudText>
+                <div class="owd-pages">
+                    @for (var i = 0; i < Dashboard.Layout.Pages.Count; i++)
+                    {
+                        var index = i;
+                        var thumb = Dashboard.Layout.Pages[index];
+                        <div @key="thumb.Id" class="owd-page-card @(index == _page ? "selected" : "")">
+                            <div class="owd-thumb-grid" role="button" tabindex="0" @onclick="() => SelectPage(index)" title="Mostrar @thumb.Name">
+                                @foreach (var w in thumb.Widgets)
+                                {
+                                    <div @key="w.InstanceId" class="owd-thumb-widget"
+                                         style="grid-column: @(w.Column + 1) / span @w.Size.Columns; grid-row: @(w.Row + 1) / span @w.Size.Rows">
+                                        <WidgetLiveFrame Dashboard="Dashboard" InstanceId="w.InstanceId" MaxPerSecond="1" />
+                                    </div>
+                                }
+                            </div>
+                            @if (_renamingPage == index)
+                            {
+                                <MudTextField T="string" @bind-Value="_pageNameDraft" Immediate="true" AutoFocus="true" OnKeyDown="PageNameKey"
+                                              Error="@(_pageNameError is not null)" ErrorText="@_pageNameError"
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="owd-page-name-edit" />
+                                <div class="owd-page-actions">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Primary" Size="Size.Small" OnClick="SaveRename" aria-label="Salvar nome" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="CancelRename" aria-label="Cancelar" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="owd-page-name" title="Duplo clique para renomear" @ondblclick="() => StartRename(index)">
+                                    @if (index == Dashboard.CurrentPage)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Monitor" Size="Size.Small" title="No aparelho agora" />
+                                    }
+                                    <span class="owd-ellipsis">@thumb.Name</span>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Class="owd-page-pen"
+                                                   OnClick="() => StartRename(index)" aria-label="@($"Renomear {thumb.Name}")" />
+                                </div>
+                                <div class="owd-page-actions">
+                                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" Disabled="@(index == 0)"
+                                                   OnClick="() => MovePage(index, -1)" aria-label="@($"Mover {thumb.Name} para a esquerda")" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Disabled="@(index == Dashboard.Layout.Pages.Count - 1)"
+                                                   OnClick="() => MovePage(index, 1)" aria-label="@($"Mover {thumb.Name} para a direita")" />
+                                    <MudSpacer />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                   Disabled="@(Dashboard.Layout.Pages.Count < 2)"
+                                                   OnClick="() => RemovePage(index)" aria-label="@($"Excluir {thumb.Name}")" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    <button type="button" class="owd-page-card owd-page-add" @onclick="AddPage" title="Nova página">
+                        <div class="owd-thumb-grid"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Large" /></div>
+                        <div class="owd-page-name">Nova página</div>
+                    </button>
+                </div>
+            </MudPaper>
         </MudItem>
     </MudGrid>
 </MudStack>
 
 @code {
-    private int _page;
+    // A página do editor é a do aparelho: escolher aqui troca lá, e swipe lá (ou na prévia) troca aqui.
+    private int _page => Dashboard.CurrentPage;
     private Guid? _selected;
+
+    // Aba do painel do widget (0 = Geral, 1 = Configurações); fica a mesma ao trocar de widget.
+    private int _sideTab;
 
     private DashboardHost Dashboard => Agent.Dashboard;
     private LayoutPage? CurrentPage => Dashboard.Layout.Pages.ElementAtOrDefault(_page);
@@ -156,15 +265,23 @@
 
     protected override void OnInitialized()
     {
-        _page = Dashboard.CurrentPage;
         Dashboard.LayoutChanged += Refresh;
+        Dashboard.PageChanged += OnPageChanged;
+        Agent.Changed += Refresh;
+        Settings.Changed += Refresh;
     }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
 
+    private void OnPageChanged() => InvokeAsync(() =>
+    {
+        if (Selected is null)
+            _selected = null;
+        StateHasChanged();
+    });
+
     private async Task SelectPage(int page)
     {
-        _page = page;
         _selected = null;
         await Dashboard.GoToPageAsync(page, OpenWigi.Device.Protocol.Transition.None);
     }
@@ -186,6 +303,7 @@
             { d => d.Widgets, Dashboard.AvailableWidgets },
             { d => d.Page, page },
             { d => d.NameOf, id => Dashboard.DisplayNameOf(id) },
+            { d => d.Dashboard, Dashboard },
             { d => d.IconOf, async id => await Dashboard.GetCatalogIconAsync(id) is { } frame ? PreviewImage.ToDataUrl(frame) : null },
         };
         var dialog = await Dialogs.ShowAsync<AddWidgetDialog>("Adicionar widget", parameters,
@@ -384,20 +502,78 @@
     }
 
     private async Task AddPage() =>
-        await SelectPage(await Dashboard.AddPageAsync($"Página {Dashboard.Layout.Pages.Count + 1}"));
+        await SelectPage(await Dashboard.AddPageAsync());
 
-    private async Task RemovePage()
+    private Task MovePage(int index, int delta)
     {
-        if (await Dashboard.RemovePageAsync(_page))
-            _page = Math.Min(_page, Dashboard.Layout.Pages.Count - 1);
+        CancelRename();
+        return Dashboard.MovePageAsync(index, index + delta);
     }
 
-    private async Task RenamePage(string name)
+    // Página com widgets só sai depois do aceite: ela leva os widgets e as configurações deles junto.
+    private async Task RemovePage(int index)
     {
-        if (!string.IsNullOrWhiteSpace(name))
-            await Dashboard.RenamePageAsync(_page, name.Trim());
+        if (Dashboard.Layout.Pages.ElementAtOrDefault(index) is not { } page)
+            return;
+        var count = page.Widgets.Count;
+        if (count > 0)
+        {
+            var confirmed = await Dialogs.ShowMessageBoxAsync(
+                "Excluir página",
+                (MarkupString)($"A página <b>{System.Net.WebUtility.HtmlEncode(page.Name)}</b> tem {count} widget(s). " +
+                "Excluir apaga a página, os widgets dela e as configurações deles. Isso não dá para desfazer."),
+                yesText: "Excluir com os widgets", cancelText: "Cancelar");
+            if (confirmed != true)
+                return;
+        }
+        if (_renamingPage == index)
+            CancelRename();
+        _selected = null;
+        await Dashboard.RemovePageAsync(index, withWidgets: count > 0);
     }
 
+    // Página sendo renomeada no carrossel (null = nenhuma) e o texto em edição.
+    private int? _renamingPage;
+    private string? _pageNameDraft;
+    private string? _pageNameError;
+
+    private void StartRename(int index)
+    {
+        _renamingPage = index;
+        _pageNameDraft = Dashboard.Layout.Pages.ElementAtOrDefault(index)?.Name ?? string.Empty;
+        _pageNameError = null;
+    }
+
+    private void CancelRename()
+    {
+        _renamingPage = null;
+        _pageNameDraft = null;
+        _pageNameError = null;
+    }
+
+    // Nome vazio ou de outra página não grava: o campo fica aberto com o motivo para corrigir.
+    private async Task SaveRename()
+    {
+        if (_renamingPage is not { } index)
+            return;
+        var name = _pageNameDraft ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+            _pageNameError = "A página precisa de um nome";
+        else if (Dashboard.IsPageNameTaken(name, index))
+            _pageNameError = "Já existe uma página com esse nome";
+        else if (name.Trim() == Dashboard.Layout.Pages.ElementAtOrDefault(index)?.Name || await Dashboard.RenamePageAsync(index, name))
+            CancelRename();
+        else
+            _pageNameError = "Não deu para renomear";
+    }
+
+    private async Task PageNameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SaveRename();
+        else if (e.Key == "Escape")
+            CancelRename();
+    }
     // Delete com um widget selecionado = "Tirar" (com a mesma confirmação).
     private DotNetObjectReference<Widgets>? _self;
     private IJSObjectReference? _deleteKey;
@@ -421,6 +597,9 @@
     public async ValueTask DisposeAsync()
     {
         Dashboard.LayoutChanged -= Refresh;
+        Dashboard.PageChanged -= OnPageChanged;
+        Agent.Changed -= Refresh;
+        Settings.Changed -= Refresh;
         try
         {
             if (_deleteKey is not null)

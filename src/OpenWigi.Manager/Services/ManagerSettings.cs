@@ -16,7 +16,7 @@ public sealed class ManagerSettings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash", "manager.json");
     private Stored _stored;
 
-    private sealed record Stored(bool DarkMode = true, int? Brightness = null);
+    private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true);
 
     public ManagerSettings()
     {
@@ -36,6 +36,18 @@ public sealed class ManagerSettings
         set
         {
             _stored = _stored with { DarkMode = value };
+            Save();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Nome dos widgets por cima da prévia no editor. Desligado, o tile mostra só o que vai para o aparelho.</summary>
+    public bool ShowWidgetNames
+    {
+        get => _stored.ShowWidgetNames;
+        set
+        {
+            _stored = _stored with { ShowWidgetNames = value };
             Save();
             Changed?.Invoke();
         }

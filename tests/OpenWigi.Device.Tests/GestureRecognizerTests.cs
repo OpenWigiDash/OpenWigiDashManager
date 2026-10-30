@@ -118,7 +118,9 @@ public class GestureRecognizerTests
     {
         Feed(Down(100, 100), Down(400, 100));
         Assert.Empty(Feed(Down(400, 100), Up(400, 100)));
-        Assert.Contains(GestureKind.PressStarted, Feed(None, Down(10, 10)));
+        Feed(None);
+        _time.Advance(TimeSpan.FromMilliseconds(350)); // e o intervalo pós-swipe
+        Assert.Contains(GestureKind.PressStarted, Feed(Down(10, 10)));
     }
 
     [Fact]
@@ -147,5 +149,31 @@ public class GestureRecognizerTests
         _time.Advance(TimeSpan.FromMilliseconds(300));
         var progress = Assert.Single(recognizer.Process(Down(0, 0)), e => e.Kind == GestureKind.PressProgress);
         Assert.Equal(0.5, progress.Progress, 2);
+    }
+
+    // Captura real no aparelho (2026-10-29): dois swipes para a esquerda seguidos; entre eles o dedo
+    // voltando encostou 47 ms no meio da tela, ~260 ms depois de sair, e virava tap num botão.
+    [Fact]
+    public void Dedo_voltando_logo_depois_do_swipe_nao_vira_tap()
+    {
+        var swipe = Feed(Down(742, 310), Down(734, 313), Down(667, 319), Down(631, 319), Down(549, 315),
+            Down(492, 312), Down(389, 305), Down(145, 312), Up(145, 312));
+        Assert.Contains(GestureKind.SwipeLeft, swipe);
+
+        Feed(None, None, None, None, None, None, None); // ~230 ms sem contato
+        Assert.Empty(Feed(Down(552, 299), Up(552, 299), None));
+
+        // O swipe seguinte, ~460 ms depois do primeiro sair, vale normalmente.
+        _time.Advance(TimeSpan.FromMilliseconds(150));
+        var next = Feed(Down(787, 373), Down(705, 372), Down(638, 370), Down(596, 369), Up(596, 369));
+        Assert.Contains(GestureKind.SwipeLeft, next);
+    }
+
+    [Fact]
+    public void Toque_depois_do_intervalo_do_swipe_vale()
+    {
+        Feed(Down(700, 300), Down(600, 300), Down(500, 300), Up(500, 300), None);
+        _time.Advance(TimeSpan.FromMilliseconds(400));
+        Assert.Contains(GestureKind.Tap, Feed(Down(200, 70), Down(200, 70), Up(200, 70)));
     }
 }

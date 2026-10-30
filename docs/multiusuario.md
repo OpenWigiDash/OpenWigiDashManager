@@ -60,3 +60,11 @@ guarda do que escreveu (o WigiDash não devolve a imagem). O mouse na janela vir
 pelo mesmo reconhecedor de gestos: clicar dá tap, segurar o botão dá long-press e arrastar dá swipe.
 A prévia e o toque emulado só valem para o dono da tela, então outro usuário não vê nem mexe na
 tela de quem está no console. Pelo RDP, rode o serviço com `--OpenWigi:AllowRemoteSessions=true`.
+
+## Testar com outro usuário sem instalar nada nele
+
+`scripts\Deploy-DevManager.ps1` (sem admin) publica o manager em `C:\OpenWigiDash\dev-manager`, copia os
+widgets do usuário atual para `C:\OpenWigiDash\dev-widgets` e cria `C:\OpenWigiDash\Abrir OpenWigiDash (teste).cmd`.
+No outro usuário do Windows basta abrir esse atalho: o serviço de dev já é da máquina, e layout e configurações
+ficam no `%APPDATA%` de cada um. Depois é trocar de usuário no console (Win+L, "Trocar usuário") e ver a tela
+do aparelho passar de um para o outro.

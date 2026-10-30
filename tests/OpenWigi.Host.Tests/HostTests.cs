@@ -149,12 +149,16 @@ public sealed class HostTests : IAsyncLifetime
         var host = await StartAsync();
         await host.ActivateAsync(true);
         var first = _sink.Shown.Last();
+        var pageChanges = 0;
+        host.PageChanged += () => pageChanges++;
 
         await host.HandleGestureAsync(new GestureEvent(GestureKind.SwipeLeft, 500, 300, TimeSpan.FromMilliseconds(200)));
 
+        // O editor e a prévia acompanham pela notificação.
         Assert.Equal(1, host.CurrentPage);
+        Assert.Equal(1, pageChanges);
         Assert.NotEqual(first, _sink.Shown.Last());
-        Assert.Equal(Transition.WipeWest, _sink.Transitions.Last());
+        Assert.Equal(Transition.WipeEast, _sink.Transitions.Last());
     }
 
     [Fact]
@@ -237,6 +241,82 @@ public sealed class HostTests : IAsyncLifetime
 
         await host.RenameWidgetAsync(second.Value, "");
         Assert.Equal("Contador (exemplo)", host.DisplayNameOf(second.Value));
+    }
+
+    [Fact]
+    public async Task Quadro_de_cada_instancia_fica_disponivel_para_o_editor()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Outra");
+        var changed = new List<Guid>();
+        host.FrameChanged += id => { lock (changed) changed.Add(id); };
+
+        var id = (await host.AddWidgetAsync(Counter, page))!.Value;
+
+        // Mesmo numa página que não está no aparelho, o editor já tem o quadro do tamanho do widget.
+        var frame = host.FrameOf(id);
+        Assert.NotNull(frame);
+        Assert.Equal(WidgetSize.Small.PixelSize, frame.Size);
+        lock (changed)
+            Assert.Contains(id, changed);
+        Assert.Null(host.FrameOf(Guid.NewGuid()));
+    }
+
+[Fact]
+    public async Task Paginas_nunca_tem_nome_repetido()
+    {
+        // Layout antigo com nome repetido: ao carregar, a segunda ganha número.
+        Directory.CreateDirectory(Data);
+        new LayoutStore(Path.Combine(Data, "layout.json")).Save(new DashboardLayout
+        {
+            Pages = [new LayoutPage { Name = "Página 1" }, new LayoutPage { Name = "Página 3" }, new LayoutPage { Name = "página 3" }],
+        });
+        var host = await StartAsync();
+        Assert.Equal(["Página 1", "Página 3", "página 3 2"], host.Layout.Pages.Select(p => p.Name));
+
+        // Nova página sem nome pega o primeiro "Página N" livre; com nome usado, ganha número.
+        Assert.Equal("Página 2", host.Layout.Pages[await host.AddPageAsync()].Name);
+        Assert.Equal("Página 1 2", host.Layout.Pages[await host.AddPageAsync("Página 1")].Name);
+
+        // Renomear para o nome de outra (sem diferenciar maiúsculas) é recusado; para o próprio, não.
+        Assert.False(await host.RenamePageAsync(0, " página 3 "));
+        Assert.Equal("Página 1", host.Layout.Pages[0].Name);
+        Assert.True(await host.RenamePageAsync(0, "PÁGINA 1"));
+        Assert.False(await host.RenamePageAsync(0, "  "));
+    }
+
+    [Fact]
+    public async Task Excluir_pagina_com_widgets_so_com_aceite_e_apaga_as_instancias()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Jogos");
+        var counter = (await host.AddWidgetAsync(Counter, page))!.Value;
+        await host.GoToPageAsync(page, Transition.None);
+
+        Assert.False(await host.RemovePageAsync(page)); // sem o aceite, não sai
+        Assert.True(await host.RemovePageAsync(page, withWidgets: true));
+
+        Assert.Equal(["Página 1"], host.Layout.Pages.Select(p => p.Name));
+        Assert.Equal(0, host.CurrentPage); // estava nela: foi para a vizinha
+        Assert.DoesNotContain(host.Layout.AllPlacements, p => p.InstanceId == counter);
+        Assert.Null(host.FrameOf(counter));
+        Assert.False(Directory.Exists(Path.Combine(Data, "instances", counter.ToString("D"))));
+        Assert.False(await host.RemovePageAsync(0, withWidgets: true)); // a última página fica
+    }
+
+    [Fact]
+    public async Task Mudar_a_ordem_das_paginas_mantem_a_pagina_atual()
+    {
+        var host = await StartAsync();
+        await host.AddPageAsync("B");
+        await host.AddPageAsync("C");
+        await host.GoToPageAsync(2, Transition.None); // "C" no aparelho
+
+        Assert.True(await host.MovePageAsync(2, 0));
+        Assert.Equal(["C", "Página 1", "B"], host.Layout.Pages.Select(p => p.Name));
+        Assert.Equal(0, host.CurrentPage); // continua mostrando "C", agora no lugar 0
+        Assert.Equal(["C", "Página 1", "B"], new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages.Select(p => p.Name));
+        Assert.False(await host.MovePageAsync(0, 3));
     }
 
     [Fact]

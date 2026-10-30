@@ -23,40 +23,6 @@ html, body {
     right: 0.75rem;
 }
 
-/* A prévia mantém a proporção do aparelho (1016x592). */
-.owd-device {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1016 / 592;
-    background: #0e0f13;
-    /* Moldura fora da caixa (sombra), para o clique em offsetX/Y cair direto em pixels da tela. */
-    margin: 10px;
-    width: calc(100% - 20px);
-    border-radius: 6px;
-    box-shadow: 0 0 0 10px #1b1d24, 0 0 0 11px #2a2d36;
-    overflow: hidden;
-    user-select: none;
-    touch-action: none;
-}
-
-.owd-device img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    cursor: pointer;
-    image-rendering: auto;
-    -webkit-user-drag: none;
-}
-
-.owd-device .owd-empty {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #5c606b;
-}
-
 /* Grade do editor: 5x4 células, mesma proporção do aparelho. */
 .owd-grid {
     display: grid;
@@ -101,6 +67,44 @@ html, body {
 /* O widget arrastado fica translúcido no lugar de origem. */
 .owd-widget.ghost {
     opacity: 0.35;
+}
+
+/* Prévia ao vivo: o quadro do widget ocupa o tile inteiro, na mesma proporção do aparelho. */
+.owd-live {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Nome por cima da prévia, discreto; o tipo e o tamanho só ao passar o mouse ou selecionado. */
+.owd-widget-label {
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(14, 15, 19, 0.72);
+    color: #e8e9ee;
+    pointer-events: none;
+}
+
+.owd-widget-label .owd-widget-caption {
+    display: none;
+    color: #a9adbb;
+}
+
+.owd-widget:hover .owd-widget-caption,
+.owd-widget.selected .owd-widget-caption {
+    display: block;
+}
+
+.owd-widget .owd-resize {
+    z-index: 2;
 }
 
 .owd-grid {
@@ -223,4 +227,178 @@ html, body {
 .owd-widget.selected {
     border-color: #e5243b;
     box-shadow: 0 0 0 1px #e5243b;
+}
+
+.owd-muted {
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Switch "Mostrar nomes" desligado: o tile fica só com a prévia (o selecionado mantém o nome). */
+.owd-widget-label.hidden {
+    display: none;
+}
+
+/* Assistente: o encaixe mostra a prévia do widget novo por baixo da borda verde. */
+.owd-drop-preview {
+    position: relative;
+    overflow: hidden;
+}
+
+.owd-drop-preview .owd-live {
+    opacity: 0.85;
+}
+
+.owd-drop-preview .owd-drop-label {
+    position: relative;
+    z-index: 1;
+}
+
+/* Carrossel de páginas: cartões com miniatura ao vivo, nome (renomear) e ações (mover, excluir).
+   Quebra em linhas em vez de rolar de lado: usa a largura que tiver. */
+.owd-pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 8px 2px 4px;
+}
+
+.owd-page-card {
+    /* Largura fixa: nem o campo de renomear estica o cartão. */
+    flex: 0 0 176px;
+    width: 176px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid var(--mud-palette-lines-default);
+    background: transparent;
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    transition: border-color 120ms ease;
+}
+
+/* Hover só clareia a borda: vermelho é só da selecionada, para nunca parecer que há duas. */
+.owd-page-card:hover:not(.selected) {
+    border-color: var(--mud-palette-text-secondary);
+}
+
+.owd-page-card.selected {
+    border-color: #e5243b;
+    box-shadow: 0 0 0 1px #e5243b;
+}
+
+/* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. */
+.owd-thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 1px;
+    width: 100%;
+    height: 94px;
+    padding: 0;
+    border: 0;
+    background: #0e0f13;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.owd-thumb-widget {
+    position: relative;
+    background: #23252d;
+}
+
+.owd-page-add {
+    cursor: pointer;
+}
+
+.owd-page-add .owd-thumb-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px dashed var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+}
+
+.owd-page-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    font-size: 0.85rem;
+    cursor: text;
+}
+
+.owd-page-pen {
+    margin-left: auto !important;
+    opacity: 0.6;
+}
+
+.owd-page-card:hover .owd-page-pen {
+    opacity: 1;
+}
+
+.owd-page-name-edit {
+    margin-top: 0 !important;
+}
+
+.owd-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.owd-ellipsis {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Painel do widget: fica à vista ao rolar a tela e rola por dentro quando o plugin tem muitos campos. */
+.owd-side {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Tela do plugin: o que ele fixar mais largo que o painel rola de lado em vez de vazar. */
+.owd-widget-settings {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* Em telas estreitas o painel desce para baixo do Canvas: aí não precisa ficar preso. */
+@media (max-width: 959.98px) {
+    .owd-side {
+        position: static;
+        max-height: none;
+    }
+}
+/* Canvas sem passar da altura da janela: assim o carrossel de páginas aparece sem rolar em telas largas. */
+.owd-canvas {
+    max-width: calc((100vh - 540px) * 1016 / 592);
+    min-width: 420px;
+    margin: 0 auto;
+}
+
+/* Abas do painel do widget: o cabeçalho fica no topo enquanto o conteúdo rola. */
+.owd-side-tabs .mud-tabs-tabbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--mud-palette-surface);
+}
+
+/* As duas abas cabem no painel estreito, sem setas de rolar. */
+.owd-side-tabs .mud-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 8px;
+    text-transform: none;
 }

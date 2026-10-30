@@ -14,6 +14,7 @@ internal sealed class WidgetRuntime : IAsyncDisposable
     private readonly SemaphoreSlim _calls = new(1, 1);
     private readonly ILogger _logger;
     private int _renderRequested;
+    private WidgetFrame? _lastFrame;
 
     public WidgetRuntime(LoadedWidget widget, WidgetPlacement placement, WidgetContext context, ILogger logger)
     {
@@ -27,7 +28,21 @@ internal sealed class WidgetRuntime : IAsyncDisposable
     public WidgetPlacement Placement { get; }
     public WidgetContext Context { get; }
     public IWidgetInstance? Instance { get; private set; }
-    public WidgetFrame? LastFrame { get; set; }
+/// <summary>Último quadro completo da instância. Trocar avisa <see cref="FrameChanged"/> (prévia no editor).</summary>
+    public WidgetFrame? LastFrame
+    {
+        get => _lastFrame;
+        set
+        {
+            if (ReferenceEquals(_lastFrame, value))
+                return;
+            _lastFrame = value;
+            if (value is not null)
+                FrameChanged?.Invoke(Placement.InstanceId);
+        }
+    }
+
+    public Action<Guid>? FrameChanged { get; set; }
     public string Name => Widget.Manifest.Name;
 
     public async Task<bool> CreateAsync(CancellationToken cancellationToken)
