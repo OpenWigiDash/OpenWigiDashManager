@@ -333,16 +333,7 @@ public event Action? LayoutChanged;
             if (page < 0)
                 return;
             _layout.Pages[page].Widgets.RemoveAll(w => w.InstanceId == instanceId);
-            if (_runtimes.Remove(instanceId, out var runtime))
-            {
-                if (ReferenceEquals(_fullscreen, runtime))
-                    _fullscreen = null;
-                if (ReferenceEquals(_pressTarget, runtime))
-                    _pressTarget = null;
-                await runtime.CallAsync("OnRemovedAsync", (i, ct) => i.OnRemovedAsync(ct), cancellationToken);
-                await runtime.DisposeAsync();
-                runtime.Context.Storage.DeleteAll();
-            }
+            await DestroyRuntimeAsync(instanceId, cancellationToken);
             await CommitLayoutAsync(page, cancellationToken);
         }
         finally
@@ -472,24 +463,48 @@ public event Action? LayoutChanged;
         }
     }
 
-    /// <summary>Remove uma página vazia (precisa sobrar pelo menos uma).</summary>
-    public async Task<bool> RemovePageAsync(int page, CancellationToken cancellationToken = default)
+    /// <summary>Remove uma página (precisa sobrar pelo menos uma). Com widgets, só se <paramref name="withWidgets"/>: eles são apagados.</summary>
+    public async Task<bool> RemovePageAsync(int page, bool withWidgets = false, CancellationToken cancellationToken = default)
     {
         await _state.WaitAsync(cancellationToken);
         try
         {
-            if (_layout.Pages.Count <= 1 || page < 0 || page >= _layout.Pages.Count || _layout.Pages[page].Widgets.Count > 0)
+            if (_layout.Pages.Count <= 1 || page < 0 || page >= _layout.Pages.Count)
                 return false;
-            _layout.Pages.RemoveAt(page);
-            if (CurrentPage >= _layout.Pages.Count)
-                CurrentPage = _layout.Pages.Count - 1;
-            await CommitLayoutAsync(CurrentPage, cancellationToken);
+            var removed = _layout.Pages[page];
+            if (removed.Widgets.Count > 0 && !withWidgets)
+                return false;
+
+            // Saindo da página que está no aparelho: mostra a vizinha antes de apagar.
+            if (page == CurrentPage)
+                await GoToPageUnlockedAsync(page == 0 ? 1 : page - 1, Transition.None, cancellationToken);
+            foreach (var placement in removed.Widgets.ToList())
+                await DestroyRuntimeAsync(placement.InstanceId, cancellationToken);
+
+            var current = _layout.Pages[CurrentPage];
+            _layout.Pages.Remove(removed);
+            CurrentPage = _layout.Pages.IndexOf(current);
+            await CommitLayoutAsync(-1, cancellationToken);
             return true;
         }
         finally
         {
             _state.Release();
         }
+    }
+
+    // Tira a instância de vez: avisa o plugin, descarta e apaga configurações e arquivos dela.
+    private async Task DestroyRuntimeAsync(Guid instanceId, CancellationToken cancellationToken)
+    {
+        if (!_runtimes.Remove(instanceId, out var runtime))
+            return;
+        if (ReferenceEquals(_fullscreen, runtime))
+            _fullscreen = null;
+        if (ReferenceEquals(_pressTarget, runtime))
+            _pressTarget = null;
+        await runtime.CallAsync("OnRemovedAsync", (i, ct) => i.OnRemovedAsync(ct), cancellationToken);
+        await runtime.DisposeAsync();
+        runtime.Context.Storage.DeleteAll();
     }
 
     /// <summary>Renomeia. Recusa (false) nome vazio ou já usado por outra página: não existem duas com o mesmo nome.</summary>

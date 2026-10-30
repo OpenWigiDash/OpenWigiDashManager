@@ -1,4 +1,4 @@
-// Configurações do plugin no painel, assistente com prévia e ordem das páginas (volta tudo como estava).
+// Configurações do plugin no painel e assistente com prévia (cancela no fim, não muda nada).
 // Uso: node settings-wizard-order.mjs <pasta-das-capturas>
 import { chromium } from 'playwright';
 const dir = process.argv[2] ?? '.';
@@ -22,15 +22,6 @@ await page.screenshot({ path: `${dir}/assistente-previa.png` });
 await page.getByRole('button', { name: 'Cancelar' }).click();
 await page.waitForTimeout(500);
 
-const names = async () => (await page.locator('.owd-page-thumb:not(.owd-page-add) .owd-page-name').allInnerTexts()).map(n => n.trim());
-const before = await names();
-await page.getByRole('button', { name: 'Mover página para a direita' }).click();
-await page.waitForTimeout(800);
-const moved = await names();
-console.log('ordem:', before.join(' | '), '->', moved.join(' | '), '| selecionada:', (await page.locator('.owd-page-thumb.selected .owd-page-name').innerText()).trim());
-await page.getByRole('button', { name: 'Mover página para a esquerda' }).click();
-await page.waitForTimeout(800);
-console.log('voltou:', (await names()).join(' | '));
 const broke = await page.locator('#blazor-error-ui').isVisible();
 console.log('barra de erro do Blazor:', broke);
 await browser.close();

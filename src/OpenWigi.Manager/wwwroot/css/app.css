@@ -229,13 +229,6 @@ html, body {
     box-shadow: 0 0 0 1px #e5243b;
 }
 
-/* Faixa de estado no topo do editor (o que era o Painel). */
-.owd-info {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 40px;
-}
-
 .owd-muted {
     color: var(--mud-palette-text-secondary);
 }
@@ -245,97 +238,6 @@ html, body {
     display: none;
 }
 
-/* Seletor de páginas: miniaturas na proporção do aparelho, em fila horizontal. */
-.owd-pages {
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding: 12px 2px 6px;
-}
-
-.owd-page-thumb {
-    flex: 0 0 auto;
-    width: 150px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 6px;
-    border-radius: 8px;
-    border: 1px solid var(--mud-palette-lines-default);
-    background: transparent;
-    color: var(--mud-palette-text-primary);
-    cursor: pointer;
-    font: inherit;
-    transition: border-color 120ms ease;
-}
-
-/* Hover só clareia a borda: vermelho é só da selecionada, para nunca parecer que há duas. */
-.owd-page-thumb:hover:not(.selected) {
-    border-color: var(--mud-palette-text-secondary);
-}
-
-.owd-page-thumb.selected {
-    border-color: #e5243b;
-    box-shadow: 0 0 0 1px #e5243b;
-}
-
-.owd-thumb-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(4, 1fr);
-    gap: 1px;
-    /* Altura fixa: dentro do <button> o aspect-ratio não pega e a grade some. 138 x 80 ~ 1016 x 592. */
-    width: 100%;
-    height: 80px;
-    background: #0e0f13;
-    border-radius: 4px;
-    overflow: hidden;
-    place-items: stretch;
-}
-
-.owd-thumb-widget {
-    position: relative;
-    background: #23252d;
-}
-
-.owd-page-add .owd-thumb-grid {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 1px dashed var(--mud-palette-lines-default);
-    color: var(--mud-palette-text-secondary);
-}
-
-.owd-page-name {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Nome da página: título com caneta (duplo clique também edita); em edição vira campo com borda. */
-.owd-page-title {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    min-width: 0;
-    cursor: text;
-}
-
-.owd-page-title .mud-typography {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.owd-page-title-edit {
-    flex: 0 1 260px;
-    margin-top: 0 !important;
-}
 /* Assistente: o encaixe mostra a prévia do widget novo por baixo da borda verde. */
 .owd-drop-preview {
     position: relative;
@@ -351,8 +253,132 @@ html, body {
     z-index: 1;
 }
 
-/* Tela do plugin dentro do painel estreito: o que o plugin fixar mais largo rola em vez de vazar. */
+/* Carrossel de páginas: cartões com miniatura ao vivo, nome (renomear) e ações (mover, excluir). */
+.owd-pages {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 8px 2px 4px;
+}
+
+.owd-page-card {
+    flex: 0 0 176px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid var(--mud-palette-lines-default);
+    background: transparent;
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    transition: border-color 120ms ease;
+}
+
+/* Hover só clareia a borda: vermelho é só da selecionada, para nunca parecer que há duas. */
+.owd-page-card:hover:not(.selected) {
+    border-color: var(--mud-palette-text-secondary);
+}
+
+.owd-page-card.selected {
+    border-color: #e5243b;
+    box-shadow: 0 0 0 1px #e5243b;
+}
+
+/* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. */
+.owd-thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 1px;
+    width: 100%;
+    height: 94px;
+    padding: 0;
+    border: 0;
+    background: #0e0f13;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.owd-thumb-widget {
+    position: relative;
+    background: #23252d;
+}
+
+.owd-page-add {
+    cursor: pointer;
+}
+
+.owd-page-add .owd-thumb-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px dashed var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+}
+
+.owd-page-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    font-size: 0.85rem;
+    cursor: text;
+}
+
+.owd-page-pen {
+    margin-left: auto !important;
+    opacity: 0.6;
+}
+
+.owd-page-card:hover .owd-page-pen {
+    opacity: 1;
+}
+
+.owd-page-name-edit {
+    margin-top: 0 !important;
+}
+
+.owd-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.owd-ellipsis {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Painel do widget: fica à vista ao rolar a tela e rola por dentro quando o plugin tem muitos campos. */
+.owd-side {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Tela do plugin: o que ele fixar mais largo que o painel rola de lado em vez de vazar. */
 .owd-widget-settings {
     max-width: 100%;
     overflow-x: auto;
+}
+
+/* Em telas estreitas o painel desce para baixo do Canvas: aí não precisa ficar preso. */
+@media (max-width: 959.98px) {
+    .owd-side {
+        position: static;
+        max-height: none;
+    }
+}
+/* Canvas sem passar da altura da janela: assim o carrossel de páginas aparece sem rolar em telas largas. */
+.owd-canvas {
+    max-width: calc((100vh - 540px) * 1016 / 592);
+    min-width: 420px;
+    margin: 0 auto;
 }

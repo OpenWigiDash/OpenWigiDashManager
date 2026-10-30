@@ -286,6 +286,25 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Excluir_pagina_com_widgets_so_com_aceite_e_apaga_as_instancias()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Jogos");
+        var counter = (await host.AddWidgetAsync(Counter, page))!.Value;
+        await host.GoToPageAsync(page, Transition.None);
+
+        Assert.False(await host.RemovePageAsync(page)); // sem o aceite, não sai
+        Assert.True(await host.RemovePageAsync(page, withWidgets: true));
+
+        Assert.Equal(["Página 1"], host.Layout.Pages.Select(p => p.Name));
+        Assert.Equal(0, host.CurrentPage); // estava nela: foi para a vizinha
+        Assert.DoesNotContain(host.Layout.AllPlacements, p => p.InstanceId == counter);
+        Assert.Null(host.FrameOf(counter));
+        Assert.False(Directory.Exists(Path.Combine(Data, "instances", counter.ToString("D"))));
+        Assert.False(await host.RemovePageAsync(0, withWidgets: true)); // a última página fica
+    }
+
+    [Fact]
     public async Task Mudar_a_ordem_das_paginas_mantem_a_pagina_atual()
     {
         var host = await StartAsync();
