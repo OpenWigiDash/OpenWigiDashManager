@@ -126,44 +126,52 @@
             <div class="owd-side">
                 @if (Selected is { } selected)
                 {
-                    <MudPaper Class="pa-4 mb-4" Outlined="true">
+                    var settings = Dashboard.GetSettings(selected.InstanceId);
+                    <MudPaper Class="pa-3 mb-4" Outlined="true">
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
-                        @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@
-                        <MudTextField T="string" @key="selected.InstanceId" Value="@Dashboard.DisplayNameOf(selected.InstanceId)"
-                                      ValueChanged="name => Dashboard.RenameWidgetAsync(selected.InstanceId, name)" DebounceInterval="500"
-                                      Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1"
-                                      HelperText="@($"{Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado"} · coluna {selected.Column + 1}, linha {selected.Row + 1}, {selected.Size}")" />
-                        @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
-                        {
-                            <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
-                            <div class="d-flex flex-wrap gap-1">
-                                @foreach (var size in sizes)
+                        <MudText Typo="Typo.h6" Class="owd-ellipsis">@Dashboard.DisplayNameOf(selected.InstanceId)</MudText>
+                        @* Abas: o que todo widget tem (Geral) e as configurações do plugin, quando ele tem. *@
+                        <MudTabs @bind-ActivePanelIndex="_sideTab" Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3" MinimumTabWidth="0px"
+                                 Class="owd-side-tabs">
+                            <MudTabPanel Text="Geral">
+                                @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@
+                                <MudTextField T="string" @key="selected.InstanceId" Value="@Dashboard.DisplayNameOf(selected.InstanceId)"
+                                              ValueChanged="name => Dashboard.RenameWidgetAsync(selected.InstanceId, name)" DebounceInterval="500"
+                                              Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                              HelperText="@($"{Dashboard.NameOf(selected.InstanceId) ?? "Widget não instalado"} · coluna {selected.Column + 1}, linha {selected.Row + 1}, {selected.Size}")" />
+                                @if (SizesOf(selected.WidgetId) is { Count: > 1 } sizes)
                                 {
-                                    var s = size;
-                                    var fits = FitsAt(selected, selected.Column, selected.Row, s);
-                                    <MudChip T="string" Size="Size.Small" Variant="@(s == selected.Size ? Variant.Filled : Variant.Outlined)"
-                                             Color="@(s == selected.Size ? Color.Primary : Color.Default)" Disabled="@(!fits && s != selected.Size)"
-                                             OnClick="() => Resize(selected.InstanceId, s)">@s</MudChip>
+                                    <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-3 d-block">Tamanho (colunas × linhas)</MudText>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var size in sizes)
+                                        {
+                                            var s = size;
+                                            var fits = FitsAt(selected, selected.Column, selected.Row, s);
+                                            <MudChip T="string" Size="Size.Small" Variant="@(s == selected.Size ? Variant.Filled : Variant.Outlined)"
+                                                     Color="@(s == selected.Size ? Color.Primary : Color.Default)" Disabled="@(!fits && s != selected.Size)"
+                                                     OnClick="() => Resize(selected.InstanceId, s)">@s</MudChip>
+                                        }
+                                    </div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
                                 }
-                            </div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
-                        }
-                        <MudStack Row="true" Class="mt-3">
-                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
-                                       OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
-                        </MudStack>
-    
-                        @* Configurações do próprio plugin, sempre à vista embaixo das gerais: o que mudar aqui já aparece no tile. *@
-                        @if (Dashboard.GetSettings(selected.InstanceId) is { } settings)
-                        {
-                            <MudDivider Class="my-4" />
-                            <MudText Typo="Typo.overline" Color="Color.Secondary" Class="d-block mb-2">Configurações do widget</MudText>
-                            <div @key="@($"settings-{selected.InstanceId}")" class="owd-widget-settings">
-                                <CascadingValue Value="settings.Context">
-                                    <DynamicComponent Type="settings.Component" Parameters="@(new Dictionary<string, object> { ["Instance"] = settings.Instance })" />
-                                </CascadingValue>
-                            </div>
-                        }
+                                <MudStack Row="true" Class="mt-3">
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                               OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
+                                </MudStack>
+                            </MudTabPanel>
+                            <MudTabPanel Text="Configurações" Disabled="@(settings is null)"
+                                         ToolTip="@(settings is null ? "Este widget não tem configurações" : null)">
+                                @* Configurações do próprio plugin: o que mudar aqui já aparece no tile. *@
+                                @if (settings is { } plugin)
+                                {
+                                    <div @key="@($"settings-{selected.InstanceId}")" class="owd-widget-settings">
+                                        <CascadingValue Value="plugin.Context">
+                                            <DynamicComponent Type="plugin.Component" Parameters="@(new Dictionary<string, object> { ["Instance"] = plugin.Instance })" />
+                                        </CascadingValue>
+                                    </div>
+                                }
+                            </MudTabPanel>
+                        </MudTabs>
                     </MudPaper>
                 }
     
@@ -247,6 +255,9 @@
     // A página do editor é a do aparelho: escolher aqui troca lá, e swipe lá (ou na prévia) troca aqui.
     private int _page => Dashboard.CurrentPage;
     private Guid? _selected;
+
+    // Aba do painel do widget (0 = Geral, 1 = Configurações); fica a mesma ao trocar de widget.
+    private int _sideTab;
 
     private DashboardHost Dashboard => Agent.Dashboard;
     private LayoutPage? CurrentPage => Dashboard.Layout.Pages.ElementAtOrDefault(_page);

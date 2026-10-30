@@ -382,3 +382,19 @@ html, body {
     min-width: 420px;
     margin: 0 auto;
 }
+
+/* Abas do painel do widget: o cabeçalho fica no topo enquanto o conteúdo rola. */
+.owd-side-tabs .mud-tabs-tabbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--mud-palette-surface);
+}
+
+/* As duas abas cabem no painel estreito, sem setas de rolar. */
+.owd-side-tabs .mud-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 8px;
+    text-transform: none;
+}
