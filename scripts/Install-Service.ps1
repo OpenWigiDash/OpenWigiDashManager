@@ -16,6 +16,13 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) { throw 'Rode este script num PowerShell como administrador.' }
 
+# O instalador (MSI) registra o mesmo serviço em Program Files. Não mexer nele por aqui: desinstale o
+# OpenWigiDash em Configurações > Aplicativos antes de voltar ao serviço de dev (docs\instalador.md).
+$installedKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+if (Get-ItemProperty $installedKey -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'OpenWigiDash' -and $_.WindowsInstaller -eq 1 }) {
+    throw 'O OpenWigiDash está instalado pelo instalador. Desinstale-o (Configurações > Aplicativos) antes de usar o serviço de dev.'
+}
+
 $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if ($existing) {
     Write-Host "Parando e removendo o serviço atual..." -ForegroundColor Yellow

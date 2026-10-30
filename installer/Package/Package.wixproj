@@ -1,0 +1,14 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+
+  <!-- O MSI: serviço, manager, widgets que vêm junto, atalho e início com o Windows. -->
+  <PropertyGroup>
+    <OutputName>OpenWigiDash</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>Version=$(Version);PublishRoot=$(PublishRoot);BrandingDir=$(BrandingDir)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
+  </ItemGroup>
+
+</Project>

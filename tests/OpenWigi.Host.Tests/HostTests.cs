@@ -74,6 +74,44 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Plugin_do_usuario_ganha_do_que_veio_com_o_instalador()
+    {
+        // O mesmo plugin nas duas pastas: carrega uma vez só, sem erro de id repetido.
+        var bundled = Path.Combine(_root, "Bundled");
+        CopyDirectory(Path.Combine(Plugins, "OpenWigi.Samples.Clock"), Path.Combine(bundled, "OpenWigi.Samples.Clock"));
+        _host = new DashboardHost(new DashboardOptions { PluginsDirectory = Plugins, BundledPluginsDirectory = bundled, DataDirectory = Data },
+            _sink, NullLoggerFactory.Instance);
+        await _host.StartAsync();
+
+        Assert.Empty(_host.PluginErrors);
+        Assert.Equal(2, _host.AvailableWidgets.Count);
+        Assert.All(_host.AvailableWidgets, w => Assert.StartsWith(Plugins, w.PluginDirectory, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Sem_widgets_do_usuario_carrega_os_do_instalador()
+    {
+        var bundled = Path.Combine(_root, "Bundled");
+        Directory.Move(Plugins, bundled);
+        _host = new DashboardHost(new DashboardOptions { PluginsDirectory = Plugins, BundledPluginsDirectory = bundled, DataDirectory = Data },
+            _sink, NullLoggerFactory.Instance);
+        await _host.StartAsync();
+
+        Assert.Empty(_host.PluginErrors);
+        Assert.Equal(new HashSet<Guid> { Clock, Counter }, _host.AvailableWidgets.Select(w => w.Manifest.Id).ToHashSet());
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination, overwrite: true);
+        }
+    }
+
+    [Fact]
     public async Task Primeira_execucao_monta_um_layout_com_cada_widget()
     {
         var host = await StartAsync();

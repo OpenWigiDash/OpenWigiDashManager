@@ -17,6 +17,7 @@ namespace OpenWigi.Manager;
 /// O manager roda no tray de cada usuário. Ele é o agente (fala com o serviço e desenha os widgets
 /// quando tem a tela) e, quando pedido, abre a janela de configuração.
 ///   --tray      começa só no ícone (é o que o início com o Windows usa)
+///   --autostart aberto pela entrada Run da máquina: sai se o usuário desligou o início com o Windows
 ///   --plugins   pasta de plugins alternativa
 ///   --open      abre a janela numa tela (ex.: /widgets)
 ///   --preview   abre a prévia destacada
@@ -58,6 +59,14 @@ public partial class App : System.Windows.Application
         };
 
         _services = BuildServices(e.Args);
+        var settings = _services.GetRequiredService<ManagerSettings>();
+        settings.AdoptMachineAutostart();
+        // A entrada Run da máquina abre o manager para todo usuário; quem desligou em Ajustes sai aqui.
+        if (e.Args.Contains("--autostart") && !settings.StartWithWindows)
+        {
+            Shutdown();
+            return;
+        }
         var agent = _services.GetRequiredService<AgentClient>();
         var dashboard = _services.GetRequiredService<DashboardHost>();
         agent.Attach(dashboard);
@@ -93,9 +102,12 @@ public partial class App : System.Windows.Application
             var plugins = index >= 0 && index + 1 < args.Length
                 ? args[index + 1]
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenWigiDash", "Widgets");
+            // Instalado, os widgets que vêm junto ficam ao lado da pasta do manager (Program Files\OpenWigiDash\Widgets).
+            var bundled = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Widgets"));
             var options = new DashboardOptions
             {
                 PluginsDirectory = plugins,
+                BundledPluginsDirectory = index < 0 && Directory.Exists(bundled) ? bundled : null,
                 DataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash"),
             };
             return new DashboardHost(options, sp.GetRequiredService<AgentClient>().Sink, sp.GetRequiredService<ILoggerFactory>());

@@ -1,0 +1,10 @@
+<Project>
+  <!-- Corta a herança do Directory.Build.props da raiz: TargetFramework, Nullable e
+       TreatWarningsAsErrors são de projeto .NET, não de projeto WiX. -->
+  <PropertyGroup>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
+    <!-- scripts\Build-Installer.ps1 publica o serviço, o manager e os widgets aqui antes do WiX. -->
+    <PublishRoot Condition="'$(PublishRoot)' == ''">$(MSBuildThisFileDirectory)..\.artifacts\installer\publish\</PublishRoot>
+    <BrandingDir>$(MSBuildThisFileDirectory)..\assets\branding\</BrandingDir>
+  </PropertyGroup>
+</Project>
