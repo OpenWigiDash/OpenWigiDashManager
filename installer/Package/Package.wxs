@@ -89,22 +89,22 @@
 
     <ComponentGroup Id="Manager" Directory="ManagerFolder">
       <Component Id="ManagerExe">
-        <File Id="OpenWigiDashManagerExe" Source="$(PublishRoot)manager\OpenWigiDashManager.exe" KeyPath="yes" />
+        <!-- Atalho no menu Iniciar (o mesmo serve para fixar na barra de tarefas). Fica no componente do
+             exe, e não num próprio com chave de registro, porque os ICEs tratam o menu Iniciar como perfil
+             do usuário e só aceitariam chave em HKCU num pacote por máquina. -->
+        <File Id="OpenWigiDashManagerExe" Source="$(PublishRoot)manager\OpenWigiDashManager.exe" KeyPath="yes">
+          <Shortcut Id="ManagerShortcut"
+                    Directory="ProgramMenuFolder"
+                    Name="OpenWigiDash"
+                    Description="Widgets e páginas do painel WigiDash"
+                    WorkingDirectory="ManagerFolder"
+                    Icon="AppIcon"
+                    Advertise="no" />
+        </File>
       </Component>
       <Files Include="$(PublishRoot)manager\**">
         <Exclude Files="$(PublishRoot)manager\OpenWigiDashManager.exe" />
       </Files>
-
-      <!-- Menu Iniciar (o mesmo atalho serve para fixar na barra de tarefas). -->
-      <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
-        <Shortcut Id="ManagerShortcut"
-                  Name="OpenWigiDash"
-                  Description="Widgets e páginas do painel WigiDash"
-                  Target="[ManagerFolder]OpenWigiDashManager.exe"
-                  WorkingDirectory="ManagerFolder"
-                  Icon="AppIcon" />
-        <RegistryValue Root="HKLM" Key="Software\OpenWigiDash" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
-      </Component>
 
       <!-- Abre com o login de todos os usuários, direto no tray. Quem desligar em Ajustes fica gravado
            no perfil dele, e o manager sai sozinho quando é aberto por esta entrada (ManagerSettings). -->
