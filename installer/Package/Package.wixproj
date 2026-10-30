@@ -5,6 +5,9 @@
     <OutputName>OpenWigiDash</OutputName>
     <InstallerPlatform>x64</InstallerPlatform>
     <DefineConstants>Version=$(Version);PublishRoot=$(PublishRoot);BrandingDir=$(BrandingDir)</DefineConstants>
+    <!-- ICE43/ICE57 tratam o menu Iniciar como perfil do usuário e pedem chave em HKCU para o atalho.
+         Com Scope="perMachine" ele vai para o menu Iniciar de todos os usuários: falso positivo. -->
+    <SuppressIces>ICE43;ICE57</SuppressIces>
   </PropertyGroup>
 
   <ItemGroup>

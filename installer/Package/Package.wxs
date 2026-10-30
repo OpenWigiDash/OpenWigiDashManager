@@ -89,9 +89,8 @@
 
     <ComponentGroup Id="Manager" Directory="ManagerFolder">
       <Component Id="ManagerExe">
-        <!-- Atalho no menu Iniciar (o mesmo serve para fixar na barra de tarefas). Fica no componente do
-             exe, e não num próprio com chave de registro, porque os ICEs tratam o menu Iniciar como perfil
-             do usuário e só aceitariam chave em HKCU num pacote por máquina. -->
+        <!-- Atalho no menu Iniciar (o mesmo serve para fixar na barra de tarefas). Num pacote por máquina o
+             menu Iniciar é o de todos os usuários, mas os ICE43/57 não sabem disso: ver Package.wixproj. -->
         <File Id="OpenWigiDashManagerExe" Source="$(PublishRoot)manager\OpenWigiDashManager.exe" KeyPath="yes">
           <Shortcut Id="ManagerShortcut"
                     Directory="ProgramMenuFolder"
