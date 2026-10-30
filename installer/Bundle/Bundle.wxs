@@ -14,7 +14,9 @@
           AboutUrl="https://github.com/victorperez2911/OpenWigiDashManager">
 
     <BootstrapperApplication>
+      <!-- O tema exige um link de licença. O repositório ainda não tem LICENSE: aponta para ele até ter. -->
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
+                                              LicenseUrl="https://github.com/victorperez2911/OpenWigiDashManager"
                                               LogoFile="$(BrandingDir)png\openwigidash-64.png"
                                               SuppressOptionsUI="yes"
                                               ShowVersion="yes" />
