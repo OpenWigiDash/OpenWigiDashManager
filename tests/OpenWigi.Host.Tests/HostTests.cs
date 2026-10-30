@@ -358,6 +358,28 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Trocar_widgets_do_mesmo_tamanho_de_lugar()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Troca");
+        var first = (await host.AddWidgetAsync(Counter, page))!.Value;
+        var second = (await host.AddWidgetAsync(Counter, page))!.Value;
+        var widgets = host.Layout.Pages[page].Widgets;
+        var a = widgets.Single(w => w.InstanceId == first);
+        var b = widgets.Single(w => w.InstanceId == second);
+        var (aAt, bAt) = ((a.Column, a.Row), (b.Column, b.Row));
+
+        Assert.True(await host.SwapWidgetsAsync(first, second));
+        Assert.Equal(bAt, (a.Column, a.Row));
+        Assert.Equal(aAt, (b.Column, b.Row));
+        var saved = new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[page].Widgets;
+        Assert.Equal(bAt, saved.Single(w => w.InstanceId == first) is var s ? (s.Column, s.Row) : default);
+
+        Assert.False(await host.SwapWidgetsAsync(first, first));
+        Assert.False(await host.SwapWidgetsAsync(first, Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task Ao_abrir_de_novo_volta_na_pagina_em_que_estava()
     {
         var host = await StartAsync();

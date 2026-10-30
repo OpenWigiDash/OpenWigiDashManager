@@ -376,6 +376,31 @@ public event Action? LayoutChanged;
     }
 
     /// <summary>
+    /// Troca dois widgets do mesmo tamanho e da mesma página de lugar: cada um vai para a posição do outro.
+    /// False se não estão na mesma página ou têm tamanhos diferentes.
+    /// </summary>
+    public async Task<bool> SwapWidgetsAsync(Guid first, Guid second, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var page = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == first));
+            if (page < 0 || first == second)
+                return false;
+            var a = _layout.Pages[page].Widgets.First(w => w.InstanceId == first);
+            if (_layout.Pages[page].Widgets.FirstOrDefault(w => w.InstanceId == second) is not { } b || a.Size != b.Size)
+                return false;
+            (a.Column, a.Row, b.Column, b.Row) = (b.Column, b.Row, a.Column, a.Row);
+            await CommitLayoutAsync(page, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>
     /// Muda o tamanho de um widget no lugar onde ele está. A instância é recriada no tamanho novo
     /// (o contrato fixa o tamanho por instância), mas mantém o id, as configurações e os arquivos.
     /// False se o widget não suporta o tamanho ou se ele não cabe ali.
