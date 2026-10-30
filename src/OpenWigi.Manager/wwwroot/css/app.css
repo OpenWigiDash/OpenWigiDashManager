@@ -253,16 +253,20 @@ html, body {
     z-index: 1;
 }
 
-/* Carrossel de páginas: cartões com miniatura ao vivo, nome (renomear) e ações (mover, excluir). */
+/* Carrossel de páginas: cartões com miniatura ao vivo, nome (renomear) e ações (mover, excluir).
+   Quebra em linhas em vez de rolar de lado: usa a largura que tiver. */
 .owd-pages {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
-    overflow-x: auto;
     padding: 8px 2px 4px;
 }
 
 .owd-page-card {
+    /* Largura fixa: nem o campo de renomear estica o cartão. */
     flex: 0 0 176px;
+    width: 176px;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
