@@ -107,7 +107,7 @@
       </Component>
 
       <!-- Abre com o login de todos os usuários, direto no tray. Quem desligar em Ajustes fica gravado
-           no perfil dele, e o manager sai sozinho quando vem com --autostart (ManagerSettings). -->
+           no perfil dele, e o manager sai sozinho quando é aberto por esta entrada (ManagerSettings). -->
       <Component Id="Autostart">
         <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="OpenWigiDash" Type="string"
                        Value="&quot;[ManagerFolder]OpenWigiDashManager.exe&quot; --tray --autostart" KeyPath="yes" />
