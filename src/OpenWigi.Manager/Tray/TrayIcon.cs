@@ -34,17 +34,19 @@ public sealed class TrayIcon : IDisposable
                 post(Update);
         };
 
+        // Os cliques chegam pelo laço do WinForms. Levados para a thread da UI, um erro ao abrir uma janela
+        // passa pelo tratamento do WPF em vez de cair na caixa de exceção do WinForms.
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Abrir o OpenWigiDash", null, (_, _) => open());
-        menu.Items.Add("Prévia do aparelho", null, (_, _) => openPreview());
+        menu.Items.Add("Abrir o OpenWigiDash", null, (_, _) => post(open));
+        menu.Items.Add("Prévia do aparelho", null, (_, _) => post(openPreview));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Sair", null, (_, _) => exit());
+        menu.Items.Add("Sair", null, (_, _) => post(exit));
 
         _icon = new NotifyIcon { ContextMenuStrip = menu, Visible = true };
         _icon.MouseClick += (_, e) =>
         {
             if (e.Button == MouseButtons.Left)
-                open();
+                post(open);
         };
         Update();
         agent.Changed += _onChanged;
