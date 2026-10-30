@@ -286,6 +286,21 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mudar_a_ordem_das_paginas_mantem_a_pagina_atual()
+    {
+        var host = await StartAsync();
+        await host.AddPageAsync("B");
+        await host.AddPageAsync("C");
+        await host.GoToPageAsync(2, Transition.None); // "C" no aparelho
+
+        Assert.True(await host.MovePageAsync(2, 0));
+        Assert.Equal(["C", "Página 1", "B"], host.Layout.Pages.Select(p => p.Name));
+        Assert.Equal(0, host.CurrentPage); // continua mostrando "C", agora no lugar 0
+        Assert.Equal(["C", "Página 1", "B"], new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages.Select(p => p.Name));
+        Assert.False(await host.MovePageAsync(0, 3));
+    }
+
+    [Fact]
     public async Task Catalogo_usa_a_previa_do_plugin_como_icone()
     {
         var host = await StartAsync();

@@ -336,3 +336,23 @@ html, body {
     flex: 0 1 260px;
     margin-top: 0 !important;
 }
+/* Assistente: o encaixe mostra a prévia do widget novo por baixo da borda verde. */
+.owd-drop-preview {
+    position: relative;
+    overflow: hidden;
+}
+
+.owd-drop-preview .owd-live {
+    opacity: 0.85;
+}
+
+.owd-drop-preview .owd-drop-label {
+    position: relative;
+    z-index: 1;
+}
+
+/* Tela do plugin dentro do painel estreito: o que o plugin fixar mais largo rola em vez de vazar. */
+.owd-widget-settings {
+    max-width: 100%;
+    overflow-x: auto;
+}

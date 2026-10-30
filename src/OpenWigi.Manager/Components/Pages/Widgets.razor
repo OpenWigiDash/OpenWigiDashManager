@@ -4,7 +4,6 @@
 @inject AgentClient Agent
 @inject ManagerSettings Settings
 @inject ISnackbar Snackbar
-@inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IDialogService Dialogs
 
@@ -77,6 +76,11 @@
                     <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Primary" Size="Size.Small" OnClick="SaveRename" aria-label="Salvar nome" />
                     <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="CancelRename" aria-label="Cancelar" />
                 }
+                @* Ordem das páginas (a do swipe e das miniaturas): move a página atual uma casa para cada lado. *@
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" Disabled="@(_page == 0)"
+                               OnClick="() => MovePage(-1)" aria-label="Mover página para a esquerda" title="Mover página para a esquerda" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Disabled="@(_page >= Dashboard.Layout.Pages.Count - 1)"
+                               OnClick="() => MovePage(1)" aria-label="Mover página para a direita" title="Mover página para a direita" />
                 <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Variant="Variant.Text" Size="Size.Small"
                            Disabled="@(Dashboard.Layout.Pages.Count < 2 || CurrentPage?.Widgets.Count > 0)" OnClick="RemovePage">
                     Excluir página vazia
@@ -200,12 +204,21 @@
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanhos apagados não cabem a partir desta posição: mova o widget antes.</MudText>
                     }
                     <MudStack Row="true" Class="mt-3">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings"
-                                   Disabled="@(Dashboard.GetSettings(selected.InstanceId) is null)"
-                                   OnClick="@(() => Navigation.NavigateTo($"/widgets/{selected.InstanceId}"))">Configurar</MudButton>
                         <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
                                    OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
                     </MudStack>
+
+                    @* Configurações do próprio plugin, sempre à vista embaixo das gerais: o que mudar aqui já aparece no tile. *@
+                    @if (Dashboard.GetSettings(selected.InstanceId) is { } settings)
+                    {
+                        <MudDivider Class="my-4" />
+                        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="d-block mb-2">Configurações do widget</MudText>
+                        <div @key="@($"settings-{selected.InstanceId}")" class="owd-widget-settings">
+                            <CascadingValue Value="settings.Context">
+                                <DynamicComponent Type="settings.Component" Parameters="@(new Dictionary<string, object> { ["Instance"] = settings.Instance })" />
+                            </CascadingValue>
+                        </div>
+                    }
                 </MudPaper>
             }
 
@@ -273,6 +286,7 @@
             { d => d.Widgets, Dashboard.AvailableWidgets },
             { d => d.Page, page },
             { d => d.NameOf, id => Dashboard.DisplayNameOf(id) },
+            { d => d.Dashboard, Dashboard },
             { d => d.IconOf, async id => await Dashboard.GetCatalogIconAsync(id) is { } frame ? PreviewImage.ToDataUrl(frame) : null },
         };
         var dialog = await Dialogs.ShowAsync<AddWidgetDialog>("Adicionar widget", parameters,
@@ -472,6 +486,8 @@
 
     private async Task AddPage() =>
         await SelectPage(await Dashboard.AddPageAsync());
+
+    private Task MovePage(int delta) => Dashboard.MovePageAsync(_page, _page + delta);
 
     private async Task RemovePage()
     {

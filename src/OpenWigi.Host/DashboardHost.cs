@@ -37,7 +37,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     private readonly PluginCatalog _catalog;
     private readonly LayoutStore _store;
     private readonly Dictionary<Guid, WidgetRuntime> _runtimes = [];
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, Task<WidgetFrame?>> _icons = [];
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Guid WidgetId, WidgetSize Size), Task<WidgetFrame?>> _icons = [];
     private readonly SemaphoreSlim _state = new(1, 1);
     private readonly CancellationTokenSource _stopping = new();
     private DashboardLayout _layout = new();
@@ -65,21 +65,26 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     /// <c>null</c> = o plugin não tem prévia (ou ela falhou) e a UI usa um ícone genérico.
     /// </summary>
     public Task<WidgetFrame?> GetCatalogIconAsync(Guid widgetId) =>
-        _icons.GetOrAdd(widgetId, LoadCatalogIconAsync);
+        _catalog.Find(widgetId) is { } widget
+            ? GetWidgetPreviewAsync(widgetId, widget.Manifest.SupportedSizes.MinBy(s => s.Columns * s.Rows))
+            : Task.FromResult<WidgetFrame?>(null);
 
-    private async Task<WidgetFrame?> LoadCatalogIconAsync(Guid widgetId)
+    /// <summary>Prévia do widget num tamanho (assistente de adicionar), pedida uma vez por tamanho. null = sem prévia.</summary>
+    public Task<WidgetFrame?> GetWidgetPreviewAsync(Guid widgetId, WidgetSize size) =>
+        _icons.GetOrAdd((widgetId, size), key => LoadPreviewAsync(key.WidgetId, key.Size));
+
+    private async Task<WidgetFrame?> LoadPreviewAsync(Guid widgetId, WidgetSize size)
     {
-        if (_catalog.Find(widgetId) is not { } widget)
+        if (_catalog.Find(widgetId) is not { } widget || !widget.Manifest.SupportedSizes.Contains(size))
             return null;
-        var size = widget.Manifest.SupportedSizes.MinBy(s => s.Columns * s.Rows);
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            return await widget.Widget.GetPreviewAsync(size, timeout.Token);
+            return await widget.Widget.GetPreviewAsync(size, timeout.Token) is { } frame && frame.Size == size.PixelSize ? frame : null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Prévia de {Name} falhou; o catálogo usa o ícone genérico", widget.Manifest.Name);
+            _logger.LogWarning(ex, "Prévia de {Name} em {Size} falhou; a UI usa o ícone genérico", widget.Manifest.Name, size);
             return null;
         }
     }
@@ -434,6 +439,32 @@ public event Action? LayoutChanged;
             _layout.Pages.Add(new LayoutPage { Name = string.IsNullOrEmpty(name) ? NextPageName() : UniquePageName(name) });
             await CommitLayoutAsync(-1, cancellationToken);
             return _layout.Pages.Count - 1;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>
+    /// Muda a página de lugar na ordem (a do swipe e das miniaturas). A página atual continua a mesma,
+    /// só o número dela muda; widgets e configurações vão junto.
+    /// </summary>
+    public async Task<bool> MovePageAsync(int from, int to, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var count = _layout.Pages.Count;
+            if (from < 0 || from >= count || to < 0 || to >= count || from == to)
+                return false;
+            var current = _layout.Pages[CurrentPage];
+            var page = _layout.Pages[from];
+            _layout.Pages.RemoveAt(from);
+            _layout.Pages.Insert(to, page);
+            CurrentPage = _layout.Pages.IndexOf(current);
+            await CommitLayoutAsync(-1, cancellationToken);
+            return true;
         }
         finally
         {

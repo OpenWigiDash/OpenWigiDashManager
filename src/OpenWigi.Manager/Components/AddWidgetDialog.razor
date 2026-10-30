@@ -77,17 +77,30 @@
                 }
                 @foreach (var placement in Page.Widgets)
                 {
-                    <div class="owd-widget owd-occupied"
+                    <div class="owd-widget owd-occupied" title="@(NameOf(placement.InstanceId) ?? "Widget")"
                          style="grid-column: @(placement.Column + 1) / span @placement.Size.Columns; grid-row: @(placement.Row + 1) / span @placement.Size.Rows">
-                        <MudText Typo="Typo.caption">@(NameOf(placement.InstanceId) ?? "Widget")</MudText>
+                        @* Os widgets que já estão na página aparecem como no Canvas, ao vivo. *@
+                        @if (Dashboard is not null)
+                        {
+                            <WidgetLiveFrame Dashboard="Dashboard" InstanceId="placement.InstanceId" MaxPerSecond="2" />
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption">@(NameOf(placement.InstanceId) ?? "Widget")</MudText>
+                        }
                     </div>
                 }
                 @if (_at is { } at)
                 {
                     var c = Math.Min(at.Column, WidgetGrid.Columns - 1);
                     var r = Math.Min(at.Row, WidgetGrid.Rows - 1);
-                    <div class="owd-drop @(Fits ? "ok" : "bad")"
+                    <div class="owd-drop owd-drop-preview @(Fits ? "ok" : "bad")"
                          style="grid-column: @(c + 1) / span @Math.Min(_size.Columns, WidgetGrid.Columns - c); grid-row: @(r + 1) / span @Math.Min(_size.Rows, WidgetGrid.Rows - r)">
+                        @* Como o widget novo vai ficar: a prévia do plugin nesse tamanho, quando ele tem. *@
+                        @if (_preview is not null && Fits)
+                        {
+                            <img class="owd-live" src="@_preview" alt="" draggable="false" />
+                        }
                         <span class="owd-drop-label">@_size</span>
                     </div>
                 }
@@ -124,6 +137,9 @@
     [Parameter, EditorRequired] public IReadOnlyList<OpenWigi.Host.Plugins.LoadedWidget> Widgets { get; set; } = [];
     [Parameter, EditorRequired] public LayoutPage Page { get; set; } = default!;
     [Parameter] public Func<Guid, string?> NameOf { get; set; } = _ => null;
+
+    /// <summary>Para desenhar os widgets da página e a prévia do novo; sem ele, o assistente mostra só nomes.</summary>
+    [Parameter] public DashboardHost? Dashboard { get; set; }
 
     /// <summary>Ícone de cada widget, como data URL; null = o genérico.</summary>
     [Parameter] public Func<Guid, Task<string?>> IconOf { get; set; } = _ => Task.FromResult<string?>(null);
@@ -165,11 +181,26 @@
         ChooseSize(widget.Manifest.SupportedSizes.FirstOrDefault(s => Page.FindFreeCell(s) is not null, widget.Manifest.SupportedSizes[0]));
     }
 
-    private void ChooseSize(WidgetSize size)
+private void ChooseSize(WidgetSize size)
     {
         _size = size;
         if (!Fits)
             _at = Page.FindFreeCell(size);
+        _ = LoadPreviewAsync(_widget!.Manifest.Id, size);
+    }
+
+    private string? _preview;
+
+    private async Task LoadPreviewAsync(Guid widgetId, WidgetSize size)
+    {
+        _preview = null;
+        if (Dashboard is null)
+            return;
+        var frame = await Dashboard.GetWidgetPreviewAsync(widgetId, size);
+        if (_widget?.Manifest.Id != widgetId || _size != size)
+            return; // a pessoa já trocou de tamanho
+        _preview = frame is null ? null : await Task.Run(() => PreviewImage.ToDataUrl(frame));
+        StateHasChanged();
     }
 
     private void Confirm()
