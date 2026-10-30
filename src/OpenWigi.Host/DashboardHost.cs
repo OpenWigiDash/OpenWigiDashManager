@@ -182,7 +182,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
                 // Swipe horizontal fora de tela cheia troca de página, como no manager antigo.
                 var count = _layout.Pages.Count;
                 var next = kind == TouchKind.SwipeLeft ? (CurrentPage + 1) % count : (CurrentPage - 1 + count) % count;
-                await GoToPageUnlockedAsync(next, kind == TouchKind.SwipeLeft ? Transition.WipeWest : Transition.WipeEast, cancellationToken);
+                // Mesma animação do manager antigo: próxima página (swipe para a esquerda) entra com WipeEast.
+                await GoToPageUnlockedAsync(next, kind == TouchKind.SwipeLeft ? Transition.WipeEast : Transition.WipeWest, cancellationToken);
                 _pressTarget = null;
                 return;
             }

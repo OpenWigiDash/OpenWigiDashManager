@@ -158,7 +158,7 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Equal(1, host.CurrentPage);
         Assert.Equal(1, pageChanges);
         Assert.NotEqual(first, _sink.Shown.Last());
-        Assert.Equal(Transition.WipeWest, _sink.Transitions.Last());
+        Assert.Equal(Transition.WipeEast, _sink.Transitions.Last());
     }
 
     [Fact]

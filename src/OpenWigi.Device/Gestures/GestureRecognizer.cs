@@ -37,6 +37,11 @@ public sealed record GestureOptions
     public int DragThreshold { get; init; } = 15;
     /// <summary>Movimento a partir do qual o arraste vira swipe.</summary>
     public int SwipeThreshold { get; init; } = 150;
+    /// <summary>
+    /// Depois de um swipe, contatos que começam antes disso (contado do dedo sair) são ignorados. Na
+    /// captura no aparelho, o dedo voltando para o próximo swipe encostou ~260 ms depois e virou um tap.
+    /// </summary>
+    public TimeSpan SwipeCooldown { get; init; } = TimeSpan.FromMilliseconds(350);
     public bool ReportProgress { get; init; } = true;
 }
 
@@ -55,6 +60,8 @@ public sealed class GestureRecognizer(GestureOptions? options = null, TimeProvid
     private bool _pressing;
     private bool _dragging;
     private bool _longFired;
+    private bool _afterSwipe;
+    private long? _swipeLiftedAt;
     private long _pressStart;
     private int _startX, _startY, _lastX, _lastY;
     private long? _lastTapAt;
@@ -74,8 +81,26 @@ public sealed class GestureRecognizer(GestureOptions? options = null, TimeProvid
         if (_waitForIdle)
         {
             if (sample.Contact == TouchContact.None)
+            {
                 _waitForIdle = false;
+                if (_afterSwipe)
+                {
+                    _afterSwipe = false;
+                    _swipeLiftedAt = now;
+                }
+            }
             return events;
+        }
+
+        // Contato logo depois de um swipe é o dedo voltando, não um toque: some inteiro (até o próximo "nada").
+        if (_swipeLiftedAt is { } lifted && !_pressing && sample.Contact != TouchContact.None)
+        {
+            _swipeLiftedAt = null;
+            if (_time.GetElapsedTime(lifted, now) < _options.SwipeCooldown)
+            {
+                _waitForIdle = true;
+                return events;
+            }
         }
 
         switch (sample.Contact)
@@ -100,9 +125,9 @@ public sealed class GestureRecognizer(GestureOptions? options = null, TimeProvid
     /// <summary>Esquece o toque em andamento (ex.: o aparelho reconectou ou trocou de dono).</summary>
     public void Reset()
     {
-        _pressing = _dragging = _longFired = false;
+        _pressing = _dragging = _longFired = _afterSwipe = false;
         _waitForIdle = true;
-        _lastTapAt = _lockoutFrom = null;
+        _lastTapAt = _lockoutFrom = _swipeLiftedAt = null;
     }
 
     private void Start(TouchSample sample, long now, List<GestureEvent> events)
@@ -136,6 +161,7 @@ public sealed class GestureRecognizer(GestureOptions? options = null, TimeProvid
             events.Add(new GestureEvent(GestureKind.PressEnded, sample.X, sample.Y, duration));
             _pressing = false;
             _waitForIdle = true;
+            _afterSwipe = true;
         }
         else if (distance > _options.DragThreshold)
         {
