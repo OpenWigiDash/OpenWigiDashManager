@@ -154,6 +154,7 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
     <Authors>SeuNome</Authors>
     <Description>Mostra quem está falando no canal de voz.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
   </PropertyGroup>
@@ -161,6 +162,7 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
     <PackageReference Include="victorperez2911.OpenWigi.Sdk" Version="2.0.0-preview.2" ExcludeAssets="runtime" />
     <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
 ```
@@ -176,6 +178,9 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
 O pacote não tem `lib/`: um plugin não é biblioteca e não pode ser referenciado por outro projeto.
 
 - **Id**: `<Autor>.OpenWigiDash.<Nome>`.
+- **Ícone**: PNG quadrado de 128x128 ou 256x256 (até 1 MB), com o desenho do próprio widget, em
+  `PackageIcon`. É o ícone que aparece no nuget.org e na Loja do Manager. Sem ícone, os dois mostram o
+  genérico. O logo do OpenWigiDash é do SDK e do Manager; plugin não usa.
 - **Versão**: SemVer. Enquanto o SDK for preview, o plugin também precisa ser (`1.0.0-preview.1`): o
   NuGet recusa versão estável que depende de preview (NU5104). O Manager oferece a versão mais nova
   cuja dependência do SDK tem limite inferior compatível com o host (mesmo major, minor menor ou igual; ver [Versão](#versão)).
