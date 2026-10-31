@@ -1,4 +1,4 @@
-# OpenWigiDashManager - gera o instalador (MSI + OpenWigiDash-Setup.exe), igual ao que a release faz.
+﻿# OpenWigiDashManager - gera o instalador (MSI + OpenWigiDash-Setup.exe), igual ao que a release faz.
 # Não precisa de admin. Saída em .artifacts\installer\.
 #
 #   scripts\Build-Installer.ps1                  versão 0.0.1

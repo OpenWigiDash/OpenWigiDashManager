@@ -1,4 +1,4 @@
-# OpenWigiDashManager - testa o instalador num Windows limpo, no Windows Sandbox, sem mexer neste PC.
+﻿# OpenWigiDashManager - testa o instalador num Windows limpo, no Windows Sandbox, sem mexer neste PC.
 #
 #   scripts\Test-InstallerSandbox.ps1              instala, liga o WigiDash virtual e abre o manager com a prévia
 #   scripts\Test-InstallerSandbox.ps1 -Uninstall   instala, confere, desinstala e confere de novo, sem abrir nada
@@ -24,7 +24,9 @@ $sandbox = Join-Path $env:windir 'System32\WindowsSandbox.exe'
 if (-not (Test-Path $sandbox)) {
     throw 'Windows Sandbox não está ligado. Ative "Área Restrita do Windows" em "Ativar ou desativar recursos do Windows" e reinicie.'
 }
-if (Get-Process -Name 'WindowsSandbox*' -ErrorAction SilentlyContinue) {
+# Só a janela conta: os processos de serviço do Sandbox (WindowsSandboxServer, RemoteSession...) ficam
+# vivos um tempo depois de fechar e não impedem abrir outro.
+if (Get-Process -Name 'WindowsSandbox', 'WindowsSandboxClient' -ErrorAction SilentlyContinue | Where-Object MainWindowHandle -ne 0) {
     throw 'Já há um Windows Sandbox aberto (só um por vez). Feche-o antes.'
 }
 
