@@ -46,6 +46,7 @@ elseif ($entries -notcontains "plugin/$entry") { $problems += "plugin.json apont
 if ($entries | Where-Object { $_ -like 'lib/*' }) { $problems += 'há arquivos em lib/ (plugin não é biblioteca)' }
 foreach ($shared in 'OpenWigi.Sdk', 'MudBlazor', 'Microsoft.AspNetCore.Components', 'Microsoft.Extensions.Logging.Abstractions') {
     if ($entries -contains "plugin/$shared.dll") { $problems += "plugin/ leva $shared.dll, que o host já entrega" }
+    if ($entries | Where-Object { $_ -like "plugin/wwwroot/_content/$shared/*" }) { $problems += "plugin/ leva wwwroot/_content/$shared, que o host já entrega" }
 }
 
 Write-Host "Pacote: $($package.Name)"
