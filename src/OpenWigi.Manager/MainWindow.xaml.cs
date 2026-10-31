@@ -16,6 +16,33 @@ public partial class MainWindow : Window
         _services = services;
         InitializeComponent();
         WebView.Services = services;
+        RestorePlacement();
+    }
+
+    // Abre onde e como foi fechada. Se o monitor de antes sumiu, fica no padrão (centralizada).
+    private void RestorePlacement()
+    {
+        if (_services.GetRequiredService<ManagerSettings>().Window is not { } saved)
+            return;
+        var bounds = new Rect(saved.Left, saved.Top, Math.Max(MinWidth, saved.Width), Math.Max(MinHeight, saved.Height));
+        var screen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        if (!screen.IntersectsWith(bounds))
+            return;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        (Left, Top, Width, Height) = (bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+        if (saved.Maximized)
+            WindowState = WindowState.Maximized;
+    }
+
+    // RestoreBounds é o tamanho fora do maximizado: ao desmaximizar depois de abrir, volta para ele.
+    private void SavePlacement()
+    {
+        var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        if (bounds.IsEmpty)
+            return;
+        _services.GetRequiredService<ManagerSettings>().Window = new ManagerSettings.WindowPlacement(
+            bounds.Left, bounds.Top, bounds.Width, bounds.Height, WindowState == WindowState.Maximized);
     }
 
     public void Navigate(string route) => _services.GetRequiredService<ManagerSettings>().RequestNavigation(route);
@@ -31,6 +58,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        SavePlacement();
         // Esconde em vez de fechar: o WebView2 é caro de recriar e o painel continua rodando.
         if (_exiting)
             return;

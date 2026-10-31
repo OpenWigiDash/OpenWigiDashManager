@@ -16,7 +16,24 @@ public sealed class ManagerSettings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash", "manager.json");
     private Stored _stored;
 
-    private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true, bool StartWithWindows = true);
+    private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true, bool StartWithWindows = true,
+        WindowPlacement? Window = null);
+
+    /// <summary>Onde a janela estava ao fechar: posição e tamanho fora do maximizado, e se estava maximizada.</summary>
+    public sealed record WindowPlacement(double Left, double Top, double Width, double Height, bool Maximized);
+
+    /// <summary>Lugar da janela do manager, para ela abrir como foi fechada. null = nunca fechou, abre no padrão.</summary>
+    public WindowPlacement? Window
+    {
+        get => _stored.Window;
+        set
+        {
+            if (_stored.Window == value)
+                return;
+            _stored = _stored with { Window = value };
+            Save();
+        }
+    }
 
     public ManagerSettings()
     {
