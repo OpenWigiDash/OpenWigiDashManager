@@ -170,8 +170,9 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
 O pacote não tem `lib/`: um plugin não é biblioteca e não pode ser referenciado por outro projeto.
 
 - **Id**: `<Autor>.OpenWigiDash.<Nome>`.
-- **Versão**: SemVer. O Manager oferece a versão mais nova cuja dependência do SDK tem limite inferior
-  compatível com o host (mesmo major, minor menor ou igual; ver [Versão](#versão)).
+- **Versão**: SemVer. Enquanto o SDK for preview, o plugin também precisa ser (`1.0.0-preview.1`): o
+  NuGet recusa versão estável que depende de preview (NU5104). O Manager oferece a versão mais nova
+  cuja dependência do SDK tem limite inferior compatível com o host (mesmo major, minor menor ou igual; ver [Versão](#versão)).
 - **`plugin.json` instalado**: o instalador acrescenta `"package": { "id": "...", "version": "..." }` para
   saber de onde o plugin veio. O host ignora esse campo.
 - **Conferir o pacote**: `scripts/Test-PluginPackage.ps1 -Project <seu.csproj>`.

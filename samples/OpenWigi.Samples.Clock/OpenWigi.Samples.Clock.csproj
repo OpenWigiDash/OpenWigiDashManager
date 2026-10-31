@@ -8,6 +8,8 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <!-- `dotnet pack` gera o pacote de plugin (ver docs/sdk.md, "Publicar no nuget.org"). -->
     <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
+    <!-- Enquanto o SDK for preview, o plugin também é (NU5104: versão estável não depende de preview). -->
+    <Version>1.0.0-preview.1</Version>
     <Description>Widget de exemplo do OpenWigiDash: relógio e contador com long-press.</Description>
   </PropertyGroup>
 
