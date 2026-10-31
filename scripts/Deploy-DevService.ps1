@@ -7,6 +7,7 @@ param(
     [string]$ServiceDir = 'C:\OpenWigiDash\dev-service',
     [switch]$AllowRemoteSessions = $false,
     [switch]$StopOfficial = $false,
+    [switch]$Virtual = $false,      # WigiDash de mentira: desenvolve sem o aparelho ligado
     [switch]$SkipBuild = $false
 )
 
@@ -37,7 +38,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $staging 'OpenWigiService.exe'))) { 
 # Passo 2: só um processo abre o WinUSB por vez
 Write-Host "[2/4] Liberando o aparelho..." -ForegroundColor Green
 $official = Get-Process -Name 'WigiDashManager' -ErrorAction SilentlyContinue
-if ($official) {
+if ($official -and -not $Virtual) {
     if (-not $StopOfficial) { throw 'O manager oficial está com o aparelho. Use -StopOfficial para fechá-lo.' }
     $official | Stop-Process -Force
 }
@@ -52,7 +53,8 @@ if ($service.Status -ne 'Stopped') {
 Write-Host "[3/4] Copiando para $ServiceDir..." -ForegroundColor Green
 Copy-Item -Path (Join-Path $staging '*') -Destination $ServiceDir -Recurse -Force
 $local = Join-Path $ServiceDir 'appsettings.local.json'
-@{ OpenWigi = @{ AllowRemoteSessions = [bool]$AllowRemoteSessions } } | ConvertTo-Json -Depth 3 | Set-Content $local -Encoding utf8
+$device = if ($Virtual) { 'Virtual' } else { 'Usb' }
+@{ OpenWigi = @{ AllowRemoteSessions = [bool]$AllowRemoteSessions; Device = $device } } | ConvertTo-Json -Depth 3 | Set-Content $local -Encoding utf8
 
 # Passo 4: iniciar e mostrar o começo do log
 Write-Host "[4/4] Iniciando..." -ForegroundColor Green
@@ -65,4 +67,4 @@ Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'OpenWi
     Sort-Object TimeCreated | Select-Object -Last 10 | ForEach-Object { "{0:HH:mm:ss} {1}" -f $_.TimeCreated, $_.Message }
 
 Write-Host ""
-Write-Host "Serviço atualizado (AllowRemoteSessions = $([bool]$AllowRemoteSessions))." -ForegroundColor Green
+Write-Host "Serviço atualizado (AllowRemoteSessions = $([bool]$AllowRemoteSessions), aparelho = $device)." -ForegroundColor Green

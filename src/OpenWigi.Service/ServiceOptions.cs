@@ -1,5 +1,15 @@
 namespace OpenWigi.Service;
 
+/// <summary>Com que aparelho o serviço fala.</summary>
+public enum DeviceKind
+{
+    /// <summary>O WigiDash de verdade, pelo WinUSB.</summary>
+    Usb,
+
+    /// <summary>Um WigiDash de mentira, para desenvolver sem o aparelho; a tela aparece na prévia.</summary>
+    Virtual,
+}
+
 public sealed class ServiceOptions
 {
     public const string Section = "OpenWigi";
@@ -17,4 +27,10 @@ public sealed class ServiceOptions
     public TimeSpan SessionPollInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan ReconnectInterval { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// <see cref="DeviceKind.Virtual"/> troca o aparelho por um de mentira: o serviço não abre o WinUSB
+    /// e o manager desenha na prévia, onde o mouse vira toque.
+    /// </summary>
+    public DeviceKind Device { get; set; } = DeviceKind.Usb;
 }
