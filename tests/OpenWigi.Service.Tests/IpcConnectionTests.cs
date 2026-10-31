@@ -21,6 +21,8 @@ public class IpcConnectionTests
         new IpcError("falhou"),
         new SubscribePreview(true),
         new EmulatedTouch(TouchContact.Down, 500, 300),
+        new SelectDevice(DeviceKind.Virtual),
+        new DeviceStatus(true, Guid.NewGuid(), "virtual", DeviceKind.Virtual, UsbPresent: true),
     ];
 
     [Theory]

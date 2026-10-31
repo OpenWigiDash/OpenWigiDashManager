@@ -9,6 +9,16 @@ namespace OpenWigi.Ipc;
 /// </summary>
 public abstract record IpcMessage;
 
+/// <summary>Com que aparelho o serviço fala.</summary>
+public enum DeviceKind : byte
+{
+    /// <summary>O WigiDash de verdade, pelo WinUSB.</summary>
+    Usb = 0,
+
+    /// <summary>Um WigiDash de mentira, para quem não tem o aparelho: a tela aparece na prévia.</summary>
+    Virtual = 1,
+}
+
 // Agente -> serviço
 
 /// <summary>Primeira mensagem do agente. A sessão do Windows não vem daqui: o serviço descobre pelo processo do pipe.</summary>
@@ -34,6 +44,9 @@ public sealed record SubscribePreview(bool Enabled) : IpcMessage;
 /// </summary>
 public sealed record EmulatedTouch(TouchContact Contact, int X, int Y) : IpcMessage;
 
+/// <summary>Troca o aparelho ativo (USB ou virtual). Vale para a máquina toda e fica gravado. Só vale do dono.</summary>
+public sealed record SelectDevice(DeviceKind Kind) : IpcMessage;
+
 // Serviço -> agente
 
 public sealed record Welcome(int SessionId, DeviceStatus Device) : IpcMessage;
@@ -44,7 +57,12 @@ public sealed record Welcome(int SessionId, DeviceStatus Device) : IpcMessage;
 /// </summary>
 public sealed record Ownership(bool IsOwner, string Reason) : IpcMessage;
 
-public sealed record DeviceStatus(bool Connected, Guid DeviceId, string Firmware) : IpcMessage
+/// <summary>
+/// Estado do aparelho ativo (<paramref name="Kind"/>). <paramref name="UsbPresent"/> diz se o WigiDash de verdade
+/// está ligado, mesmo com o virtual ativo, para a UI mostrar as duas opções.
+/// </summary>
+public sealed record DeviceStatus(bool Connected, Guid DeviceId, string Firmware, DeviceKind Kind = DeviceKind.Usb,
+    bool UsbPresent = false) : IpcMessage
 {
     public static DeviceStatus Disconnected { get; } = new(false, Guid.Empty, string.Empty);
 }

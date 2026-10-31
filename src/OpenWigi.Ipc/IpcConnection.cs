@@ -13,7 +13,7 @@ namespace OpenWigi.Ipc;
 public sealed class IpcConnection(Stream stream) : IAsyncDisposable
 {
     public const string PipeName = "OpenWigiDash.v1";
-    public const ushort ProtocolVersion = 1;
+    public const ushort ProtocolVersion = 2;
     private const int MaxMessageBytes = 4 * 1024 * 1024;
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -28,6 +28,7 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         Sleep = 6,
         SubscribePreview = 7,
         EmulatedTouch = 8,
+        SelectDevice = 9,
         Welcome = 64,
         Ownership = 65,
         DeviceStatus = 66,
@@ -122,6 +123,10 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
                 w.Write(m.X);
                 w.Write(m.Y);
                 break;
+            case SelectDevice m:
+                w.Write((byte)Kind.SelectDevice);
+                w.Write((byte)m.Kind);
+                break;
             case PreviewFrame m:
                 w.Write((byte)Kind.PreviewFrame);
                 w.Write((byte)m.Page);
@@ -179,6 +184,7 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
             Kind.Sleep => new SleepDisplay(),
             Kind.SubscribePreview => new SubscribePreview(r.ReadBoolean()),
             Kind.EmulatedTouch => new EmulatedTouch((TouchContact)r.ReadByte(), r.ReadInt32(), r.ReadInt32()),
+            Kind.SelectDevice => new SelectDevice((DeviceKind)r.ReadByte()),
             Kind.PreviewFrame => new PreviewFrame(r.ReadByte(), r.ReadBytes(r.ReadInt32())),
             Kind.Welcome => new Welcome(r.ReadInt32(), ReadStatus(r)),
             Kind.Ownership => new Ownership(r.ReadBoolean(), r.ReadString()),
@@ -196,10 +202,12 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         w.Write(status.Connected);
         w.Write(status.DeviceId.ToByteArray());
         w.Write(status.Firmware);
+        w.Write((byte)status.Kind);
+        w.Write(status.UsbPresent);
     }
 
     private static DeviceStatus ReadStatus(BinaryReader r) =>
-        new(r.ReadBoolean(), new Guid(r.ReadBytes(16)), r.ReadString());
+        new(r.ReadBoolean(), new Guid(r.ReadBytes(16)), r.ReadString(), (DeviceKind)r.ReadByte(), r.ReadBoolean());
 
     private async Task<bool> ReadExactlyOrEndAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

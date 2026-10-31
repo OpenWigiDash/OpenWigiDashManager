@@ -21,6 +21,9 @@ public interface IDisplay
     bool Wake();
     bool Sleep();
     bool InjectTouch(TouchContact contact, int x, int y);
+
+    /// <summary>Troca o aparelho ativo; false se este display não tem esse aparelho.</summary>
+    bool SelectDevice(DeviceKind kind);
 }
 
 internal sealed class DeviceHostDisplay(DeviceHost host) : IDisplay
@@ -54,4 +57,5 @@ internal sealed class DeviceHostDisplay(DeviceHost host) : IDisplay
     public bool Wake() => host.TryUse(d => d.Wake());
     public bool Sleep() => host.TryUse(d => d.Sleep());
     public bool InjectTouch(TouchContact contact, int x, int y) => host.TryUse(d => d.InjectTouch(contact, x, y));
+    public bool SelectDevice(DeviceKind kind) => kind == DeviceKind.Usb;
 }

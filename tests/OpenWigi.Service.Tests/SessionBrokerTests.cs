@@ -184,6 +184,19 @@ public class SessionBrokerTests
         Assert.Equal([(TouchContact.Down, 100, 200)], _display.Injected);
     }
 
+    [Fact]
+    public async Task Troca_de_aparelho_so_vale_do_dono()
+    {
+        _sessions.Console = 1;
+        var (victor, _) = await ConnectAsync(1, "victor");
+        var (filha, _) = await ConnectAsync(4, "filha");
+
+        _broker.Handle(filha, new SelectDevice(DeviceKind.Virtual));
+        _broker.Handle(victor, new SelectDevice(DeviceKind.Virtual));
+
+        Assert.Equal([DeviceKind.Virtual], _display.Selected);
+    }
+
     internal sealed class FakeChannel : IAgentChannel
     {
         public List<IpcMessage> Sent { get; } = [];
@@ -208,11 +221,11 @@ public class SessionBrokerTests
         public void Raise() => Changed?.Invoke();
     }
 
-    private sealed class FakeDisplay : IDisplay
+    internal sealed class FakeDisplay : IDisplay
     {
         public List<int> Frames { get; } = [];
         public List<int> Shown { get; } = [];
-        public DeviceStatus Status { get; private set; } = new(true, Guid.NewGuid(), "teste");
+        public DeviceStatus Status { get; set; } = new(true, Guid.NewGuid(), "teste");
         public event Action<DeviceStatus>? StatusChanged;
         public event Action<GestureEvent>? Gesture;
 
@@ -245,6 +258,14 @@ public class SessionBrokerTests
         public bool InjectTouch(TouchContact contact, int x, int y)
         {
             Injected.Add((contact, x, y));
+            return true;
+        }
+
+        public List<DeviceKind> Selected { get; } = [];
+
+        public bool SelectDevice(DeviceKind kind)
+        {
+            Selected.Add(kind);
             return true;
         }
 
