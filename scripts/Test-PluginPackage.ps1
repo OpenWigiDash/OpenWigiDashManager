@@ -50,6 +50,7 @@ foreach ($shared in 'OpenWigi.Sdk', 'MudBlazor', 'Microsoft.AspNetCore.Component
 }
 
 Write-Host "Pacote: $($package.Name)"
+if (-not $metadata.icon) { Write-Host 'AVISO: sem PackageIcon; o nuget.org e a Loja vão mostrar o ícone genérico.' -ForegroundColor Yellow }
 Write-Host "Dependência do SDK: $($sdk.version)"
 Write-Host "Conteúdo de plugin/:"
 $entries | Where-Object { $_ -like 'plugin/*' } | ForEach-Object { Write-Host "  $_" }

@@ -18,6 +18,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/victorperez2911/OpenWigiDashManager</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <Authors>Victor Perez</Authors>
     <Product>OpenWigiDashManager</Product>
     <Description>Contratos para escrever widgets do OpenWigiDashManager (.NET 10): widget, instância assíncrona que entrega quadros, toques ricos, contexto do host e tela de configurações em Razor.</Description>
@@ -35,6 +36,7 @@
 
   <ItemGroup>
     <None Include="..\..\docs\sdk.md" Pack="true" PackagePath="README.md" />
+    <None Include="..\..\assets\branding\png\openwigidash-256.png" Pack="true" PackagePath="icon.png" />
     <!-- Entra no projeto de quem referencia o pacote: com OpenWigiDashPlugin=true, `dotnet pack` gera o pacote de plugin. -->
     <None Include="build\victorperez2911.OpenWigi.Sdk.targets" Pack="true" PackagePath="build\" />
   </ItemGroup>
