@@ -6,6 +6,8 @@ using OpenWigi.Service.Sessions;
 
 // Roda como serviço Windows (instalado) ou no console, para desenvolvimento:
 //   dotnet run --project src/OpenWigi.Service -- --OpenWigi:AllowRemoteSessions=true
+// Sem o aparelho, com um WigiDash de mentira que aparece na prévia do manager:
+//   dotnet run --project src/OpenWigi.Service -- --OpenWigi:Device=Virtual
 // Como serviço, o diretório atual é System32: a configuração vem da pasta do executável.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
@@ -28,9 +30,16 @@ if (WindowsServiceHelpers.IsWindowsService())
     builder.Services.AddSingleton<IHostLifetime, SessionAwareServiceLifetime>();
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<DeviceHost>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceHost>());
-builder.Services.AddSingleton<IDisplay>(sp => new DeviceHostDisplay(sp.GetRequiredService<DeviceHost>()));
+if (builder.Configuration.GetValue<DeviceKind>($"{ServiceOptions.Section}:{nameof(ServiceOptions.Device)}") == DeviceKind.Virtual)
+{
+    builder.Services.AddSingleton<IDisplay>(sp => new VirtualDisplay(sp.GetRequiredService<TimeProvider>()));
+}
+else
+{
+    builder.Services.AddSingleton<DeviceHost>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceHost>());
+    builder.Services.AddSingleton<IDisplay>(sp => new DeviceHostDisplay(sp.GetRequiredService<DeviceHost>()));
+}
 builder.Services.AddSingleton<SessionBroker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionBroker>());
 builder.Services.AddHostedService<AgentServer>();

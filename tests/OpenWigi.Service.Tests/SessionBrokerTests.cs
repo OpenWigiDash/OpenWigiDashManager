@@ -184,7 +184,7 @@ public class SessionBrokerTests
         Assert.Equal([(TouchContact.Down, 100, 200)], _display.Injected);
     }
 
-    private sealed class FakeChannel : IAgentChannel
+    internal sealed class FakeChannel : IAgentChannel
     {
         public List<IpcMessage> Sent { get; } = [];
 
@@ -196,7 +196,7 @@ public class SessionBrokerTests
         }
     }
 
-    private sealed class FakeSessions : ISessionMonitor
+    internal sealed class FakeSessions : ISessionMonitor
     {
         public int? Console { get; set; }
         public bool Locked { get; set; }

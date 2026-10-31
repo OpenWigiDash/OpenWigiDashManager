@@ -64,6 +64,19 @@ pelo mesmo reconhecedor de gestos: clicar dá tap, segurar o botão dá long-pre
 A prévia e o toque emulado só valem para o dono da tela, então outro usuário não vê nem mexe na
 tela de quem está no console. Pelo RDP, rode o serviço com `--OpenWigi:AllowRemoteSessions=true`.
 
+## Sem o aparelho (WigiDash virtual)
+
+Com `OpenWigi:Device = Virtual` o serviço não abre o WinUSB e usa um WigiDash de mentira, como o
+"Virtual WigiDash" do manager oficial. Ele se diz conectado, aceita os quadros (que aparecem na prévia
+do manager e no `OpenWigiAgent --preview`) e passa o mouse da prévia pelo mesmo reconhecedor de gestos do
+aparelho real: clicar dá tap, segurar dá long-press e arrastar dá swipe. O brilho escolhido fica guardado.
+
+- Serviço de dev: `scripts\Deploy-DevService.ps1 -Virtual` (sem `-Virtual` volta para o aparelho).
+- No console, com o serviço instalado parado: `dotnet run --project src\OpenWigi.Service -- --OpenWigi:Device=Virtual`.
+
+Dá para usar com o manager oficial aberto, porque nada disputa o aparelho. Serve para mexer no host e no
+manager e para testar plugins: basta pôr o plugin na pasta de widgets e abrir a prévia.
+
 ## Testar com outro usuário sem instalar nada nele
 
 `scripts\Deploy-DevManager.ps1` (sem admin) publica o manager em `C:\OpenWigiDash\dev-manager`, copia os
