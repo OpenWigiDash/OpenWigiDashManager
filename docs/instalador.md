@@ -11,6 +11,7 @@ win-x64: não precisa do .NET instalado.
 | Serviço `OpenWigiDash` (automático, LocalService, reinicia se cair) | `C:\Program Files\OpenWigiDash\Service` |
 | Manager (tray + janela) | `C:\Program Files\OpenWigiDash\Manager` |
 | Widgets que vêm junto | `C:\Program Files\OpenWigiDash\Widgets` |
+| Dados do serviço (ex.: `device.txt`, o aparelho ativo), com Modify para o LocalService | `C:\ProgramData\OpenWigiDash\Service` |
 | Origem `OpenWigiDash` do Log de Eventos | Aplicativo |
 | Atalho | Menu Iniciar (fixar na barra de tarefas a partir dele) |
 | Início com o Windows de todos os usuários | `HKLM\...\Run`, valor `OpenWigiDash`, com `--tray --autostart` |

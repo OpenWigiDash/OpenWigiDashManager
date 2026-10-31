@@ -51,6 +51,9 @@ if ($service) {
 foreach ($dir in 'Service', 'Manager', 'Widgets\OpenWigi.Samples.Clock') {
     Check "Pasta $dir" (Test-Path (Join-Path $programFiles $dir))
 }
+$serviceData = Join-Path $env:ProgramData 'OpenWigiDash\Service'
+Check 'ProgramData\OpenWigiDash\Service gravável pelo LocalService' ([bool]((Get-Acl $serviceData -ErrorAction SilentlyContinue).Access |
+    Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-19' -and $_.FileSystemRights -match 'Modify' }))
 Check 'Atalho no menu Iniciar' (Test-Path $shortcut)
 Check 'Início com o Windows (HKLM Run)' ([bool](Get-ItemProperty $runKey -Name OpenWigiDash -ErrorAction SilentlyContinue))
 $bundle = Get-Bundle

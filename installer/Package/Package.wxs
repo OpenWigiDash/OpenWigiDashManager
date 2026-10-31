@@ -46,8 +46,23 @@
       </Directory>
     </StandardDirectory>
 
+    <!-- Dados do serviço (ex.: device.txt, o aparelho ativo escolhido no manager). Quem grava é o serviço,
+         que roda como LocalService e não teria permissão de criar isso sozinho em todo Windows. -->
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DataFolder" Name="OpenWigiDash">
+        <Directory Id="ServiceDataFolder" Name="Service" />
+      </Directory>
+    </StandardDirectory>
+
     <Feature Id="Main" Title="OpenWigiDash" AllowAbsent="no">
       <ComponentGroupRef Id="Service" />
+      <Component Id="ServiceData" Directory="ServiceDataFolder" Guid="5f5c0f4e-8a0b-4d0e-9c43-2a1f6b7d9e21">
+        <!-- SDDL em vez de nomes de conta, que mudam com o idioma do Windows: sistema e admins com controle
+             total, LocalService (LS) com Modify, usuários (BU) com leitura. -->
+        <CreateFolder>
+          <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;LS)(A;OICI;0x1200a9;;;BU)" />
+        </CreateFolder>
+      </Component>
       <ComponentGroupRef Id="Manager" />
       <Files Directory="WidgetsFolder" Include="$(PublishRoot)widgets\**" />
     </Feature>
