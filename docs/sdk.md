@@ -197,18 +197,38 @@ Publicação pelo GitHub Actions com Trusted Publishing (sem chave guardada), no
 `.github/workflows/sdk-publish.yml`:
 
 ```yaml
+on:
+  push:
+    tags: ['v*']   # tag v1.2.0-preview.1 publica a versão 1.2.0-preview.1
 permissions:
   contents: read
   id-token: write
-steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-dotnet@v4
-    with:
-      dotnet-version: 10.0.x
-  - run: dotnet pack -c Release -o nupkgs /p:Version=${{ github.ref_name }}
-  - uses: NuGet/login@v1
-    id: nuget
-    with:
-      user: ${{ vars.NUGET_USER }}
-  - run: dotnet nuget push nupkgs/*.nupkg --api-key ${{ steps.nuget.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+jobs:
+  publish:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          dotnet pack -c Release -o nupkgs /p:Version=$version
+      - uses: NuGet/login@v1
+        id: nuget
+        with:
+          user: ${{ vars.NUGET_USER }}
+      # No runner Windows o curinga (nupkgs/*.nupkg) não chega expandido ao dotnet: um push por arquivo.
+      - run: |
+          Get-ChildItem nupkgs -Filter *.nupkg | ForEach-Object {
+            dotnet nuget push $_.FullName --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 ```
+
+Antes da primeira publicação, crie no nuget.org (seu usuário > Trusted Publishing) uma política com o
+repositório, o nome do arquivo do workflow e o id exato do pacote em "Glob Patterns", e crie a variável
+`NUGET_USER` (Settings > Secrets and variables > Actions > Variables) com o seu usuário do nuget.org.
