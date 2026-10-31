@@ -39,6 +39,24 @@ scripts\Build-Installer.ps1 -Version 0.1.0
 Sai em `.artifacts\installer\`. No GitHub, o workflow `Release` faz o mesmo a cada tag `vX.Y.Z` e cria a
 Release com os dois arquivos; em PR que mexe no instalador ele só compila e guarda como artefato.
 
+## Testar num Windows limpo (Windows Sandbox)
+
+```powershell
+scripts\Test-InstallerSandbox.ps1 -Build              # gera, instala no Sandbox e abre o manager
+scripts\Test-InstallerSandbox.ps1 -Uninstall          # instala, confere, desinstala e confere de novo
+```
+
+Abre o Windows Sandbox (um Windows limpo, descartado ao fechar) e roda lá dentro
+`scripts\sandbox\Install-InSandbox.ps1`: instala o `OpenWigiDash-Setup.exe` em modo silencioso e confere
+serviço, pastas, atalho, `Run`, a entrada em Aplicativos e o WebView2. O Sandbox não repassa USB, então
+o serviço instalado lá passa a usar o WigiDash virtual (`appsettings.local.json` com `Device = Virtual` e
+`AllowRemoteSessions`, porque a sessão do Sandbox chega como remota) e o manager abre com a prévia, onde
+o mouse vira toque. O resultado volta para `.artifacts\sandbox\logs\resultado.txt`, com os logs do
+instalador e os eventos do serviço ao lado. Este PC não é tocado.
+
+Precisa do Windows Pro ou Enterprise com "Área Restrita do Windows" ligada em "Ativar ou desativar
+recursos do Windows".
+
 ## No PC de desenvolvimento
 
 O serviço de dev (`scripts\Setup-DevService.ps1`) e o instalado têm o mesmo nome, `OpenWigiDash`, e só um
