@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting.WindowsServices;
+using Microsoft.Extensions.Options;
 using OpenWigi.Service;
 using OpenWigi.Service.Agents;
 using OpenWigi.Service.Device;
@@ -6,7 +7,8 @@ using OpenWigi.Service.Sessions;
 
 // Roda como serviço Windows (instalado) ou no console, para desenvolvimento:
 //   dotnet run --project src/OpenWigi.Service -- --OpenWigi:AllowRemoteSessions=true
-// Sem o aparelho, com um WigiDash de mentira que aparece na prévia do manager:
+// Sem o aparelho, com um WigiDash de mentira que aparece na prévia do manager (o "Aparelho ativo" escolhido
+// no manager, se houver, vale mais):
 //   dotnet run --project src/OpenWigi.Service -- --OpenWigi:Device=Virtual
 // Como serviço, o diretório atual é System32: a configuração vem da pasta do executável.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
@@ -30,16 +32,14 @@ if (WindowsServiceHelpers.IsWindowsService())
     builder.Services.AddSingleton<IHostLifetime, SessionAwareServiceLifetime>();
 
 builder.Services.AddSingleton(TimeProvider.System);
-if (builder.Configuration.GetValue<DeviceKind>($"{ServiceOptions.Section}:{nameof(ServiceOptions.Device)}") == DeviceKind.Virtual)
-{
-    builder.Services.AddSingleton<IDisplay>(sp => new VirtualDisplay(sp.GetRequiredService<TimeProvider>()));
-}
-else
-{
-    builder.Services.AddSingleton<DeviceHost>();
-    builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceHost>());
-    builder.Services.AddSingleton<IDisplay>(sp => new DeviceHostDisplay(sp.GetRequiredService<DeviceHost>()));
-}
+builder.Services.AddSingleton<DeviceHost>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceHost>());
+builder.Services.AddSingleton(sp => new VirtualDisplay(sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => new DeviceChoiceStore(DeviceChoiceStore.DefaultPath,
+    sp.GetRequiredService<IOptions<ServiceOptions>>().Value.Device, sp.GetRequiredService<ILogger<DeviceChoiceStore>>()));
+builder.Services.AddSingleton<IDisplay>(sp => new SwitchableDisplay(
+    new DeviceHostDisplay(sp.GetRequiredService<DeviceHost>()), sp.GetRequiredService<VirtualDisplay>(),
+    sp.GetRequiredService<DeviceChoiceStore>(), sp.GetRequiredService<ILogger<SwitchableDisplay>>()));
 builder.Services.AddSingleton<SessionBroker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionBroker>());
 builder.Services.AddHostedService<AgentServer>();

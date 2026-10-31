@@ -136,6 +136,6 @@ O mesmo widget, com teste, está em `tests/OpenWigi.Sdk.Tests/ContractTests.cs`.
 
 ## Testar sem o aparelho
 
-Com o serviço em `OpenWigi:Device = Virtual`, o widget roda no manager como se o WigiDash estivesse
+Com **Ajustes > Aparelho ativo > WigiDash virtual** no manager, o widget roda como se o WigiDash estivesse
 ligado. A tela aparece na prévia, onde o mouse vira toque. Ver
 [multiusuario.md](multiusuario.md#sem-o-aparelho-wigidash-virtual).

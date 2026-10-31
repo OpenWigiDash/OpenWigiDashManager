@@ -8,6 +8,15 @@
 
     <MudPaper Class="pa-4" Outlined="true">
         <MudText Typo="Typo.overline" Color="Color.Secondary">Aparelho</MudText>
+        <MudSelect T="DeviceKind" Label="Aparelho ativo" Value="Agent.Device.Kind" ValueChanged="SelectDevice"
+                   Variant="Variant.Outlined" Dense="true" Disabled="@(!Agent.IsOwner)" Class="mb-1">
+            <MudSelectItem Value="DeviceKind.Usb">@UsbLabel</MudSelectItem>
+            <MudSelectItem Value="DeviceKind.Virtual">WigiDash virtual</MudSelectItem>
+        </MudSelect>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
+            O virtual é para quem não tem o aparelho: a tela aparece na prévia e o mouse nela vira toque.
+            A escolha vale para todos os usuários deste PC.
+        </MudText>
         <MudText Typo="Typo.body2" Class="mb-2">Brilho da tela agora (não fica gravado no aparelho).</MudText>
         <MudSlider T="int" Value="Brightness" ValueChanged="SetBrightness" Min="5" Max="100" Step="5"
                    Disabled="@(Agent.Status != AgentStatus.Owner)" Color="Color.Primary">@Brightness%</MudSlider>
@@ -39,4 +48,10 @@
     private void OnAgentChanged() => InvokeAsync(StateHasChanged);
 
     private Task SetBrightness(int value) => Agent.SetBrightnessAsync(value);
+
+    private string UsbLabel => Agent.Device.UsbPresent || Agent.Device is { Kind: DeviceKind.Usb, Connected: true }
+        ? "WigiDash (USB)"
+        : "WigiDash (USB) — desconectado";
+
+    private Task SelectDevice(DeviceKind kind) => Agent.SelectDeviceAsync(kind);
 }

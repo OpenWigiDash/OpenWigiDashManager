@@ -6,7 +6,7 @@ using OpenWigi.Service.Agents;
 namespace OpenWigi.Service.Device;
 
 /// <summary>
-/// WigiDash de mentira, para desenvolver sem o aparelho (<c>OpenWigi:Device = Virtual</c>). Aceita
+/// WigiDash de mentira, para quem não tem o aparelho ("Aparelho ativo" no manager). Aceita
 /// quadros e páginas, que o broker guarda para a prévia, e transforma o toque emulado em gestos com o
 /// mesmo reconhecedor e a mesma leitura a cada ~33 ms do aparelho real.
 /// </summary>
@@ -29,7 +29,7 @@ public sealed class VirtualDisplay : IDisplay, IDisposable
     }
 
     /// <summary>Está sempre ligado: não há cabo para cair.</summary>
-    public DeviceStatus Status { get; } = new(true, DeviceId, "virtual");
+    public DeviceStatus Status { get; } = new(true, DeviceId, "virtual", DeviceKind.Virtual);
 
     public event Action<DeviceStatus>? StatusChanged
     {
@@ -66,6 +66,8 @@ public sealed class VirtualDisplay : IDisplay, IDisposable
             _injected = contact == TouchContact.None ? null : (contact, x, y);
         return true;
     }
+
+    public bool SelectDevice(DeviceKind kind) => kind == DeviceKind.Virtual;
 
     public void Dispose() => _poll.Dispose();
 

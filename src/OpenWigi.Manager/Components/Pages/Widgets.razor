@@ -25,8 +25,8 @@
         <MudGrid Spacing="1">
             <MudItem xs="12" sm="4" Class="owd-ellipsis">
                 <MudText Typo="Typo.body2" Class="owd-ellipsis">
-                    <span class="owd-muted">Aparelho </span>@(Agent.Device.Connected ? "WigiDash conectado" : "Desconectado")
-                    @if (Agent.Device.Connected)
+                    <span class="owd-muted">Aparelho </span>@DeviceLabel
+                    @if (Agent.Device is { Connected: true, Kind: DeviceKind.Usb })
                     {
                         <span class="owd-muted" title="Firmware @Agent.Device.Firmware"> · @Agent.Device.Firmware</span>
                     }
@@ -260,6 +260,13 @@
 </MudStack>
 
 @code {
+    private string DeviceLabel => Agent.Device switch
+    {
+        { Kind: DeviceKind.Virtual } => "WigiDash virtual",
+        { Connected: true } => "WigiDash conectado",
+        _ => "Desconectado",
+    };
+
     // A página do editor é a do aparelho: escolher aqui troca lá, e swipe lá (ou na prévia) troca aqui.
     private int _page => Dashboard.CurrentPage;
     private Guid? _selected;

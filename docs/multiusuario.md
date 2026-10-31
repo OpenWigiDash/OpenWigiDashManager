@@ -66,16 +66,19 @@ tela de quem está no console. Pelo RDP, rode o serviço com `--OpenWigi:AllowRe
 
 ## Sem o aparelho (WigiDash virtual)
 
-Com `OpenWigi:Device = Virtual` o serviço não abre o WinUSB e usa um WigiDash de mentira, como o
-"Virtual WigiDash" do manager oficial. Ele se diz conectado, aceita os quadros (que aparecem na prévia
-do manager e no `OpenWigiAgent --preview`) e passa o mouse da prévia pelo mesmo reconhecedor de gestos do
-aparelho real: clicar dá tap, segurar dá long-press e arrastar dá swipe. O brilho escolhido fica guardado.
+Em **Ajustes > Aparelho ativo** o manager troca entre o WigiDash de verdade (USB) e um **WigiDash virtual**,
+como o "Virtual WigiDash" do manager oficial. Serve para quem não tem o aparelho, para testar o instalador
+num Windows limpo (Windows Sandbox) e para desenvolver. O virtual se diz conectado e aceita os quadros, que
+aparecem na prévia do manager e no `OpenWigiAgent --preview`. O mouse na prévia passa pelo mesmo
+reconhecedor de gestos do aparelho real: clicar dá tap, segurar dá long-press e arrastar dá swipe.
 
-- Serviço de dev: `scripts\Deploy-DevService.ps1 -Virtual` (sem `-Virtual` volta para o aparelho).
-- No console, com o serviço instalado parado: `dotnet run --project src\OpenWigi.Service -- --OpenWigi:Device=Virtual`.
-
-Dá para usar com o manager oficial aberto, porque nada disputa o aparelho. Serve para mexer no host e no
-manager e para testar plugins: basta pôr o plugin na pasta de widgets e abrir a prévia.
+- A troca vale na hora, sem reiniciar o serviço, e só o dono da tela pode trocar.
+- A escolha é da máquina (o aparelho é um só) e fica em `%ProgramData%\OpenWigiDash\Service\device.txt`,
+  gravado pelo serviço: uma linha, `Usb` ou `Virtual`.
+- Sem escolha gravada vale `OpenWigi:Device` da configuração do serviço (padrão `Usb`). Para o serviço de dev,
+  `scripts\Deploy-DevService.ps1 -Virtual` grava isso; no console,
+  `dotnet run --project src\OpenWigi.Service -- --OpenWigi:Device=Virtual`.
+- O serviço continua procurando o WigiDash de verdade, e a lista mostra se ele está ligado.
 
 ## Testar com outro usuário sem instalar nada nele
 

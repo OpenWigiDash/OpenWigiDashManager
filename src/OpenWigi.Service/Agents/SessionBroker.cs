@@ -100,6 +100,9 @@ public sealed class SessionBroker : BackgroundService
             case SleepDisplay:
                 _display.Sleep();
                 break;
+            case SelectDevice select:
+                _display.SelectDevice(select.Kind);
+                break;
         }
     }
 

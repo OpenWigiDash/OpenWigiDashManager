@@ -88,6 +88,12 @@ public sealed class AgentClient : IAsyncDisposable
         }
     }
 
+    /// <summary>Este usuário está com a tela (mesmo que o aparelho ativo esteja desligado).</summary>
+    public bool IsOwner { get; private set; }
+
+    /// <summary>Troca o aparelho ativo da máquina (USB ou virtual). O serviço só aceita do dono da tela.</summary>
+    public Task SelectDeviceAsync(DeviceKind kind) => IsOwner ? SendAsync(new SelectDevice(kind)) : Task.CompletedTask;
+
     public Task TouchAsync(TouchContact contact, int x, int y) =>
         Status == AgentStatus.Owner ? SendAsync(new EmulatedTouch(contact, x, y)) : Task.CompletedTask;
 
@@ -124,6 +130,7 @@ public sealed class AgentClient : IAsyncDisposable
             }
 
             _connection = null;
+            IsOwner = false;
             if (Dashboard.IsActive)
                 await Dashboard.ActivateAsync(false, CancellationToken.None);
             Set(AgentStatus.NoService, "Serviço OpenWigiDash não encontrado. Ele está instalado e rodando?");
@@ -155,9 +162,10 @@ public sealed class AgentClient : IAsyncDisposable
                     SessionId = welcome.SessionId;
                     Device = welcome.Device;
                     Set(welcome.Device.Connected ? AgentStatus.Waiting : AgentStatus.NoDevice,
-                        welcome.Device.Connected ? "Aguardando a tela" : "WigiDash desconectado");
+                        welcome.Device.Connected ? "Aguardando a tela" : NoDeviceReason);
                     break;
                 case Ownership ownership:
+                    IsOwner = ownership.IsOwner;
                     await Dashboard.ActivateAsync(ownership.IsOwner, cancellationToken);
                     Set(ownership.IsOwner ? AgentStatus.Owner : Device.Connected ? AgentStatus.Waiting : AgentStatus.NoDevice,
                         ownership.Reason);
@@ -165,7 +173,9 @@ public sealed class AgentClient : IAsyncDisposable
                 case DeviceStatus status:
                     Device = status;
                     if (!status.Connected)
-                        Set(AgentStatus.NoDevice, "WigiDash desconectado");
+                        Set(AgentStatus.NoDevice, NoDeviceReason);
+                    else
+                        Changed?.Invoke();
                     break;
                 case Gesture gesture:
                     _ = Dashboard.HandleGestureAsync(gesture.Event, cancellationToken);
@@ -194,6 +204,8 @@ public sealed class AgentClient : IAsyncDisposable
             }
         }
     }
+
+    private const string NoDeviceReason = "WigiDash desconectado. Sem o aparelho? Escolha o WigiDash virtual em Ajustes.";
 
     private void Set(AgentStatus status, string reason)
     {
