@@ -35,6 +35,8 @@
 
   <ItemGroup>
     <None Include="..\..\docs\sdk.md" Pack="true" PackagePath="README.md" />
+    <!-- Entra no projeto de quem referencia o pacote: com OpenWigiDashPlugin=true, `dotnet pack` gera o pacote de plugin. -->
+    <None Include="build\victorperez2911.OpenWigi.Sdk.targets" Pack="true" PackagePath="build\" />
   </ItemGroup>
 
   <ItemGroup>

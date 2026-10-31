@@ -5,8 +5,10 @@
        configurações em Razor. -->
   <PropertyGroup>
     <RootNamespace>OpenWigi.Samples.Clock</RootNamespace>
-    <IsPackable>false</IsPackable>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- `dotnet pack` gera o pacote de plugin (ver docs/sdk.md, "Publicar no nuget.org"). -->
+    <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
+    <Description>Widget de exemplo do OpenWigiDash: relógio e contador com long-press.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,5 +19,8 @@
     <PackageReference Include="System.Drawing.Common" Version="10.0.14" />
     <PackageReference Include="MudBlazor" Version="9.11.0" ExcludeAssets="runtime" />
   </ItemGroup>
+
+  <!-- Pelo pacote, o NuGet importa este arquivo sozinho; pela referência de projeto, importamos à mão. -->
+  <Import Project="..\..\src\OpenWigi.Sdk\build\victorperez2911.OpenWigi.Sdk.targets" />
 
 </Project>

@@ -133,3 +133,65 @@ public sealed class ContadorInstancia(IWidgetContext ctx) : IWidgetInstance
 ```
 
 O mesmo widget, com teste, está em `tests/OpenWigi.Sdk.Tests/ContractTests.cs`.
+
+## Publicar no nuget.org
+
+Plugin da comunidade é um pacote do nuget.org com `packageType` `OpenWigiDashPlugin`. O pacote do SDK já
+traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e rodar `dotnet pack`.
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PackageId>SeuNome.OpenWigiDash.Discord</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>SeuNome</Authors>
+    <Description>Mostra quem está falando no canal de voz.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="victorperez2911.OpenWigi.Sdk" Version="2.0.0-preview.2" ExcludeAssets="runtime" />
+    <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+```
+
+`dotnet pack -c Release` gera `SeuNome.OpenWigiDash.Discord.1.0.0.nupkg` com:
+
+| Onde | O quê |
+| --- | --- |
+| `.nuspec` | `packageType` `OpenWigiDashPlugin`, tag `openwigidash-plugin`, dependência de `victorperez2911.OpenWigi.Sdk` |
+| `plugin/` | a saída do `dotnet publish`, sem os assemblies compartilhados; vira `Widgets\<id do pacote>` na instalação |
+| `plugin/plugin.json` | `{ "entry": "<sua dll>" }`, gerado se o projeto não tiver um (a pasta instalada tem o nome do pacote, não da DLL) |
+
+O pacote não tem `lib/`: um plugin não é biblioteca e não pode ser referenciado por outro projeto.
+
+- **Id**: `<Autor>.OpenWigiDash.<Nome>`.
+- **Versão**: SemVer. O Manager oferece a versão mais nova cuja dependência do SDK tem limite inferior
+  compatível com o host (mesmo major, minor menor ou igual; ver [Versão](#versão)).
+- **`plugin.json` instalado**: o instalador acrescenta `"package": { "id": "...", "version": "..." }` para
+  saber de onde o plugin veio. O host ignora esse campo.
+- **Conferir o pacote**: `scripts/Test-PluginPackage.ps1 -Project <seu.csproj>`.
+
+Publicação pelo GitHub Actions com Trusted Publishing (sem chave guardada), no padrão de
+`.github/workflows/sdk-publish.yml`:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-dotnet@v4
+    with:
+      dotnet-version: 10.0.x
+  - run: dotnet pack -c Release -o nupkgs /p:Version=${{ github.ref_name }}
+  - uses: NuGet/login@v1
+    id: nuget
+    with:
+      user: ${{ vars.NUGET_USER }}
+  - run: dotnet nuget push nupkgs/*.nupkg --api-key ${{ steps.nuget.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+```
