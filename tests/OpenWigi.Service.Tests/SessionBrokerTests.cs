@@ -185,6 +185,32 @@ public class SessionBrokerTests
     }
 
     [Fact]
+    public async Task Sem_dono_qualquer_agente_troca_o_aparelho()
+    {
+        _sessions.Remote.Add(4);
+        var (sandbox, _) = await ConnectAsync(4, "WDAGUtilityAccount");
+        Assert.Null(_broker.Owner); // remota, sem AllowRemoteSessions
+
+        _broker.Handle(sandbox, new SelectDevice(DeviceKind.Virtual));
+
+        Assert.Equal([DeviceKind.Virtual], _display.Selected);
+    }
+
+    [Fact]
+    public async Task Com_o_virtual_ativo_sessao_remota_fica_com_a_tela()
+    {
+        _sessions.Remote.Add(4);
+        var (sandbox, channel) = await ConnectAsync(4, "WDAGUtilityAccount");
+        Assert.Null(_broker.Owner);
+
+        _display.Status = new DeviceStatus(true, Guid.NewGuid(), "virtual", DeviceKind.Virtual);
+        await _broker.EvaluateAsync();
+
+        Assert.Equal(sandbox.Id, _broker.Owner);
+        Assert.Contains(channel.Sent, m => m is Ownership { IsOwner: true });
+    }
+
+    [Fact]
     public async Task Troca_de_aparelho_so_vale_do_dono()
     {
         _sessions.Console = 1;
@@ -215,8 +241,16 @@ public class SessionBrokerTests
         public bool Locked { get; set; }
         public event Action? Changed;
 
-        public SessionSnapshot Capture(IEnumerable<int> knownSessions) =>
-            new(Console, Locked, Console is { } c ? new HashSet<int> { c } : []);
+        /// <summary>Sessões remotas ativas (RDP, Windows Sandbox).</summary>
+        public HashSet<int> Remote { get; } = [];
+
+        public SessionSnapshot Capture(IEnumerable<int> knownSessions)
+        {
+            var active = new HashSet<int>(Remote);
+            if (Console is { } c)
+                active.Add(c);
+            return new SessionSnapshot(Console, Locked, active);
+        }
 
         public void Raise() => Changed?.Invoke();
     }

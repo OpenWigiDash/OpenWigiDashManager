@@ -9,13 +9,13 @@
     <MudPaper Class="pa-4" Outlined="true">
         <MudText Typo="Typo.overline" Color="Color.Secondary">Aparelho</MudText>
         <MudSelect T="DeviceKind" Label="Aparelho ativo" Value="Agent.Device.Kind" ValueChanged="SelectDevice"
-                   Variant="Variant.Outlined" Dense="true" Disabled="@(!Agent.IsOwner)" Class="mb-1">
+                   Variant="Variant.Outlined" Dense="true" Disabled="@(Agent.Status is AgentStatus.NoService)" Class="mb-1">
             <MudSelectItem Value="DeviceKind.Usb">@UsbLabel</MudSelectItem>
             <MudSelectItem Value="DeviceKind.Virtual">WigiDash virtual</MudSelectItem>
         </MudSelect>
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
             O virtual é para quem não tem o aparelho: a tela aparece na prévia e o mouse nela vira toque.
-            A escolha vale para todos os usuários deste PC.
+            A escolha vale para todos os usuários deste PC. Com a tela em outra sessão, só quem está com ela troca.
         </MudText>
         <MudText Typo="Typo.body2" Class="mb-2">Brilho da tela agora (não fica gravado no aparelho).</MudText>
         <MudSlider T="int" Value="Brightness" ValueChanged="SetBrightness" Min="5" Max="100" Step="5"

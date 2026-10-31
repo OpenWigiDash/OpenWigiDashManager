@@ -45,6 +45,9 @@ public sealed class SessionBroker : BackgroundService
     }
 
     public Guid? Owner => _owner;
+
+    // O WigiDash virtual não tem tela física para proteger de quem está longe dela: sessão remota pode usá-lo.
+    private bool AllowRemoteSessions => _options.AllowRemoteSessions || _display.Status.Kind == DeviceKind.Virtual;
     public string Reason => _reason;
 
     public async Task RegisterAsync(AgentSession agent, CancellationToken cancellationToken = default)
@@ -68,6 +71,14 @@ public sealed class SessionBroker : BackgroundService
         if (message is Hello hello)
         {
             agent.UserName = hello.UserName;
+            return;
+        }
+
+        // Sem dono, qualquer agente troca o aparelho: é assim que quem entra pelo RDP ou pelo Windows Sandbox,
+        // sem o WigiDash, liga o virtual e passa a ter a tela. Com dono, só ele troca.
+        if (message is SelectDevice select && _owner is null)
+        {
+            _display.SelectDevice(select.Kind);
             return;
         }
 
@@ -116,7 +127,7 @@ public sealed class SessionBroker : BackgroundService
             var snapshot = _sessions.Capture(agents.Select(a => a.SessionId).Distinct());
             var decision = OwnershipPolicy.Decide(
                 agents.Select(a => new AgentCandidate(a.Id, a.SessionId, a.ConnectedAt)).ToList(),
-                snapshot, _options.AllowRemoteSessions);
+                snapshot, AllowRemoteSessions);
 
             var previous = _owner;
             var changed = previous != decision.Owner;

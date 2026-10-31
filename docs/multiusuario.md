@@ -11,7 +11,7 @@ aparelho até fechar, e a troca de usuário congela a tela. Aqui o aparelho é s
 | Usuário no console, desbloqueado, com o agente aberto | O agente desse usuário |
 | Sessão do console bloqueada (Win+L) | O serviço: relógio e "Sessão bloqueada" |
 | Usuário no console sem o agente (ou tela de login) | O serviço |
-| Sessão remota (RDP) | Ninguém, a não ser com `OpenWigi:AllowRemoteSessions = true` |
+| Sessão remota (RDP, Windows Sandbox) | Ninguém, a não ser com `OpenWigi:AllowRemoteSessions = true` ou com o WigiDash virtual ativo |
 | Dois agentes na mesma sessão | O mais recente |
 
 O serviço reavalia ao receber os avisos de sessão do Windows (logon, logoff, lock, unlock,
@@ -72,7 +72,10 @@ num Windows limpo (Windows Sandbox) e para desenvolver. O virtual se diz conecta
 aparecem na prévia do manager e no `OpenWigiAgent --preview`. O mouse na prévia passa pelo mesmo
 reconhecedor de gestos do aparelho real: clicar dá tap, segurar dá long-press e arrastar dá swipe.
 
-- A troca vale na hora, sem reiniciar o serviço, e só o dono da tela pode trocar.
+- A troca vale na hora, sem reiniciar o serviço. Se alguém está com a tela, só ele troca; sem dono, qualquer
+  usuário troca. É assim que quem entra pelo RDP ou pelo Windows Sandbox, sem o aparelho, liga o virtual.
+- Com o virtual ativo, sessão remota pode ficar com a tela (não há tela física para proteger), sem precisar de
+  `AllowRemoteSessions`. O console continua tendo a preferência.
 - A escolha é da máquina (o aparelho é um só) e fica em `%ProgramData%\OpenWigiDash\Service\device.txt`,
   gravado pelo serviço: uma linha, `Usb` ou `Virtual`.
 - Sem escolha gravada vale `OpenWigi:Device` da configuração do serviço (padrão `Usb`). Para o serviço de dev,
