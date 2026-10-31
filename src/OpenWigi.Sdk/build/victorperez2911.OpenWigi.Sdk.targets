@@ -1,0 +1,56 @@
+<Project>
+  <!--
+    Com <OpenWigiDashPlugin>true</OpenWigiDashPlugin> no .csproj, `dotnet pack` gera um pacote de plugin
+    para o nuget.org: packageType OpenWigiDashPlugin, tag openwigidash-plugin e, em plugin/, a saída do
+    publish pronta para virar Widgets\<id> (sem os assemblies que o host compartilha).
+  -->
+  <PropertyGroup Condition="'$(OpenWigiDashPlugin)' == 'true'">
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <IsPackable>true</IsPackable>
+    <PackageType>OpenWigiDashPlugin</PackageType>
+    <PackageTags>$(PackageTags);openwigidash-plugin</PackageTags>
+    <!-- A DLL vai em plugin/, não em lib/: ninguém deve referenciar um plugin como biblioteca. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- NU5100: DLL fora de lib/ (proposital). NU5128: dependências sem lib/ correspondente (idem). -->
+    <NoWarn>$(NoWarn);NU5100;NU5128</NoWarn>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_OpenWigiPluginContent</TargetsForTfmSpecificContentInPackage>
+    <_OpenWigiPluginDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'openwigi-plugin', '$(TargetFramework)'))</_OpenWigiPluginDir>
+  </PropertyGroup>
+
+  <!-- Mesma lista de OpenWigiSdk.SharedAssemblies (um teste confere): o host entrega estes, o plugin não leva. -->
+  <ItemGroup Condition="'$(OpenWigiDashPlugin)' == 'true'">
+    <_OpenWigiSharedAssembly Include="OpenWigi.Sdk" />
+    <_OpenWigiSharedAssembly Include="Microsoft.AspNetCore.Components" />
+    <_OpenWigiSharedAssembly Include="Microsoft.AspNetCore.Components.Forms" />
+    <_OpenWigiSharedAssembly Include="Microsoft.AspNetCore.Components.Web" />
+    <_OpenWigiSharedAssembly Include="Microsoft.Extensions.Logging.Abstractions" />
+    <_OpenWigiSharedAssembly Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <_OpenWigiSharedAssembly Include="MudBlazor" />
+  </ItemGroup>
+
+  <!-- Roda uma vez por TargetFramework durante o pack: publica numa pasta limpa e põe tudo em plugin/. -->
+  <Target Name="_OpenWigiPluginContent">
+    <RemoveDir Directories="$(_OpenWigiPluginDir)" />
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Publish"
+             Properties="TargetFramework=$(TargetFramework);Configuration=$(Configuration);PublishDir=$(_OpenWigiPluginDir)" />
+
+    <ItemGroup>
+      <_OpenWigiSharedFile Include="@(_OpenWigiSharedAssembly->'$(_OpenWigiPluginDir)%(Identity).dll')" />
+      <_OpenWigiSharedFile Include="@(_OpenWigiSharedAssembly->'$(_OpenWigiPluginDir)%(Identity).pdb')" />
+      <_OpenWigiSharedFile Include="@(_OpenWigiSharedAssembly->'$(_OpenWigiPluginDir)%(Identity).xml')" />
+    </ItemGroup>
+    <Delete Files="@(_OpenWigiSharedFile)" />
+
+    <!-- Sem plugin.json, o host procura <pasta>.dll; a pasta vai ter o id do pacote, então a entrada precisa ser dita. -->
+    <WriteLinesToFile Condition="!Exists('$(_OpenWigiPluginDir)plugin.json')"
+                      File="$(_OpenWigiPluginDir)plugin.json"
+                      Lines="{ &quot;entry&quot;: &quot;$(TargetFileName)&quot; }"
+                      Overwrite="true" />
+
+    <ItemGroup>
+      <_OpenWigiPluginFile Include="$(_OpenWigiPluginDir)**\*" />
+      <TfmSpecificPackageFile Include="@(_OpenWigiPluginFile)" PackagePath="plugin/%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>
