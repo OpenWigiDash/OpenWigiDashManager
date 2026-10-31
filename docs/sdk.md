@@ -180,7 +180,12 @@ O pacote não tem `lib/`: um plugin não é biblioteca e não pode ser referenci
 - **Id**: `<Autor>.OpenWigiDash.<Nome>`.
 - **Ícone**: PNG quadrado de 128x128 ou 256x256 (até 1 MB), com o desenho do próprio widget, em
   `PackageIcon`. É o ícone que aparece no nuget.org e na Loja do Manager. Sem ícone, os dois mostram o
-  genérico. O logo do OpenWigiDash é do SDK e do Manager; plugin não usa.
+  genérico.
+  - Plugins oficiais (publicados por `victorperez2911`) levam o logo do OpenWigiDash como selo no canto
+    inferior direito: cerca de 1/3 da largura do ícone, por cima do desenho, com uma borda fina da cor do
+    fundo para destacar. Use `assets/branding/png/openwigidash-256.png` (ou o `.svg`) como fonte do selo.
+  - Plugins da comunidade não usam o logo, para não parecer oficiais. Também não use logos de marcas de
+    terceiros (Discord, Elgato etc.): faça um desenho próprio.
 - **Versão**: SemVer. Enquanto o SDK for preview, o plugin também precisa ser (`1.0.0-preview.1`): o
   NuGet recusa versão estável que depende de preview (NU5104). O Manager oferece a versão mais nova
   cuja dependência do SDK tem limite inferior compatível com o host (mesmo major, minor menor ou igual; ver [Versão](#versão)).
