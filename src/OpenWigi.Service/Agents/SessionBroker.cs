@@ -76,9 +76,9 @@ public sealed class SessionBroker : BackgroundService
 
         // Sem dono, qualquer agente troca o aparelho: é assim que quem entra pelo RDP ou pelo Windows Sandbox,
         // sem o WigiDash, liga o virtual e passa a ter a tela. Com dono, só ele troca.
-        if (message is SelectDevice select && _owner is null)
+        if (message is SelectDevice choice && _owner is null)
         {
-            _display.SelectDevice(select.Kind);
+            _display.SelectDevice(choice.Kind);
             return;
         }
 
