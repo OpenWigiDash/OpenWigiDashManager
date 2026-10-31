@@ -41,6 +41,8 @@
       <_OpenWigiSharedFile Include="@(_OpenWigiSharedAssembly->'$(_OpenWigiPluginDir)%(Identity).xml')" />
     </ItemGroup>
     <Delete Files="@(_OpenWigiSharedFile)" />
+    <!-- Os static web assets dessas bibliotecas (ex.: wwwroot/_content/MudBlazor) também vêm do host. -->
+    <RemoveDir Directories="@(_OpenWigiSharedAssembly->'$(_OpenWigiPluginDir)wwwroot\_content\%(Identity)')" />
 
     <!-- Sem plugin.json, o host procura <pasta>.dll; a pasta vai ter o id do pacote, então a entrada precisa ser dita. -->
     <WriteLinesToFile Condition="!Exists('$(_OpenWigiPluginDir)plugin.json')"
