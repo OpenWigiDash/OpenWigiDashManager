@@ -1,4 +1,4 @@
-# OpenWigiDashManager - testa o instalador num Windows limpo, no Windows Sandbox, sem mexer neste PC.
+﻿# OpenWigiDashManager - testa o instalador num Windows limpo, no Windows Sandbox, sem mexer neste PC.
 #
 #   scripts\Test-InstallerSandbox.ps1              instala, liga o WigiDash virtual e abre o manager com a prévia
 #   scripts\Test-InstallerSandbox.ps1 -Uninstall   instala, confere, desinstala e confere de novo, sem abrir nada
