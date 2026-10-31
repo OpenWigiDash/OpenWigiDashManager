@@ -10,7 +10,7 @@ public sealed record OwnershipDecision(Guid? Owner, string Reason);
 
 /// <summary>
 /// Quem desenha no WigiDash. Regra: o agente da sessão que está no console físico, desbloqueada.
-/// Sessões remotas só entram se a opção permitir e o console não tiver dono.
+/// Sessões remotas só entram se for permitido (opção AllowRemoteSessions ou WigiDash virtual) e o console não tiver dono.
 /// </summary>
 public static class OwnershipPolicy
 {
@@ -34,7 +34,7 @@ public static class OwnershipPolicy
                 .OrderByDescending(a => a.ConnectedAt)
                 .FirstOrDefault();
             if (remote is not null)
-                return new OwnershipDecision(remote.AgentId, "Sessão remota ativa (opção AllowRemoteSessions)");
+                return new OwnershipDecision(remote.AgentId, "Sessão remota ativa");
         }
 
         return new OwnershipDecision(null, sessions.ConsoleSessionId is null

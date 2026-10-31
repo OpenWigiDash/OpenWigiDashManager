@@ -88,11 +88,11 @@ public sealed class AgentClient : IAsyncDisposable
         }
     }
 
-    /// <summary>Este usuário está com a tela (mesmo que o aparelho ativo esteja desligado).</summary>
-    public bool IsOwner { get; private set; }
-
-    /// <summary>Troca o aparelho ativo da máquina (USB ou virtual). O serviço só aceita do dono da tela.</summary>
-    public Task SelectDeviceAsync(DeviceKind kind) => IsOwner ? SendAsync(new SelectDevice(kind)) : Task.CompletedTask;
+    /// <summary>
+    /// Troca o aparelho ativo da máquina (USB ou virtual). O serviço aceita do dono da tela ou, sem dono, de
+    /// qualquer um; se recusar, o <see cref="Device"/> não muda.
+    /// </summary>
+    public Task SelectDeviceAsync(DeviceKind kind) => SendAsync(new SelectDevice(kind));
 
     public Task TouchAsync(TouchContact contact, int x, int y) =>
         Status == AgentStatus.Owner ? SendAsync(new EmulatedTouch(contact, x, y)) : Task.CompletedTask;
@@ -130,7 +130,6 @@ public sealed class AgentClient : IAsyncDisposable
             }
 
             _connection = null;
-            IsOwner = false;
             if (Dashboard.IsActive)
                 await Dashboard.ActivateAsync(false, CancellationToken.None);
             Set(AgentStatus.NoService, "Serviço OpenWigiDash não encontrado. Ele está instalado e rodando?");
@@ -165,7 +164,6 @@ public sealed class AgentClient : IAsyncDisposable
                         welcome.Device.Connected ? "Aguardando a tela" : NoDeviceReason);
                     break;
                 case Ownership ownership:
-                    IsOwner = ownership.IsOwner;
                     await Dashboard.ActivateAsync(ownership.IsOwner, cancellationToken);
                     Set(ownership.IsOwner ? AgentStatus.Owner : Device.Connected ? AgentStatus.Waiting : AgentStatus.NoDevice,
                         ownership.Reason);
