@@ -31,3 +31,19 @@ aparece ligada ao PR no GitHub Projects e fecha sozinha no merge. Não feche iss
 
 - Issue que o PR só avança, sem terminar (ex.: falta teste manual no aparelho): `Refs #N`.
 - Se uma issue precisou ser fechada sem PR, comente nela o PR ou commit que entregou.
+
+## Publicar versão (tags)
+
+A sessão do Claude só consegue empurrar o próprio branch: `git push` de tag volta 403. Não tente
+empurrar tag. Para publicar, rode o workflow com a versão (sem o "v") no `main`, só quando o Victor
+pedir a publicação daquela versão:
+
+- Manager: workflow **Release** (`release.yml`), input `version` (ex.: `1.4.0`). Cria a tag `v1.4.0`
+  e a release, com assinatura do SignPath (precisa de aprovação no site).
+- SDK: workflow **Publicar SDK no NuGet** (`sdk-publish.yml`), input `version` (ex.: `1.2.0-preview.1`).
+  Publica no nuget.org e cria a tag `sdk-v1.2.0-preview.1`.
+- Widgets (Discord, Stream Deck Mirror): workflow **Release Widget** (`release.yml`), input `version`.
+
+Pelo MCP do GitHub: `actions_run_trigger` com `method: run_workflow`, `workflow_id: release.yml`,
+`ref: main`, `inputs: {"version": "..."}`. Se a sessão não puder rodar, passe ao Victor o link
+Actions > workflow > Run workflow, nunca comandos de tag.
