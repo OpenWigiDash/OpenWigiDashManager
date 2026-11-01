@@ -103,7 +103,7 @@ public sealed class CounterWidget : IWidget
         Version = new(1, 0),
         Author = "OpenWigiDashManager",
         Description = "Tap soma um, long-press zera. Exemplo de toques ricos.",
-        SupportedSizes = [WidgetSize.Small, WidgetSize.Wide, WidgetSize.Mini],
+        SupportedSizes = [WidgetSize.Small, WidgetSize.Wide],
     };
 
     public ValueTask<IWidgetInstance> CreateInstanceAsync(IWidgetContext context, CancellationToken cancellationToken) =>

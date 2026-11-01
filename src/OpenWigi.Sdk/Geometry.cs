@@ -193,8 +193,14 @@ public sealed record TileFrame
     public int OuterRadius(PixelSize tile) =>
         Rounded ? Math.Min(CornerRadius, Math.Min(tile.Width, tile.Height) / 4) : 0;
 
-    /// <summary>Padrão das páginas: 3 px de respiro, borda de 2 px, cantos arredondados.</summary>
-    public static TileFrame Default { get; } = new() { Spacing = 3, Border = 2, Rounded = true };
+    /// <summary>
+    /// Padrão das páginas, igual ao visual de antes da moldura: tiles colados na grade, fundo preto e
+    /// cantos arredondados. O conteúdo ocupa a célula inteira (folga 0).
+    /// </summary>
+    public static TileFrame Default { get; } = new() { Spacing = 0, Border = 0, Rounded = true, Background = new(0, 0, 0) };
+
+    /// <summary>Moldura completa sugerida: 3 px de respiro, borda de 2 px, cantos arredondados e fundo roxo escuro.</summary>
+    public static TileFrame Framed { get; } = new() { Spacing = 3, Border = 2, Rounded = true };
 
     /// <summary>Sem moldura: tiles colados na grade, fundo preto (o visual da grade antiga sem cantos).</summary>
     public static TileFrame None { get; } = new() { Spacing = 0, Border = 0, Rounded = false, Background = new(0, 0, 0) };

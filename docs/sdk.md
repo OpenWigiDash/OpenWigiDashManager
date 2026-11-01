@@ -28,6 +28,10 @@ sempre 145 px: os tamanhos da grade 5x4 antiga continuam com os mesmos pixels.
 | `Large` | 4x4 | 404x294 |
 | `FullScreen` | 10x8 | 1016x592 |
 
+**O 1x1 é para botão com ícone.** Com 98x70 (88x60 com a moldura completa) não cabe texto legível.
+Ofereça `Mini` só nos widgets que são um toque num ícone (mutar, microfone, atalho); widgets com texto,
+lista ou número começam em `Small`.
+
 Qualquer tamanho de 1x1 a 10x8 vale (ex.: `new WidgetSize(3, 2)` = 302x145). `WidgetSize.CellSpan` dá
 os pixels das células começando numa linha par; `WidgetGrid.CellBounds(coluna, linha, tamanho)` dá o
 retângulo exato. Os valores de `WidgetGrid` são `static readonly`, não `const`, para não ficarem
@@ -44,7 +48,9 @@ Cada página tem uma moldura (`TileFrame`), escolhida pela pessoa no manager ent
 | `Rounded` | cantos retos ou arredondados (raio fixo de 12 px, menor em tile pequeno) |
 | `BorderColor`, `Background` | cores escolhidas pela pessoa |
 
-O padrão (`TileFrame.Default`) é 3 px de respiro, borda de 2 px e cantos arredondados.
+O padrão (`TileFrame.Default`) é o visual de antes da moldura: sem respiro, sem borda, fundo preto e
+cantos arredondados, com o conteúdo ocupando a célula inteira. `TileFrame.Framed` é a moldura completa
+sugerida (3 px de respiro, borda de 2 px).
 
 **Quem desenha o quê:** o host pinta o fundo da página, a borda e o canto arredondado. O widget
 desenha só a área de conteúdo, que é a célula menos `Spacing + Border` de cada lado:

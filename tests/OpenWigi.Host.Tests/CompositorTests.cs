@@ -85,7 +85,7 @@ public class CompositorTests
     {
         var sink = new RecordingSink();
         var compositor = new Compositor(sink);
-        var frame = TileFrame.Default;
+        var frame = TileFrame.Framed;
         var shape = new TileShape(WidgetGrid.CellBounds(2, 2, WidgetSize.Small), frame);
         var content = shape.Content;
         var white = WidgetFrame.Solid(new PixelSize(content.Width, content.Height), 255, 255, 255);
