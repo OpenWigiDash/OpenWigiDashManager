@@ -83,9 +83,11 @@ recursos do Windows".
 O serviço de dev (`scripts\Setup-DevService.ps1`) e o instalado têm o mesmo nome, `OpenWigiDash`, e só um
 processo abre o USB. Então é um ou outro:
 
-- **Ir para o instalado:** num PowerShell como admin, `scripts\Setup-DevService.ps1 -Remove` (ou
-  `scripts\Install-Service.ps1 -Uninstall`, se usou esse). Depois rode o `OpenWigiDash-Setup.exe`. Se o
-  serviço de dev ainda existir, o instalador para e diz isso.
+- **Ir para o instalado:** rode o `OpenWigiDash-Setup.exe`. Se o serviço de dev (ou um registro de serviço
+  que sobrou de uma desinstalação) existir, o instalador para e remove esse serviço e registra o dele. Os
+  arquivos do dev ficam onde estão. Se o Windows ainda estiver apagando o serviço antigo ("marcado para
+  exclusão", por exemplo com a janela de Serviços aberta), a instalação falha: feche Serviços ou reinicie
+  e rode de novo.
 - **Voltar ao dev:** desinstale o OpenWigiDash em Configurações > Aplicativos e rode
   `scripts\Setup-DevService.ps1` de novo. Enquanto o instalado existir, os scripts do serviço de dev
   avisam e não mexem nele.
