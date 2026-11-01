@@ -3,7 +3,7 @@
 
 
 <!--
-  Cópia do HyperlinkTheme.xml do WiX 6.0.2 (src/ext/Bal/stdbas/Resources), só com IconFile na Window.
+  Cópia do HyperlinkTheme.xml do WiX 6.0.2 (src/ext/Bal/stdbas/Resources), com IconFile na Window e a versão abaixo do título.
   O WixStdBA do WiX 6 roda num processo próprio e, sem ícone no tema, a janela e a barra de tarefas
   mostram o ícone genérico dele em vez do ícone do bundle.
 -->
@@ -15,7 +15,9 @@
 
     <Window Width="485" Height="300" HexStyle="100a0000" FontId="0" Caption="#(loc.Caption)" IconFile="openwigidash.ico">
         <ImageControl X="11" Y="11" Width="64" Height="64" ImageFile="logo.png" Visible="yes"/>
-        <Label X="80" Y="11" Width="-11" Height="64" FontId="1" Visible="yes" DisablePrefix="yes">#(loc.Title)</Label>
+        <Label X="80" Y="11" Width="-11" Height="34" FontId="1" Visible="yes" DisablePrefix="yes">#(loc.Title)</Label>
+        <!-- A versão que este setup instala, em todas as páginas (o HyperlinkTheme original não mostra). -->
+        <Label X="82" Y="47" Width="-11" Height="20" FontId="3" Visible="yes" DisablePrefix="yes">Versão [WixBundleVersion]</Label>
 
         <Page Name="Help">
             <Label X="11" Y="80" Width="-11" Height="30" FontId="2" DisablePrefix="yes">#(loc.HelpHeader)</Label>
