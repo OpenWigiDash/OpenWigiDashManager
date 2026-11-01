@@ -47,11 +47,15 @@ public sealed class PluginInstaller(PluginFeed feed, string widgetsDirectory, st
                 ?? throw new PluginInstallException($"{id} não tem a versão {version}.");
             if (!chosen.IsCompatible)
                 throw new PluginInstallException($"{id} {chosen.Version} {Requirement(chosen)}");
+            if (feed.Policy.BlockReason(chosen.Id, chosen.Version) is { } reason)
+                throw new PluginInstallException($"{id} {chosen.Version} está bloqueada: {reason}");
         }
         else
         {
-            chosen = PluginFeed.PickCompatible(versions)
-                ?? throw new PluginInstallException($"Nenhuma versão de {id} serve para este OpenWigiDash: a mais nova {Requirement(versions[^1])}");
+            chosen = feed.PickInstallable(versions)
+                ?? throw new PluginInstallException(PluginFeed.PickCompatible(versions) is not null
+                    ? $"Todas as versões de {id} que servem para este OpenWigiDash estão bloqueadas."
+                    : $"Nenhuma versão de {id} serve para este OpenWigiDash: a mais nova {Requirement(versions[^1])}");
         }
 
         var previous = Find(chosen.Id)?.Version;
@@ -65,7 +69,7 @@ public sealed class PluginInstaller(PluginFeed feed, string widgetsDirectory, st
         var installed = Find(id) ?? throw new PluginInstallException($"{id} não está instalado.");
         if (installed.PackageId is null || installed.Version is null)
             throw new PluginInstallException($"{installed.Folder} foi copiado à mão; instale pelo feed para poder atualizar.");
-        var latest = PluginFeed.PickCompatible(await feed.GetVersionsAsync(installed.PackageId, cancellationToken));
+        var latest = feed.PickInstallable(await feed.GetVersionsAsync(installed.PackageId, cancellationToken));
         if (latest is null || !(latest.Version > installed.Version))
             return null;
         var applied = await InstallVersionAsync(latest, cancellationToken);
@@ -85,7 +89,7 @@ public sealed class PluginInstaller(PluginFeed feed, string widgetsDirectory, st
         {
             try
             {
-                var latest = PluginFeed.PickCompatible(await feed.GetVersionsAsync(plugin.PackageId!, cancellationToken));
+                var latest = feed.PickInstallable(await feed.GetVersionsAsync(plugin.PackageId!, cancellationToken));
                 checkedAny = true;
                 if (latest is not null && latest.Version > plugin.Version!)
                     updates.Add(new PluginUpdate(plugin, latest.Version));

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/victorperez2911/OpenWigiDashManager/main/plugins/verified.schema.json",
+  "title": "Plugins verificados e versões bloqueadas do OpenWigiDash",
+  "type": "object",
+  "required": ["version", "plugins"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "description": "Id do pacote no nuget.org." },
+          "owner": { "type": "string", "minLength": 1, "description": "Conta dona do pacote no nuget.org. Sem owner, a entrada só bloqueia versões." },
+          "repository": { "type": "string", "pattern": "^https://", "description": "Repositório com o código-fonte revisado." },
+          "blockedVersions": {
+            "type": "array",
+            "description": "Versões exatas (1.0.0) ou faixas do NuGet ([1.0.0, 1.2.0)).",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "reason": {
+            "type": "object",
+            "description": "Motivo de cada bloqueio, pela mesma chave usada em blockedVersions.",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

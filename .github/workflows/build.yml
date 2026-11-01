@@ -18,3 +18,7 @@ jobs:
       - name: Pacote de plugin
         shell: pwsh
         run: ./scripts/Test-PluginPackage.ps1 -Configuration Release
+      - name: Lista de plugins verificados (schema)
+        shell: pwsh
+        run: |
+          if (-not (Test-Json -Path plugins/verified.json -SchemaFile plugins/verified.schema.json)) { exit 1 }

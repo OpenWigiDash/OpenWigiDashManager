@@ -38,7 +38,7 @@ public sealed class PluginStoreTests : IDisposable
         var hit = Assert.Single(await _feed.CreateFeed().SearchAsync(null));
 
         Assert.Equal("victorperez2911", hit.Owners);
-        Assert.True(hit.Verified);
+        Assert.True(hit.Official);
         Assert.Equal("https://github.com/autor/teste", hit.ProjectUrl);
         Assert.Null(hit.LicenseUrl);
         Assert.Null(hit.IconUrl);
@@ -61,7 +61,7 @@ public sealed class PluginStoreTests : IDisposable
 
         var hit = Assert.Single(await _feed.CreateFeed().SearchAsync(null));
 
-        Assert.False(hit.Verified);
+        Assert.False(hit.Official);
     }
 
     [Fact]

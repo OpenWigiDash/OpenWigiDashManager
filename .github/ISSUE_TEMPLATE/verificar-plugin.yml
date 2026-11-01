@@ -1,0 +1,53 @@
+name: Pedir verificação de plugin
+description: Pedir o selo "Verificado" para um plugin publicado no nuget.org.
+title: "Verificar plugin: "
+labels: ["verificação de plugin"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Plugins verificados aparecem com o selo na Loja do manager e instalam sem o aviso de "comunidade".
+        Antes de pedir, confira o checklist de revisão em [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#verificação-de-plugins).
+  - type: input
+    id: id
+    attributes:
+      label: Id do pacote no nuget.org
+      placeholder: SuaConta.OpenWigiDash.MeuPlugin
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Conta dona do pacote no nuget.org
+      description: O selo só vale para pacotes publicados por esta conta.
+    validations:
+      required: true
+  - type: input
+    id: repository
+    attributes:
+      label: Repositório com o código-fonte
+      description: Público, com o workflow que gera e publica o pacote.
+      placeholder: https://github.com/...
+    validations:
+      required: true
+  - type: checkboxes
+    id: access
+    attributes:
+      label: O que o plugin acessa
+      options:
+        - label: Rede (internet ou rede local)
+        - label: Arquivos fora da própria pasta
+        - label: Outros processos ou programas (pipes, automação, teclado/mouse)
+        - label: Registro do Windows
+  - type: textarea
+    id: details
+    attributes:
+      label: Para que precisa desses acessos
+      description: Explique cada item marcado acima.
+  - type: input
+    id: contact
+    attributes:
+      label: Contato
+      description: Como falar com você se a revisão achar algum problema (e-mail, Discord, GitHub).
+    validations:
+      required: true

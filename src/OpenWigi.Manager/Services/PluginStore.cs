@@ -28,6 +28,8 @@ public sealed class PluginStore : IDisposable
     private readonly PluginFeed _feed;
     private readonly PluginInstaller _installer;
     private readonly PluginIconCache _icons;
+    private readonly VerifiedListSource _verified;
+    private bool _policyLoaded;
     private readonly Dictionary<string, string?> _iconUrls = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _busy = new(1, 1);
     private readonly Timer _timer;
@@ -42,6 +44,8 @@ public sealed class PluginStore : IDisposable
         _feed = new PluginFeed(_http);
         _installer = new PluginInstaller(_feed, widgetsDirectory, PluginInstaller.DefaultCacheDirectory);
         _icons = new PluginIconCache(_http, _feed, PluginIconCache.DefaultCacheDirectory);
+        _verified = new VerifiedListSource(_http, VerifiedListSource.DefaultCacheFile);
+        _feed.Policy = _verified.LoadCached();
         // Checagem diária em segundo plano: confere de hora em hora se já passou um dia da última.
         _timer = new Timer(_ => _ = BackgroundCheckAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(1));
     }
@@ -77,12 +81,43 @@ public sealed class PluginStore : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Lista de verificados e versões bloqueadas: baixa de novo (ou fica com a cópia offline).</summary>
+    public async Task RefreshPolicyAsync(CancellationToken cancellationToken = default)
+    {
+        _feed.Policy = await _verified.LoadAsync(cancellationToken);
+        _policyLoaded = true;
+        Changed?.Invoke();
+    }
+
+    public PluginTrust TrustOf(FeedPackage package) => _feed.Policy.TrustOf(package);
+
+    /// <summary>Motivo do bloqueio da versão instalada; null se ela não está bloqueada.</summary>
+    public string? BlockReason(InstalledPlugin plugin) =>
+        plugin is { PackageId: { } id, Version: { } version, PendingRemoval: false } ? _feed.Policy.BlockReason(id, version) : null;
+
+    /// <summary>Instalados numa versão bloqueada, com o motivo (para a faixa na Loja e em Widgets).</summary>
+    public IReadOnlyList<(InstalledPlugin Plugin, string Reason)> BlockedInstalled =>
+        Installed.Select(p => (p, BlockReason(p))).Where(x => x.Item2 is not null).Select(x => (x.p, x.Item2!)).ToList();
+
     private async Task BackgroundCheckAsync()
     {
+        // Na primeira volta, a lista de bloqueio é atualizada para avisar quem tem versão com problema.
+        if (!_policyLoaded)
+        {
+            try
+            {
+                await RefreshPolicyAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Lista de verificados não carregou: {Message}", ex.Message);
+            }
+        }
         if (!_settings.CheckPluginUpdates || DateTimeOffset.UtcNow - (_settings.LastPluginUpdateCheck ?? DateTimeOffset.MinValue) < CheckEvery)
             return;
         try
         {
+            await RefreshPolicyAsync();
             await CheckUpdatesAsync();
         }
         catch (Exception ex)

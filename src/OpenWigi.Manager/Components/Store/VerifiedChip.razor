@@ -1,15 +1,20 @@
-@* "Verificado" para pacotes de contas confiáveis do nuget.org; "Comunidade" para o resto. *@
-@if (Verified)
+@* Selo de confiança: Oficial (conta do projeto), Verificado (lista revisada) ou Comunidade. *@
+@switch (Trust)
 {
-    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.Verified" Class="ma-0"
-             title="Publicado por uma conta verificada do nuget.org">Verificado</MudChip>
-}
-else
-{
-    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0"
-             title="Código não revisado pelo OpenWigiDash">Comunidade</MudChip>
+    case PluginTrust.Official:
+        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Verified" Class="ma-0"
+                 title="Publicado pela conta do OpenWigiDash no nuget.org">Oficial</MudChip>
+        break;
+    case PluginTrust.Verified:
+        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.Verified" Class="ma-0"
+                 title="Revisado pelos mantenedores do OpenWigiDash">Verificado</MudChip>
+        break;
+    default:
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0"
+                 title="Código não revisado pelo OpenWigiDash">Comunidade</MudChip>
+        break;
 }
 
 @code {
-    [Parameter] public bool Verified { get; set; }
+    [Parameter] public PluginTrust Trust { get; set; }
 }

@@ -6,6 +6,7 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @inject IDialogService Dialogs
+@inject PluginStore Store
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2">
@@ -43,6 +44,13 @@
             </MudItem>
         </MudGrid>
     </MudPaper>
+    @foreach (var (plugin, reason) in Store.BlockedInstalled)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true">
+            @(plugin.PackageId) @(plugin.Version) foi bloqueada pelos mantenedores: @reason
+            <MudLink Href="/loja" Class="ml-1">Atualizar ou remover na Loja</MudLink>
+        </MudAlert>
+    }
     @if (Dashboard.PluginErrors.Count > 0)
     {
         <MudAlert Severity="Severity.Warning" Dense="true">
