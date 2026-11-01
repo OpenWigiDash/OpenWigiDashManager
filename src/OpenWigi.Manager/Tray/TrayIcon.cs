@@ -22,6 +22,7 @@ public sealed class TrayIcon : IDisposable
     private readonly UserPreferenceChangedEventHandler _onTheme;
     private readonly Dictionary<string, Icon> _cache = [];
     private string? _shown;
+    private Action? _balloonClick;
 
     /// <param name="post">Leva a atualização para a thread da UI (o agente avisa de outra thread).</param>
     public TrayIcon(AgentClient agent, Action<Action> post, Action open, Action openPreview, Action exit)
@@ -48,12 +49,31 @@ public sealed class TrayIcon : IDisposable
             if (e.Button == MouseButtons.Left)
                 post(open);
         };
+        _icon.BalloonTipClicked += (_, _) =>
+        {
+            var click = _balloonClick;
+            _balloonClick = null;
+            if (click is not null)
+                post(click);
+        };
+        _icon.BalloonTipClosed += (_, _) => _balloonClick = null;
         Update();
         agent.Changed += _onChanged;
         SystemEvents.UserPreferenceChanged += _onTheme;
     }
 
-    public void ShowBalloon(string text) => _icon.ShowBalloonTip(5000, "OpenWigiDash", text, ToolTipIcon.Warning);
+    public void ShowBalloon(string text)
+    {
+        _balloonClick = null;
+        _icon.ShowBalloonTip(5000, "OpenWigiDash", text, ToolTipIcon.Warning);
+    }
+
+    /// <summary>Aviso informativo; um clique nele roda <paramref name="onClick"/> (na thread da UI).</summary>
+    public void ShowNotice(string title, string text, Action onClick)
+    {
+        _balloonClick = onClick;
+        _icon.ShowBalloonTip(10000, title, text, ToolTipIcon.Info);
+    }
 
     public void Dispose()
     {
