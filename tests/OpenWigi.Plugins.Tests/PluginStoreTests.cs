@@ -21,6 +21,17 @@ public sealed class PluginStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Busca_esconde_pacote_deprecado()
+    {
+        _feed.Publish("victorperez2911.OpenWigiDash.Velho", "1.0.0", deprecated: true);
+        _feed.Publish(Id, "1.0.0");
+
+        var hit = Assert.Single(await _feed.CreateFeed().SearchAsync(null));
+
+        Assert.Equal(Id, hit.Id);
+    }
+
+    [Fact]
     public async Task Plugin_publicado_contra_o_id_antigo_do_sdk_continua_compativel()
     {
         _feed.Publish(Id, "1.0.0", sdkId: PluginFeed.LegacySdkPackageId);

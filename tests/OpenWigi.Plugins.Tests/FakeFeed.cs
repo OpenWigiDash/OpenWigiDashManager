@@ -36,7 +36,7 @@ internal sealed class FakeFeed : HttpMessageHandler
 
     /// <summary>Publica uma versão. <paramref name="sdk"/> null = sem dependência do SDK.</summary>
     public void Publish(string id, string version, string? sdk = "2.0.0-preview.3", bool listed = true, bool plugin = true,
-        IDictionary<string, string>? files = null, string? wrongHash = null, string sdkId = PluginFeed.SdkPackageId)
+        IDictionary<string, string>? files = null, string? wrongHash = null, string sdkId = PluginFeed.SdkPackageId, bool deprecated = false)
     {
         var lower = id.ToLowerInvariant();
         var v = version.ToLowerInvariant();
@@ -62,6 +62,8 @@ internal sealed class FakeFeed : HttpMessageHandler
                 ["dependencies"] = new JsonArray(new JsonObject { ["id"] = sdkId, ["range"] = $"[{sdk}, )" }),
             }),
         };
+        if (deprecated)
+            entry["deprecation"] = new JsonObject { ["reasons"] = new JsonArray("Legacy") };
         if (!_leaves.TryGetValue(lower, out var leaves))
             _leaves[lower] = leaves = [];
         leaves.Add(new JsonObject { ["catalogEntry"] = entry, ["packageContent"] = contentUrl });
