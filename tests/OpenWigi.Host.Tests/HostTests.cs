@@ -106,6 +106,7 @@ public sealed class HostTests : IAsyncLifetime
     {
         // Como o owd plugin deixa um plugin que estava em uso: pasta nova em .pending, aplicada no início.
         var staged = OpenWigi.Plugins.PendingChanges.StagingDirectory(Plugins, "OpenWigi.Samples.Clock");
+        Directory.CreateDirectory(OpenWigi.Plugins.PendingChanges.PendingDirectory(Plugins));
         Directory.Move(Path.Combine(Plugins, "OpenWigi.Samples.Clock"), staged);
         Directory.CreateDirectory(Path.Combine(Plugins, ".cache", "lixo"));
 
