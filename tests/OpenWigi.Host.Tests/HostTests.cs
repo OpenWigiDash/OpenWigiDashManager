@@ -620,6 +620,94 @@ public sealed class HostTests : IAsyncLifetime
             Assert.Contains(expected, problem);
     }
 
+    [Fact]
+    public async Task Restaurar_copia_exportada_traz_paginas_widgets_e_configuracoes()
+    {
+        var host = await StartAsync();
+        var widget = host.Layout.Pages[0].Widgets[0];
+        var folder = Path.Combine(Data, "instances", widget.InstanceId.ToString("D"));
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "nota.txt"), "configurado");
+        await host.AddPageAsync("Música");
+        var exported = Path.Combine(_root, "copia.zip");
+        await host.ExportLayoutAsync(exported);
+
+        // Depois da cópia: tira o widget (apaga os dados dele) e a página.
+        await host.RemoveWidgetAsync(widget.InstanceId);
+        await host.RemovePageAsync(1);
+        Assert.False(Directory.Exists(folder));
+        var changed = 0;
+        host.LayoutChanged += () => changed++;
+
+        await host.RestoreLayoutAsync(exported);
+
+        Assert.Equal(["Página 1", "Música"], host.Layout.Pages.Select(p => p.Name));
+        Assert.Contains(host.Layout.Pages[0].Widgets, w => w.InstanceId == widget.InstanceId);
+        Assert.NotNull(host.NameOf(widget.InstanceId)); // instância criada de novo
+        Assert.Equal("configurado", File.ReadAllText(Path.Combine(folder, "nota.txt")));
+        Assert.Equal(1, changed);
+        var saved = new LayoutStore(Path.Combine(Data, "layout.json")).Load();
+        Assert.Equal(2, saved.Pages.Count);
+        // O layout de antes (sem o widget e com uma página) virou cópia automática.
+        var before = LayoutStore.Parse(File.ReadAllText(host.LayoutBackups()[0]));
+        Assert.Single(before.Pages);
+        Assert.DoesNotContain(before.AllPlacements, w => w.InstanceId == widget.InstanceId);
+    }
+
+    [Fact]
+    public async Task Restaurar_copia_automatica_nao_apaga_dados_dos_widgets_que_saem()
+    {
+        var host = await StartAsync();
+        await host.DisposeAsync();
+        host = await StartAsync(); // agora há uma cópia automática com os widgets padrão
+        var backup = Assert.Single(host.LayoutBackups());
+        var widget = host.Layout.Pages[0].Widgets[0];
+        var page = await host.AddPageAsync("Nova");
+        var added = await host.AddWidgetAsync(widget.WidgetId, page);
+        Assert.NotNull(added);
+        var folder = Path.Combine(Data, "instances", added.Value.ToString("D"));
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "nota.txt"), "fica");
+
+        await host.RestoreLayoutAsync(backup);
+
+        Assert.Single(host.Layout.Pages);
+        Assert.Null(host.NameOf(added.Value));
+        Assert.True(File.Exists(Path.Combine(folder, "nota.txt")));
+        Assert.NotNull(host.NameOf(widget.InstanceId));
+    }
+
+    [Fact]
+    public async Task Restaurar_arquivo_que_nao_e_layout_nao_muda_nada()
+    {
+        var host = await StartAsync();
+        await host.AddPageAsync("Fica");
+        var bad = Path.Combine(_root, "ruim.json");
+        File.WriteAllText(bad, "{ \"nada\": 1 }");
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => host.RestoreLayoutAsync(bad));
+
+        Assert.Equal(2, host.Layout.Pages.Count);
+        Assert.All(host.Layout.AllPlacements, p => Assert.NotNull(host.NameOf(p.InstanceId)));
+    }
+
+    [Fact]
+    public async Task Restaurar_layout_da_grade_5x4_converte_para_10x8()
+    {
+        var host = await StartAsync();
+        var old = Path.Combine(_root, "antigo.json");
+        File.WriteAllText(old, $$"""
+            { "pages": [ { "name": "Antiga", "widgets": [ { "widgetId": "{{Clock}}", "column": 1, "row": 1, "size": "2x1" } ] } ] }
+            """);
+
+        await host.RestoreLayoutAsync(old);
+
+        var placement = Assert.Single(host.Layout.AllPlacements);
+        Assert.Equal((2, 2), (placement.Column, placement.Row));
+        Assert.Equal("Antiga", host.Layout.Pages[0].Name);
+        Assert.Equal(0, host.CurrentPage);
+    }
+
     private sealed class FakeSink : IDisplaySink
     {
         private readonly Lock _gate = new();
