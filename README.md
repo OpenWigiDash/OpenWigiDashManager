@@ -53,8 +53,8 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 
 | Plugin | Pacote |
 | --- | --- |
-| [Discord](https://github.com/victorperez2911/WigiDash-DiscordWidGet/tree/net10): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `victorperez2911.OpenWigiDash.Discord` |
-| [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet/tree/net10): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
+| [Discord](https://github.com/victorperez2911/WigiDash-DiscordWidGet): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `victorperez2911.OpenWigiDash.Discord` |
+| [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
 
 Pela linha de comando, com o `owd` (funciona com o manager aberto). O instalador ainda não traz o `owd`;
 rode do repositório com `dotnet run --project src/OpenWigi.Cli -- plugin ...`:
