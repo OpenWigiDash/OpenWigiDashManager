@@ -7,6 +7,10 @@ name: Release
 # SIGNPATH_ORGANIZATION_ID existe, em tag ou no workflow_dispatch com "assinar". São três pedidos ao
 # SignPath, cada um com aprovação no site: o MSI (com os .exe/.dll do projeto dentro), o motor do Burn
 # e o OpenWigiDash-Setup.exe. Sem a variável, a release sai sem assinatura, como antes.
+#
+# Também publica à mão (Actions > Release > Run workflow, na main) com a versão sem o "v": gera e assina
+# como numa tag e a release cria a tag v<versão> no commit escolhido. Assim a publicação não depende de
+# alguém empurrar a tag (as threads do Claude não podem empurrar tags, só o próprio branch).
 on:
   push:
     tags:
@@ -18,6 +22,10 @@ on:
       - '.github/workflows/release.yml'
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Versão para publicar, sem o "v" (ex.: 1.4.0). Vazio: só gera o instalador como artefato.'
+        required: false
+        default: ''
       assinar:
         description: Mandar para o SignPath (precisa de aprovação no site)
         type: boolean
@@ -30,7 +38,9 @@ jobs:
   installer:
     runs-on: windows-latest
     env:
-      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && (github.ref_type == 'tag' || inputs.assinar) }}
+      # Release de verdade: tag empurrada ou workflow_dispatch com versão.
+      PUBLISH: ${{ github.ref_type == 'tag' || inputs.version != '' }}
+      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && (github.ref_type == 'tag' || inputs.version != '' || inputs.assinar) }}
       SIGNPATH_PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG || 'OpenWigiDashManager' }}
       SIGNPATH_POLICY: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
     steps:
@@ -42,9 +52,22 @@ jobs:
 
       - name: Versão
         shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          $version = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' -replace '^v', '' } else { '0.0.${{ github.run_number }}' }
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}' -replace '^v', ''
+          } elseif ("$env:INPUT_VERSION".Trim()) {
+            $version = $env:INPUT_VERSION.Trim() -replace '^v', ''
+            if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Versão inválida: $version" }
+            git ls-remote --exit-code --tags origin "refs/tags/v$version" | Out-Null
+            if ($LASTEXITCODE -eq 0) { throw "A tag v$version já existe." }
+            $global:LASTEXITCODE = 0
+          } else {
+            $version = '0.0.${{ github.run_number }}'
+          }
           echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "TAG=v$version" >> $env:GITHUB_ENV
 
       - name: Testes
         run: dotnet test --configuration Release
@@ -186,8 +209,9 @@ jobs:
             .artifacts/installer/OpenWigiDash.msi
             .artifacts/installer/SHA256SUMS.txt
 
+      # Em workflow_dispatch, o gh cria a tag v<versão> no commit que rodou (--target).
       - name: Release
-        if: github.ref_type == 'tag'
+        if: env.PUBLISH == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -197,5 +221,5 @@ jobs:
             "Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). " +
             "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)"
           } else { "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)" }
-          gh release create '${{ github.ref_name }}' --title "OpenWigiDash $env:VERSION" --notes $notes --generate-notes `
+          gh release create $env:TAG --target '${{ github.sha }}' --title "OpenWigiDash $env:VERSION" --notes $notes --generate-notes `
             .artifacts/installer/OpenWigiDash-Setup.exe .artifacts/installer/OpenWigiDash.msi .artifacts/installer/SHA256SUMS.txt

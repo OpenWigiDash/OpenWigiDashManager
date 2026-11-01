@@ -2,21 +2,34 @@ name: Publicar SDK no NuGet
 
 # Publica o pacote OpenWigiDash.Sdk (o contrato dos widgets) no nuget.org.
 # Tag própria (sdk-vX.Y.Z) para não se misturar com as releases do manager (vX.Y.Z).
+#
+# Também publica à mão (Actions > Publicar SDK no NuGet > Run workflow, na main) com a versão sem o "v":
+# publica do commit escolhido e cria a tag sdk-v<versão> nele depois do push. Assim a publicação não
+# depende de alguém empurrar a tag (as threads do Claude não podem empurrar tags, só o próprio branch).
+# Sem versão, só testa e empacota (0.0.0-ci.N), como antes.
 on:
   push:
     tags:
       - 'sdk-v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão do SDK para publicar, sem o "v" (ex.: 1.2.0-preview.1). Vazio: só testa e empacota.'
+        required: false
+        default: ''
 
 # Trusted Publishing do nuget.org (OIDC): sem API key guardada. A política no nuget.org aponta para
 # OpenWigiDash/OpenWigiDashManager + sdk-publish.yml (dona: Org OpenWigiDash); NUGET_USER (variável do repo) é o perfil lá.
+# contents: write para criar a tag sdk-v<versão> no workflow_dispatch.
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
   publish:
     runs-on: windows-latest
+    env:
+      PUBLISH: ${{ github.ref_type == 'tag' || inputs.version != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,11 +37,22 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Versão da tag
+      - name: Versão
         shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          $version = '${{ github.ref_name }}' -replace '^sdk-v', ''
-          if ('${{ github.ref_type }}' -ne 'tag') { $version = '0.0.0-ci.${{ github.run_number }}' }
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}' -replace '^sdk-v', ''
+          } elseif ("$env:INPUT_VERSION".Trim()) {
+            $version = $env:INPUT_VERSION.Trim() -replace '^(sdk-)?v', ''
+            if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Versão inválida: $version" }
+            git ls-remote --exit-code --tags origin "refs/tags/sdk-v$version" | Out-Null
+            if ($LASTEXITCODE -eq 0) { throw "A tag sdk-v$version já existe." }
+            $global:LASTEXITCODE = 0
+          } else {
+            $version = '0.0.0-ci.${{ github.run_number }}'
+          }
           echo "VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Testes do SDK
@@ -38,14 +62,14 @@ jobs:
         run: dotnet pack src/OpenWigi.Sdk --configuration Release --output nupkgs /p:Version=${{ env.VERSION }}
 
       - name: Login no nuget.org (chave temporária via OIDC)
-        if: github.ref_type == 'tag'
+        if: env.PUBLISH == 'true'
         id: nuget
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USER }}
 
       - name: Push
-        if: github.ref_type == 'tag'
+        if: env.PUBLISH == 'true'
         shell: pwsh
         # No runner Windows o curinga não chega expandido ao dotnet: um push por arquivo.
         run: |
@@ -53,3 +77,12 @@ jobs:
             dotnet nuget push $_.FullName --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+      # Só no workflow_dispatch: a tag marca o commit publicado (numa tag empurrada ela já existe).
+      # Tag criada com o GITHUB_TOKEN não dispara este workflow de novo.
+      - name: Tag sdk-v<versão>
+        if: github.ref_type != 'tag' && inputs.version != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api repos/${{ github.repository }}/git/refs -f ref="refs/tags/sdk-v$env:VERSION" -f sha='${{ github.sha }}'
