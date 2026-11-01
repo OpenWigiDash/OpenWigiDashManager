@@ -102,6 +102,12 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
     public DashboardLayout Layout => _layout;
 
+    /// <summary>
+    /// Por que o layout salvo não abriu na última <see cref="StartAsync"/> (de versão mais nova ou com defeito), em
+    /// texto para mostrar à pessoa; null se abriu. Nesse caso o host começa com um layout vazio.
+    /// </summary>
+    public string? LayoutProblem { get; private set; }
+
     /// <summary>Página do layout que está (ou estaria) no aparelho. É a mesma no editor e na prévia.</summary>
     public int CurrentPage
     {
@@ -227,7 +233,21 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         _known.Remember(_catalog.Widgets);
         BackupLayout();
         var migrated = _store.NeedsMigration();
-        _layout = _store.Load();
+        try
+        {
+            _layout = _store.Load();
+        }
+        catch (InvalidDataException ex)
+        {
+            // Layout de versão mais nova ou com defeito não pode impedir o manager de abrir: o arquivo sai do
+            // caminho (não é sobrescrito) e a pessoa fica sabendo pelo LayoutProblem.
+            migrated = false;
+            _layout = new DashboardLayout();
+            var aside = _store.SetAside(_time.GetLocalNow());
+            LayoutProblem = $"O layout salvo não pôde ser aberto. {ex.Message} O manager começou com um layout vazio, " +
+                $"e o arquivo antigo foi guardado em {aside ?? _store.Path}.";
+            _logger.LogError(ex, "Layout em {Path} não abre; guardado em {Aside}", _store.Path, aside);
+        }
         if (migrated)
             _logger.LogInformation("Layout convertido da grade 5x4 para a 10x8; as páginas ganharam a moldura padrão");
         if (FixDuplicatePageNames() | migrated)
@@ -996,13 +1016,36 @@ public event Action? LayoutChanged;
 
     private async Task CreateRuntimeAsync(WidgetPlacement placement, CancellationToken cancellationToken)
     {
+        // Um widget que não sobe fica com a posição vazia; os outros e o manager seguem.
+        try
+        {
+            await CreateRuntimeUnsafeAsync(placement, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Widget {WidgetId} ({Instance}) não subiu; a posição fica vazia", placement.WidgetId, placement.InstanceId);
+        }
+    }
+
+    private async Task CreateRuntimeUnsafeAsync(WidgetPlacement placement, CancellationToken cancellationToken)
+    {
         if (_catalog.Find(placement.WidgetId) is not { } widget)
         {
             _logger.LogWarning("Widget {WidgetId} do layout não está instalado; a posição fica vazia", placement.WidgetId);
             return;
         }
         if (!widget.Manifest.SupportedSizes.Contains(placement.Size))
-            placement.Size = widget.Manifest.SupportedSizes[0];
+        {
+            var size = widget.Manifest.SupportedSizes[0];
+            var resized = new WidgetPlacement { Column = placement.Column, Row = placement.Row, Size = size };
+            if (!resized.FitsGrid)
+            {
+                _logger.LogWarning("{Name} não cabe em {Column},{Row} no tamanho {Size}; a posição fica vazia",
+                    widget.Manifest.Name, placement.Column, placement.Row, size);
+                return;
+            }
+            placement.Size = size;
+        }
 
         var logger = _loggerFactory.CreateLogger($"Widget.{widget.Manifest.Name}");
         var storage = new InstanceStorage(InstancesDirectory, placement.InstanceId);

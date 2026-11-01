@@ -35,6 +35,46 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        // Erros que escapam: o manager avisa e segue rodando sempre que dá. Só o que o .NET não deixa
+        // segurar (erro numa thread de fundo) fecha, e mesmo assim com a janela de erro e o relatório.
+        DispatcherUnhandledException += (_, args) =>
+        {
+            args.Handled = true;
+            OnUnexpectedError(args.Exception);
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            args.SetObserved();
+            ErrorReport.Write(args.Exception, "Erro numa tarefa em segundo plano (o manager seguiu rodando).");
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+                ErrorReport.Show(ex, "O OpenWigiDash encontrou um erro e vai fechar.");
+        };
+
+        try
+        {
+            await StartAsync(e);
+        }
+        catch (Exception ex)
+        {
+            ErrorReport.Show(ex, "O OpenWigiDash não conseguiu abrir.");
+            _tray?.Dispose();
+            try
+            {
+                _single?.ReleaseMutex();
+            }
+            catch (ApplicationException)
+            {
+                // O mutex não era desta instância.
+            }
+            Shutdown(1);
+        }
+    }
+
+    private async Task StartAsync(StartupEventArgs e)
+    {
         // Uma instância por sessão do Windows: os outros usuários têm a sua (o nome é "Local\").
         _single = new Mutex(true, @"Local\OpenWigiDashManager", out var first);
         _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\OpenWigiDashManager.Show");
@@ -45,19 +85,6 @@ public partial class App : System.Windows.Application
             return;
         }
         _ = Task.Run(WaitForShowSignal);
-
-        // O WebView2 precisa de Direct3D para desenhar a janela. Numa sessão RDP desconectada (ou sem
-        // GPU) ele falha ao abrir; isso não pode derrubar o agente, que segue desenhando no aparelho.
-        DispatcherUnhandledException += (_, args) =>
-        {
-            if (args.Exception is System.Runtime.InteropServices.COMException && args.Exception.StackTrace?.Contains("WebView2") == true)
-            {
-                args.Handled = true;
-                _window?.CloseForExit();
-                _window = null;
-                _tray?.ShowBalloon("Não foi possível abrir a janela agora (sem vídeo nesta sessão). O painel continua rodando.");
-            }
-        };
 
         _services = BuildServices(e.Args);
         var settings = _services.GetRequiredService<ManagerSettings>();
@@ -90,6 +117,48 @@ public partial class App : System.Windows.Application
         }
         if (e.Args.Contains("--preview"))
             ShowPreviewWindow();
+        if (dashboard.LayoutProblem is { } problem)
+            _ = Dispatcher.BeginInvoke(new Action(() => MessageBox.Show(problem, "OpenWigiDash",
+                MessageBoxButton.OK, MessageBoxImage.Warning)));
+    }
+
+    private DateTime _lastErrorNotice;
+
+    private void OnUnexpectedError(Exception error)
+    {
+        // O WebView2 precisa de Direct3D para desenhar a janela. Numa sessão RDP desconectada (ou sem
+        // GPU) ele falha ao abrir; isso não pode derrubar o agente, que segue desenhando no aparelho.
+        if (error is System.Runtime.InteropServices.COMException && error.StackTrace?.Contains("WebView2") == true)
+        {
+            _window?.CloseForExit();
+            _window = null;
+            _tray?.ShowBalloon("Não foi possível abrir a janela agora (sem vídeo nesta sessão). O painel continua rodando.");
+            return;
+        }
+
+        var report = ErrorReport.Write(error, "Erro inesperado (o manager seguiu rodando).");
+        // Um aviso por minuto no máximo: erro que se repete não vira uma enxurrada de balões.
+        if (DateTime.UtcNow - _lastErrorNotice < TimeSpan.FromMinutes(1))
+            return;
+        _lastErrorNotice = DateTime.UtcNow;
+        var text = $"{error.Message} O OpenWigiDash continua rodando. Clique para ver os detalhes.";
+        if (_tray is not null)
+            _tray.ShowNotice("Algo deu errado", text, () => OpenReport(report));
+        else
+            ErrorReport.Show(error, "Algo deu errado, mas o OpenWigiDash continua rodando.");
+    }
+
+    private static void OpenReport(string? report)
+    {
+        try
+        {
+            var target = report ?? ErrorReport.Directory;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true });
+        }
+        catch (Exception)
+        {
+            // Sem programa para abrir .txt: o caminho está no balão e no log.
+        }
     }
 
     private ServiceProvider BuildServices(string[] args)

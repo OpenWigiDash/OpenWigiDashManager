@@ -42,7 +42,7 @@ public sealed class ManagerSettings
         {
             _stored = File.Exists(_path) ? JsonSerializer.Deserialize<Stored>(File.ReadAllText(_path), Json) ?? new() : new();
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
         {
             _stored = new();
         }

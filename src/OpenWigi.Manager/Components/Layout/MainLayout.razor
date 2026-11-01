@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject PluginStore Store
 @inject AppUpdates Updates
+@inject DashboardHost Dashboard
 
 @* Tema só pela preferência do manager: sem seguir o Windows (ObserveSystemDarkModeChange), que na
    primeira renderização trocava para claro por conta própria e deixava a tela misturada. O bind
@@ -55,12 +56,29 @@
                     aberto pelo menu Iniciar não enxerga. Feche pela bandeja e abra pelo menu Iniciar.
                 </MudAlert>
             }
-            @Body
+            @if (Dashboard.LayoutProblem is { } problem && !_layoutProblemDismissed)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="() => _layoutProblemDismissed = true">
+                    @problem
+                </MudAlert>
+            }
+            @* Erro numa tela não derruba a janela inteira: mostra o aviso e deixa navegar para outra. *@
+            <ErrorBoundary @ref="_errors">
+                <ChildContent>@Body</ChildContent>
+                <ErrorContent Context="error">
+                    <MudAlert Severity="Severity.Error" Class="mb-4">
+                        Esta tela encontrou um erro: @error.Message
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Class="ml-2" OnClick="() => _errors?.Recover()">Tentar de novo</MudButton>
+                    </MudAlert>
+                </ErrorContent>
+            </ErrorBoundary>
         </MudContainer>
     </MudMainContent>
 </MudLayout>
 
 @code {
+    private bool _layoutProblemDismissed;
+    private ErrorBoundary? _errors;
     private readonly MudTheme _theme = OpenWigi.Manager.Theming.OpenWigiDashTheme.Create();
 
     private bool DarkMode

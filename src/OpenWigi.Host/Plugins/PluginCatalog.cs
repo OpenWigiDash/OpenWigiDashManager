@@ -49,16 +49,35 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
             }
 
             // Instalações, atualizações e remoções feitas pelo owd plugin/loja enquanto o plugin estava em uso.
-            foreach (var (directory, reason) in OpenWigi.Plugins.PendingChanges.Apply(root))
-                Fail(directory, reason);
+            try
+            {
+                foreach (var (directory, reason) in OpenWigi.Plugins.PendingChanges.Apply(root))
+                    Fail(directory, reason);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Mudanças pendentes de plugins em {Root} não foram aplicadas", root);
+            }
 
             // Pastas com ponto (.pending e outras) não são plugins.
             foreach (var directory in Directory.GetDirectories(root).Where(d => !Path.GetFileName(d).StartsWith('.')).Order(StringComparer.OrdinalIgnoreCase))
             {
-                if (loaded.Add(Path.GetFileName(directory)))
-                    await LoadAsync(directory, hosts, cancellationToken);
-                else
+                if (!loaded.Add(Path.GetFileName(directory)))
+                {
                     _logger.LogInformation("Plugin {Directory} ignorado: já carregado de outra pasta", directory);
+                    continue;
+                }
+                // Um plugin com qualquer defeito (plugin.json ruim, DLL corrompida...) fica na lista de erros;
+                // os outros carregam e o manager abre.
+                try
+                {
+                    await LoadAsync(directory, hosts, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "Plugin {Directory} não carregou", directory);
+                    Fail(directory, $"Não carregou: {ex.Message}");
+                }
             }
         }
     }
