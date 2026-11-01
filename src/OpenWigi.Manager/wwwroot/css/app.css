@@ -132,6 +132,24 @@ html, body {
     pointer-events: none;
 }
 
+/* Que widget era e de qual plugin: cada linha numa só, cortada com reticências nos tiles pequenos. */
+.owd-widget-problem > span {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.owd-widget-problem-name {
+    font-weight: 600;
+    color: var(--mud-palette-text-primary);
+}
+
+.owd-widget-problem-plugin {
+    font-size: 11px;
+    opacity: 0.85;
+}
+
 /* Prévia ao vivo: o quadro do widget ocupa o tile inteiro, na mesma proporção do aparelho. */
 .owd-live {
     position: absolute;

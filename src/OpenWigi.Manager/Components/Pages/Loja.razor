@@ -132,6 +132,10 @@
 @code {
     private enum Filter { Todos, Verificados, Instalados, Atualizacoes }
 
+    /// <summary>Texto que a busca já traz preenchido, ex.: /loja?busca=OpenWigiDash.Discord.</summary>
+    [SupplyParameterFromQuery(Name = "busca")]
+    public string? Busca { get; set; }
+
     private Filter _filter = Filter.Todos;
     private string? _query;
     private bool _loading;
@@ -200,7 +204,9 @@
         _installed = Store.Installed;
         _ = LoadIconsAsync(_installed.Select(p => p.PackageId ?? p.Folder).ToList());
         var policy = RefreshPolicyQuietly();
-        var search = Search(null);
+        // Vindo de um widget quebrado (Widgets e páginas), a Loja já abre procurando o plugin dele.
+        _query = Busca;
+        var search = Search(_query);
         // Ao abrir a Loja, confere as atualizações (se o usuário não desligou nos Ajustes).
         if (Store.UpdateCount == 0)
             _ = CheckUpdatesQuietly();
