@@ -97,5 +97,35 @@ public sealed class LayoutStore(string path)
         File.WriteAllText(temp, JsonSerializer.Serialize(layout, Json));
         File.Move(temp, Path, overwrite: true);
     }
+
+    /// <summary>Pasta das cópias de <see cref="Backup"/>: <c>backups</c> ao lado do layout.</summary>
+    public string BackupDirectory => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "backups");
+
+    /// <summary>
+    /// Copia o layout atual para <see cref="BackupDirectory"/> como <c>layout-AAAAMMDD-HHMMSS.json</c> e guarda só as
+    /// <paramref name="keep"/> mais novas. Para voltar a uma, feche o manager e copie por cima do <c>layout.json</c>.
+    /// Sem layout, ou igual à última cópia, não faz nada. Devolve o caminho da cópia nova, ou null.
+    /// </summary>
+    public string? Backup(DateTimeOffset now, int keep = 10)
+    {
+        if (!File.Exists(Path))
+            return null;
+        var current = File.ReadAllBytes(Path);
+        Directory.CreateDirectory(BackupDirectory);
+        var existing = Backups();
+        if (existing.Count > 0 && File.ReadAllBytes(existing[0]).AsSpan().SequenceEqual(current))
+            return null;
+
+        var copy = System.IO.Path.Combine(BackupDirectory, $"layout-{now.LocalDateTime:yyyyMMdd-HHmmss}.json");
+        File.WriteAllBytes(copy, current);
+        foreach (var old in Backups().Skip(Math.Max(1, keep)))
+            File.Delete(old);
+        return copy;
+    }
+
+    /// <summary>As cópias de <see cref="Backup"/>, da mais nova para a mais velha (o nome tem a data).</summary>
+    public IReadOnlyList<string> Backups() => Directory.Exists(BackupDirectory)
+        ? Directory.GetFiles(BackupDirectory, "layout-*.json").OrderDescending(StringComparer.Ordinal).ToList()
+        : [];
 }
 
