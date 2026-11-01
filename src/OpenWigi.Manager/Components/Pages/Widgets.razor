@@ -53,6 +53,15 @@
             <MudLink Href="/loja" Class="ml-1">Atualizar ou remover na Loja</MudLink>
         </MudAlert>
     }
+    @if (Store.RestartNeeded)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">
+            <div class="d-flex align-center flex-wrap gap-3">
+                <span>As mudanças nos plugins valem quando o manager reabrir.</span>
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" OnClick="Store.RequestRestart">Reiniciar agora</MudButton>
+            </div>
+        </MudAlert>
+    }
     @if (Dashboard.PluginErrors.Count > 0)
     {
         <MudAlert Severity="Severity.Warning" Dense="true">
@@ -93,16 +102,23 @@
                             <div class="owd-tile"><WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" /></div>
                             @if (Dashboard.ProblemOf(p.InstanceId) is { } problem)
                             {
-                                @* Sem isso o tile fica vazio, e não dá para saber que o plugin saiu ou não funciona nesta versão. *@
+                                @* Sem isso o tile fica vazio, e não dá para saber que o plugin saiu ou não funciona nesta versão.
+                                   O nome do widget e o do plugin ficam sempre à vista (mesmo com "Mostrar nomes" desligado):
+                                   é o que diz o que reinstalar ou atualizar para o widget voltar. *@
                                 <div class="owd-widget-problem" title="@ProblemDetail(problem)">
                                     <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
-                                    <span>@ProblemTitle(problem)</span>
+                                    <span class="owd-widget-problem-title">@ProblemTitle(problem)</span>
+                                    <span class="owd-widget-problem-name">@ProblemWidget(p, problem)</span>
+                                    <span class="owd-widget-problem-plugin">@ProblemPlugin(problem)</span>
                                 </div>
                             }
-                            <div class="owd-widget-label @(Settings.ShowWidgetNames || p.InstanceId == _selected ? "" : "hidden")">
-                                <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
-                                <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
-                            </div>
+                            else
+                            {
+                                <div class="owd-widget-label @(Settings.ShowWidgetNames || p.InstanceId == _selected ? "" : "hidden")">
+                                    <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
+                                    <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
+                                </div>
+                            }
                             @if (SizesOf(p.WidgetId).Count > 1)
                             {
                                 @* Alça do canto: puxar redimensiona, como uma janela. *@
@@ -162,8 +178,26 @@
                             <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2">
                                 <MudText Typo="Typo.body2"><b>@ProblemTitle(selectedProblem)</b></MudText>
                                 <MudText Typo="Typo.caption" Class="d-block mb-2">@ProblemDetail(selectedProblem)</MudText>
-                                <MudButton Href="/loja" Variant="Variant.Outlined" Size="Size.Small" Color="Color.Warning"
-                                           StartIcon="@Icons.Material.Filled.Storefront">Abrir a Loja</MudButton>
+                                @if (selectedProblem.Kind != WidgetProblemKind.InstanceFailed)
+                                {
+                                    <MudText Typo="Typo.caption" Class="d-block mb-2">
+                                        Widget <b>@(selectedProblem.WidgetName ?? "desconhecido")</b>
+                                        do plugin <b>@(selectedProblem.PluginFolder ?? "desconhecido")</b>.
+                                        Ele continua no layout, com as configurações, até você tirar.
+                                    </MudText>
+                                }
+                                <div class="d-flex flex-wrap gap-2">
+                                    @if (selectedProblem.PluginFolder is { } folder && Store.UpdateFor(folder) is { } update)
+                                    {
+                                        <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Warning" Disabled="_updatingPlugin"
+                                                   StartIcon="@Icons.Material.Filled.SystemUpdateAlt"
+                                                   OnClick="() => UpdatePlugin(folder)">Atualizar plugin para @update</MudButton>
+                                    }
+                                    <MudButton Href="@StoreLink(selectedProblem)" Variant="Variant.Outlined" Size="Size.Small" Color="Color.Warning"
+                                               StartIcon="@Icons.Material.Filled.Storefront">
+                                        @(selectedProblem.PluginFolder is null ? "Abrir a Loja" : selectedProblem.Kind == WidgetProblemKind.NotInstalled ? "Reinstalar pela Loja" : "Procurar na Loja")
+                                    </MudButton>
+                                </div>
                             </MudAlert>
                         }
                         @* Abas: o que todo widget tem (Geral) e as configurações do plugin, quando ele tem. *@
@@ -367,6 +401,46 @@
         _ => problem.Reason ?? "O widget deu erro ao abrir.",
     };
 
+    // Nome que o widget tinha: o da instância, senão o do tipo (lembrado de quando ele carregou).
+    private static string ProblemWidget(WidgetPlacement placement, WidgetProblem problem) =>
+        placement.Name is { Length: > 0 } name ? name : problem.WidgetName ?? "Widget desconhecido";
+
+    private static string ProblemPlugin(WidgetProblem problem) =>
+        problem.PluginFolder is { } folder ? $"plugin {folder}" : "plugin desconhecido";
+
+    // A Loja já abre procurando o plugin, com o botão de instalar ou atualizar no card dele.
+    private static string StoreLink(WidgetProblem problem) =>
+        problem.PluginFolder is { } folder ? $"/loja?busca={Uri.EscapeDataString(folder)}" : "/loja";
+
+    private bool _updatingPlugin;
+
+    private async Task UpdatePlugin(string packageId)
+    {
+        _updatingPlugin = true;
+        try
+        {
+            var result = await Store.UpdateAsync(packageId);
+            Snackbar.Add(result is null ? $"{packageId} já está na versão mais nova." : $"{packageId} atualizado para {result.Version}. O widget volta quando o manager reabrir.",
+                result is null ? Severity.Info : Severity.Success);
+        }
+        catch (OpenWigi.Plugins.PluginInstallException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException)
+        {
+            Snackbar.Add($"Não foi possível baixar {packageId}: sem conexão com o nuget.org.", Severity.Error);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Snackbar.Add($"Não foi possível gravar os arquivos de {packageId}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _updatingPlugin = false;
+        }
+    }
+
     private string DeviceLabel => Agent.Device switch
     {
         { Kind: DeviceKind.Virtual } => "WigiDash virtual",
@@ -391,6 +465,7 @@
         Dashboard.PageChanged += OnPageChanged;
         Agent.Changed += Refresh;
         Settings.Changed += Refresh;
+        Store.Changed += Refresh;
     }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
@@ -755,6 +830,7 @@
         Dashboard.PageChanged -= OnPageChanged;
         Agent.Changed -= Refresh;
         Settings.Changed -= Refresh;
+        Store.Changed -= Refresh;
         try
         {
             if (_deleteKey is not null)

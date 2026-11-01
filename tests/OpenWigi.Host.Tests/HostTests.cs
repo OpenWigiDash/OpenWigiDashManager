@@ -587,6 +587,7 @@ public sealed class HostTests : IAsyncLifetime
     {
         var first = await StartAsync();
         var placement = first.Layout.AllPlacements.First(p => p.WidgetId == Clock);
+        var name = first.NameOf(placement.InstanceId);
         await first.DisposeAsync();
 
         // Mesma pasta do plugin, mas com uma DLL que não carrega (como uma feita para outro SDK).
@@ -602,6 +603,10 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Equal(WidgetProblemKind.PluginFailed, problem.Kind);
         Assert.False(string.IsNullOrWhiteSpace(problem.Reason));
         Assert.Equal(_host.PluginErrors.Single().Reason, problem.Reason);
+        // O tile mostra qual widget e qual plugin eram, e o widget fica no layout para voltar quando o plugin voltar.
+        Assert.Equal(name, problem.WidgetName);
+        Assert.Equal("OpenWigi.Samples.Clock", problem.PluginFolder);
+        Assert.Contains(_host.Layout.AllPlacements, p => p.InstanceId == placement.InstanceId && p.WidgetId == Clock);
     }
 
     [Theory]
