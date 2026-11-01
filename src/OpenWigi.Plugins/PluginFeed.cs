@@ -25,6 +25,13 @@ public sealed record FeedPackage(
 {
     /// <summary>Página do pacote no nuget.org.</summary>
     public string GalleryUrl => $"https://www.nuget.org/packages/{Id}";
+
+    /// <summary>
+    /// Publicado por uma conta confiável do nuget.org (<see cref="PluginFeed.VerifiedOwners"/>). Quem é dono
+    /// de um pacote no nuget.org não dá para falsificar, ao contrário do id ou dos autores.
+    /// </summary>
+    public bool Verified => Owners.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Any(owner => PluginFeed.VerifiedOwners.Contains(owner, StringComparer.OrdinalIgnoreCase));
 }
 
 /// <summary>Uma versão publicada de um pacote, com o que precisa para decidir e baixar.</summary>
@@ -49,6 +56,9 @@ public sealed class PluginFeed
     public const string NuGetOrg = "https://api.nuget.org/v3/index.json";
     public const string PackageType = "OpenWigiDashPlugin";
     public const string SdkPackageId = "victorperez2911.OpenWigi.Sdk";
+
+    /// <summary>Contas do nuget.org cujos pacotes a loja mostra como verificados (a lista curada é a #48).</summary>
+    public static readonly IReadOnlyList<string> VerifiedOwners = ["victorperez2911"];
 
     private readonly HttpClient _http;
     private readonly string _indexUrl;

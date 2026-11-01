@@ -9,7 +9,7 @@
                 <MudText Typo="Typo.h6">@Item.Title</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">@Item.Id</MudText>
                 <div class="d-flex flex-wrap gap-1 mt-1">
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0">Comunidade</MudChip>
+                    <VerifiedChip Verified="@Item.Verified" />
                     @if (Item.Installed is { } installed)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined" Class="ma-0">

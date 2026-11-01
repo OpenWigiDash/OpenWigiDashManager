@@ -34,7 +34,7 @@
     <div class="d-flex align-center flex-wrap gap-3">
         <MudTextField T="string" @bind-Value="_query" DebounceInterval="400" OnDebounceIntervalElapsed="Search"
                       Placeholder="Procurar plugins no nuget.org" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="max-width: 480px" Disabled="_filter != Filter.Todos" />
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="max-width: 480px" Disabled="@(_filter is not (Filter.Todos or Filter.Verificados))" />
         <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
             @foreach (var filter in Enum.GetValues<Filter>())
             {
@@ -45,7 +45,7 @@
         </MudButtonGroup>
     </div>
 
-    @if (_error is not null && _filter == Filter.Todos)
+    @if (_error is not null && _filter is (Filter.Todos or Filter.Verificados))
     {
         <MudAlert Severity="Severity.Info">
             @_error A aba Instalados continua funcionando.
@@ -53,7 +53,7 @@
         </MudAlert>
     }
 
-    @if (_loading && _filter == Filter.Todos)
+    @if (_loading && _filter is (Filter.Todos or Filter.Verificados))
     {
         <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
     }
@@ -74,7 +74,7 @@
                         <div class="owd-store-text">
                             <div class="d-flex align-center gap-2">
                                 <MudText Typo="Typo.subtitle1" Class="owd-ellipsis">@i.Title</MudText>
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0">Comunidade</MudChip>
+                                <VerifiedChip Verified="@i.Verified" />
                             </div>
                             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block owd-ellipsis">@Caption(i)</MudText>
                             @if (i.Package is { Description.Length: > 0 } package)
@@ -116,7 +116,7 @@
 </MudStack>
 
 @code {
-    private enum Filter { Todos, Instalados, Atualizacoes }
+    private enum Filter { Todos, Verificados, Instalados, Atualizacoes }
 
     private Filter _filter = Filter.Todos;
     private string? _query;
@@ -132,6 +132,7 @@
 
     private string Label(Filter filter) => filter switch
     {
+        Filter.Verificados => "Verificados",
         Filter.Instalados => $"Instalados ({_installed.Count(p => !p.PendingRemoval)})",
         Filter.Atualizacoes => Store.UpdateCount > 0 ? $"Com atualização ({Store.UpdateCount})" : "Com atualização",
         _ => "Todos",
@@ -140,6 +141,7 @@
     private string Empty => _filter switch
     {
         Filter.Instalados => "Nenhum plugin instalado na sua pasta de widgets.",
+        Filter.Verificados when _error is null => "Nenhum plugin verificado nesta busca.",
         Filter.Atualizacoes => "Todos os plugins instalados estão na versão mais nova que serve para este manager.",
         _ => _error is null ? "Nenhum plugin encontrado." : "",
     };
@@ -147,6 +149,7 @@
     private List<StoreItem> Items => _filter switch
     {
         Filter.Todos => _results.Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
+        Filter.Verificados => _results.Where(p => p.Verified).Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
         Filter.Instalados => _installed.Select(p => Item(p.PackageId ?? p.Folder, null, p)).ToList(),
         _ => _installed.Where(p => p.PackageId is { } id && Store.UpdateFor(id) is not null).Select(p => Item(p.PackageId!, null, p)).ToList(),
     };
@@ -312,8 +315,8 @@
     {
         if (item.Package is not { } package)
             return;
-        // Até a lista de verificados (#48), todo plugin é da comunidade.
-        var confirmed = await Dialogs.ShowMessageBoxAsync(
+        // Verificado (conta confiável no nuget.org) instala direto; comunidade pede confirmação.
+        var confirmed = item.Verified ? true : await Dialogs.ShowMessageBoxAsync(
             $"Instalar {item.Title}?",
             (MarkupString)($"Este plugin é da <b>comunidade</b>: o código não foi revisado pelo OpenWigiDash. " +
                            $"Ele roda com o seu usuário do Windows e pode ler seus arquivos e usar a rede. " +

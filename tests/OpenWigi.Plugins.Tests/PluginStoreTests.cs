@@ -38,6 +38,7 @@ public sealed class PluginStoreTests : IDisposable
         var hit = Assert.Single(await _feed.CreateFeed().SearchAsync(null));
 
         Assert.Equal("victorperez2911", hit.Owners);
+        Assert.True(hit.Verified);
         Assert.Equal("https://github.com/autor/teste", hit.ProjectUrl);
         Assert.Null(hit.LicenseUrl);
         Assert.Null(hit.IconUrl);
@@ -45,6 +46,22 @@ public sealed class PluginStoreTests : IDisposable
         Assert.Equal("2.5.0", hit.RequiredSdk!.ToString()); // a mais nova listada
         Assert.Equal(new[] { "1.1.0", "1.0.0" }, hit.Versions!.Select(v => v.ToString()));
         Assert.Equal($"https://www.nuget.org/packages/{Id}", hit.GalleryUrl);
+    }
+
+    [Fact]
+    public async Task So_dono_confiavel_no_nuget_org_conta_como_verificado_nao_o_id_nem_o_autor()
+    {
+        _feed.Publish("victorperez2911.OpenWigiDash.Falso", "1.0.0");
+        _feed.SearchExtras["victorperez2911.OpenWigiDash.Falso"] = new JsonObject
+        {
+            ["owners"] = new JsonArray("outra-conta"),
+            ["authors"] = new JsonArray("victorperez2911"),
+        };
+        _feed.RefreshSearch();
+
+        var hit = Assert.Single(await _feed.CreateFeed().SearchAsync(null));
+
+        Assert.False(hit.Verified);
     }
 
     [Fact]

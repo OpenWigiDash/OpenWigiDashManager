@@ -58,7 +58,8 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 | [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
 
 No manager, a tela **Loja de plugins** busca no nuget.org, mostra o ícone de cada pacote e instala,
-atualiza ou remove com um clique. Ela confere as atualizações ao abrir e uma vez por dia (dá para desligar
+atualiza ou remove com um clique. Pacotes da conta `victorperez2911` no nuget.org aparecem como
+**Verificado**; os outros como **Comunidade**, com um aviso antes de instalar. Ela confere as atualizações ao abrir e uma vez por dia (dá para desligar
 em Ajustes), e o número de plugins com atualização aparece no menu. As mudanças valem quando o manager
 reabre; o botão "Reiniciar agora" faz isso. Sem internet, a aba Instalados continua funcionando.
 
