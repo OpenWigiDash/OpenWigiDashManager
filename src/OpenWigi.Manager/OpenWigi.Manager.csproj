@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenWigi.Host\OpenWigi.Host.csproj" />
     <ProjectReference Include="..\OpenWigi.Ipc\OpenWigi.Ipc.csproj" />
+    <ProjectReference Include="..\OpenWigi.Plugins\OpenWigi.Plugins.csproj" />
   </ItemGroup>
 
   <ItemGroup>

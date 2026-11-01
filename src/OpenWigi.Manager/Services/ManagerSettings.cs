@@ -17,7 +17,7 @@ public sealed class ManagerSettings
     private Stored _stored;
 
     private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true, bool StartWithWindows = true,
-        WindowPlacement? Window = null);
+        WindowPlacement? Window = null, bool CheckPluginUpdates = true, DateTimeOffset? LastPluginUpdateCheck = null);
 
     /// <summary>Onde a janela estava ao fechar: posição e tamanho fora do maximizado, e se estava maximizada.</summary>
     public sealed record WindowPlacement(double Left, double Top, double Width, double Height, bool Maximized);
@@ -55,6 +55,29 @@ public sealed class ManagerSettings
             _stored = _stored with { DarkMode = value };
             Save();
             Changed?.Invoke();
+        }
+    }
+
+    /// <summary>A loja confere uma vez por dia, em segundo plano, se os plugins instalados têm versão nova.</summary>
+    public bool CheckPluginUpdates
+    {
+        get => _stored.CheckPluginUpdates;
+        set
+        {
+            _stored = _stored with { CheckPluginUpdates = value };
+            Save();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Quando a última checagem de atualização dos plugins terminou.</summary>
+    public DateTimeOffset? LastPluginUpdateCheck
+    {
+        get => _stored.LastPluginUpdateCheck;
+        set
+        {
+            _stored = _stored with { LastPluginUpdateCheck = value };
+            Save();
         }
     }
 

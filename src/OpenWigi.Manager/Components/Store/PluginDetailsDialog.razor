@@ -1,0 +1,127 @@
+@* Detalhes de um plugin da Loja. Devolve a ação escolhida (install, update, remove); quem abriu executa. *@
+@inject PluginStore Store
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-3">
+            <PluginIcon Url="Icon" Size="96" />
+            <div style="min-width: 0">
+                <MudText Typo="Typo.h6">@Item.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@Item.Id</MudText>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0">Comunidade</MudChip>
+                    @if (Item.Installed is { } installed)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined" Class="ma-0">
+                            @(installed.Version is { } v ? $"Instalado: {v}" : "Copiado à mão")
+                        </MudChip>
+                    }
+                    @if (Item.Update is { } update)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ma-0">Atualização: @update</MudChip>
+                    }
+                </div>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (Item.Package is { } package)
+            {
+                <MudText Typo="Typo.body1" Style="white-space: pre-line">@(package.Description is { Length: > 0 } d ? d : "Sem descrição.")</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @(Item.Publisher is { Length: > 0 } publisher ? $"Publicado por {publisher} · " : "")@StoreItem.Downloads(package.TotalDownloads)
+                </MudText>
+                @if (Item.Incompatible)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true">@Item.Requirement</MudAlert>
+                }
+                <div class="d-flex flex-wrap gap-2">
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                               OnClick="() => PluginStore.OpenInBrowser(package.GalleryUrl)">nuget.org (README)</MudButton>
+                    @if (package.ProjectUrl is { } project)
+                    {
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Code" Size="Size.Small"
+                                   OnClick="() => PluginStore.OpenInBrowser(project)">Projeto</MudButton>
+                    }
+                    @if (package.LicenseUrl is { } license)
+                    {
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Gavel" Size="Size.Small"
+                                   OnClick="() => PluginStore.OpenInBrowser(license)">Licença</MudButton>
+                    }
+                </div>
+                @if (package.Versions is { Count: > 0 } versions)
+                {
+                    <div>
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Versões</MudText>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var version in versions.Take(12))
+                            {
+                                <MudChip T="string" Size="Size.Small" Class="ma-0"
+                                         Color="@(version.Equals(package.CompatibleVersion) ? Color.Primary : Color.Default)"
+                                         Variant="@(version.Equals(package.CompatibleVersion) ? Variant.Filled : Variant.Outlined)">@version</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Em destaque, a mais nova que serve para este manager.</MudText>
+                    </div>
+                }
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @(Item.Manual ? "Plugin copiado à mão para a pasta de widgets; a loja não sabe de onde ele veio." : "Sem dados do nuget.org agora (offline?).")
+                </MudText>
+            }
+
+            @if (Item.Installed is { } plugin)
+            {
+                var widgets = Store.WidgetsOf(plugin);
+                <div>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">Widgets deste plugin</MudText>
+                    @if (widgets.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Aparecem depois de reiniciar o manager.</MudText>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Dense="true" Elevation="0">
+                            <tbody>
+                                @foreach (var widget in widgets)
+                                {
+                                    <tr>
+                                        <td>@widget.Manifest.Name</td>
+                                        <td><MudText Typo="Typo.caption" Color="Color.Secondary">@string.Join(", ", widget.Manifest.SupportedSizes)</MudText></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </div>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        @if (Item.Installed is not null)
+        {
+            <MudButton Color="Color.Error" OnClick="@(() => Close("remove"))">Remover</MudButton>
+        }
+        <MudSpacer />
+        <MudButton OnClick="() => Dialog.Cancel()">Fechar</MudButton>
+        @if (Item.Update is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Close("update"))">Atualizar</MudButton>
+        }
+        else if (Item.Installed is null && Item.Package is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="Item.Incompatible" OnClick="@(() => Close("install"))">Instalar</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public StoreItem Item { get; set; } = default!;
+    [Parameter] public string? Icon { get; set; }
+
+    private void Close(string action) => Dialog.Close(DialogResult.Ok(action));
+}

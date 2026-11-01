@@ -35,14 +35,15 @@ Detalhes em [docs/multiusuario.md](docs/multiusuario.md#sem-o-aparelho-wigidash-
 
 As telas:
 - **Widgets e páginas** (a tela inicial): estado do aparelho, grade 5x4 com cada widget desenhando ao vivo, e embaixo as páginas em miniatura. Dá para adicionar, mover, redimensionar e tirar widgets, e criar e renomear páginas. Com um widget selecionado, as configurações do plugin (em Razor) ficam no painel ao lado, e o que mudar já aparece no tile. "Destacar prévia" abre a tela do aparelho numa janela própria, onde o mouse vira toque.
-- **Ajustes:** aparelho ativo (USB ou virtual), brilho, iniciar com o Windows e tema claro ou escuro.
+- **Loja de plugins:** busca, instala, atualiza e remove plugins do nuget.org ([Plugins](#plugins)).
+- **Ajustes:** aparelho ativo (USB ou virtual), brilho, iniciar com o Windows, tema claro ou escuro e a checagem diária de atualização dos plugins.
 
 Fechar a janela só esconde; o painel continua rodando pelo tray.
 
 | Opção | Efeito |
 | --- | --- |
 | `--tray` | Começa só no tray. É o que o "Abrir ao entrar no Windows" usa |
-| `--open /widgets` | Abre direto numa tela |
+| `--open /widgets` | Abre direto numa tela (`/widgets`, `/loja`, `/ajustes`) |
 | `--plugins <pasta>` | Pasta de plugins alternativa |
 | `--preview` | Abre a prévia destacada |
 
@@ -55,6 +56,11 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 | --- | --- |
 | [Discord](https://github.com/victorperez2911/WigiDash-DiscordWidGet): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `victorperez2911.OpenWigiDash.Discord` |
 | [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
+
+No manager, a tela **Loja de plugins** busca no nuget.org, mostra o ícone de cada pacote e instala,
+atualiza ou remove com um clique. Ela confere as atualizações ao abrir e uma vez por dia (dá para desligar
+em Ajustes), e o número de plugins com atualização aparece no menu. As mudanças valem quando o manager
+reabre; o botão "Reiniciar agora" faz isso. Sem internet, a aba Instalados continua funcionando.
 
 Pela linha de comando, com o `owd` (funciona com o manager aberto). O instalador ainda não traz o `owd`;
 rode do repositório com `dotnet run --project src/OpenWigi.Cli -- plugin ...`:
@@ -69,8 +75,7 @@ owd plugin remove victorperez2911.OpenWigiDash.Discord
 
 O `owd` escolhe a versão mais nova compatível com o SDK deste manager, confere o hash do pacote e instala
 em `%LOCALAPPDATA%\OpenWigiDash\Widgets\<id>`. Plugin em uso é trocado quando o manager reabre. Remover
-não apaga as configurações dos widgets. A loja dentro do manager ([#47](../../issues/47)) ainda está
-planejada.
+não apaga as configurações dos widgets.
 
 ### Escrever um plugin
 

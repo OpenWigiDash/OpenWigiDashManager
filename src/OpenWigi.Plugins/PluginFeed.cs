@@ -4,7 +4,10 @@ using OpenWigi.Sdk;
 
 namespace OpenWigi.Plugins;
 
-/// <summary>Um resultado da busca: o pacote com a versão mais nova que este host carrega.</summary>
+/// <summary>
+/// Um resultado da busca: o pacote com a versão mais nova que este host carrega. Sem versão compatível,
+/// <see cref="RequiredSdk"/> diz qual SDK a mais nova pede (para a loja mostrar "requer OpenWigiDash X.Y").
+/// </summary>
 public sealed record FeedPackage(
     string Id,
     string Title,
@@ -13,7 +16,16 @@ public sealed record FeedPackage(
     long TotalDownloads,
     string? IconUrl,
     PackageVersion LatestVersion,
-    PackageVersion? CompatibleVersion);
+    PackageVersion? CompatibleVersion,
+    string Owners = "",
+    string? ProjectUrl = null,
+    string? LicenseUrl = null,
+    PackageVersion? RequiredSdk = null,
+    IReadOnlyList<PackageVersion>? Versions = null)
+{
+    /// <summary>Página do pacote no nuget.org.</summary>
+    public string GalleryUrl => $"https://www.nuget.org/packages/{Id}";
+}
 
 /// <summary>Uma versão publicada de um pacote, com o que precisa para decidir e baixar.</summary>
 public sealed record FeedVersion(
@@ -70,15 +82,22 @@ public sealed class PluginFeed
             if (item is null || (string?)item["id"] is not { } id || !PackageVersion.TryParse((string?)item["version"], out var latest))
                 continue;
             var versions = await GetVersionsAsync(id, cancellationToken);
+            var compatible = PickCompatible(versions);
+            var listed = versions.Where(v => v.Listed).ToList();
             results.Add(new FeedPackage(
                 id,
                 (string?)item["title"] is { Length: > 0 } title ? title : id,
                 (string?)item["description"] ?? "",
-                item["authors"] is JsonArray authors ? string.Join(", ", authors.Select(a => (string?)a)) : (string?)item["authors"] ?? "",
+                Join(item["authors"]),
                 (long?)item["totalDownloads"] ?? 0,
-                (string?)item["iconUrl"],
+                Url((string?)item["iconUrl"]),
                 latest,
-                PickCompatible(versions)?.Version));
+                compatible?.Version,
+                Join(item["owners"]),
+                Url((string?)item["projectUrl"]),
+                Url((string?)item["licenseUrl"]),
+                compatible is null ? listed.LastOrDefault()?.SdkVersion : null,
+                listed.Select(v => v.Version).Reverse().ToList()));
         }
         return results;
     }
@@ -136,6 +155,21 @@ public sealed class PluginFeed
             return null;
         return (string?)leaf["packageHash"];
     }
+
+    /// <summary>Endereço do ícone embutido no pacote (flat container), para quando a busca não traz o iconUrl.</summary>
+    public async Task<string> PackageIconUrlAsync(string id, PackageVersion version, CancellationToken cancellationToken = default)
+    {
+        var services = await GetServicesAsync(cancellationToken);
+        var lower = id.ToLowerInvariant();
+        return $"{services.PackageBase}{lower}/{version.Original.ToLowerInvariant()}/icon";
+    }
+
+    private static string Join(JsonNode? node) =>
+        node is JsonArray array ? string.Join(", ", array.Select(a => (string?)a).Where(a => !string.IsNullOrWhiteSpace(a))) : (string?)node ?? "";
+
+    // Só http(s): o endereço vai para um link na loja, e o pacote é de terceiros.
+    private static string? Url(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp) ? uri.ToString() : null;
 
     public async Task DownloadAsync(FeedVersion version, string destination, CancellationToken cancellationToken = default)
     {
