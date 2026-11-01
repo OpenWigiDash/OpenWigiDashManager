@@ -15,6 +15,10 @@
     <PackageId>victorperez2911.OpenWigi.Sdk</PackageId>
     <!-- A versão publicada vem da tag sdk-vX.Y.Z (workflow sdk-publish.yml). -->
     <Version>2.0.0-preview.1</Version>
+    <!-- Fixa a versão do assembly no contrato (OpenWigiSdk.Version), mesmo quando a build recebe outra
+         versão global: o instalador roda com -p:Version=<versão do produto> e, sem isso, o OpenWigi.Sdk.dll
+         instalado saía 0.1.x e nenhum plugin compilado contra o SDK 2.0 carregava. -->
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/victorperez2911/OpenWigiDashManager</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
