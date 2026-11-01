@@ -40,7 +40,8 @@ public sealed record FeedVersion(
     bool Listed,
     PackageVersion? SdkVersion,
     string PackageContentUrl,
-    string? CatalogUrl)
+    string? CatalogUrl,
+    bool Deprecated = false)
 {
     /// <summary>Este host carrega a versão: depende do SDK com o mesmo major e minor menor ou igual.</summary>
     public bool IsCompatible => SdkVersion is { } sdk && OpenWigiSdk.IsCompatible(new Version(sdk.Major, sdk.Minor));
@@ -100,6 +101,10 @@ public sealed class PluginFeed
             if (item is null || (string?)item["id"] is not { } id || !PackageVersion.TryParse((string?)item["version"], out var latest))
                 continue;
             var versions = await GetVersionsAsync(id, cancellationToken);
+            // Pacote deprecado (ex.: os ids antigos victorperez2911.*, trocados pelos OpenWigiDash.*) sai da busca;
+            // quem já tem instalado continua vendo pela aba Instalados.
+            if (versions.Count > 0 && versions[^1].Deprecated)
+                continue;
             var compatible = PickInstallable(versions);
             var listed = versions.Where(v => v.Listed).ToList();
             results.Add(new FeedPackage(
@@ -149,7 +154,8 @@ public sealed class PluginFeed
                     SdkLowerBound(entry),
                     (string?)leaf!["packageContent"]
                         ?? $"{services.PackageBase}{lower}/{version.Original.ToLowerInvariant()}/{lower}.{version.Original.ToLowerInvariant()}.nupkg",
-                    (string?)entry["@id"]));
+                    (string?)entry["@id"],
+                    entry["deprecation"] is not null));
             }
         }
         versions.Sort((a, b) => a.Version.CompareTo(b.Version));
