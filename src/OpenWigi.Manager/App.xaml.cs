@@ -79,6 +79,7 @@ public partial class App : System.Windows.Application
         _services.GetRequiredService<PluginStore>().RestartRequested +=
             () => Dispatcher.BeginInvoke(new Action(RestartApp));
         _tray = new TrayIcon(agent, a => Dispatcher.BeginInvoke(a), ShowMainWindow, ShowPreviewWindow, ExitApp);
+        _services.GetRequiredService<AppUpdates>().ExitRequested += () => Dispatcher.BeginInvoke(new Action(ExitApp));
         _services.GetRequiredService<AppUpdates>().Found += release => Dispatcher.BeginInvoke(new Action(() =>
             _tray?.ShowNotice($"OpenWigiDash {release.Version} disponível", "Clique para ver as novidades em Ajustes.",
                 () => ShowMainWindow("/ajustes"))));

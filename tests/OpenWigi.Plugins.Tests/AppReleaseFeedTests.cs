@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace OpenWigi.Plugins.Tests;
@@ -97,6 +98,102 @@ public class AppReleaseFeedTests
         var feed = new AppReleaseFeed(new HttpClient(new StubHandler(HttpStatusCode.Forbidden, "{}")), Url);
 
         await Assert.ThrowsAsync<HttpRequestException>(() => feed.CheckAsync(PackageVersion.Parse("0.1.0"), includePrerelease: false));
+    }
+
+    [Fact]
+    public void Release_sem_SHA256SUMS_nao_da_para_baixar_daqui()
+    {
+        var releases = AppReleaseFeed.Parse(Releases);
+
+        Assert.Null(releases[1].ChecksumsUrl);
+        Assert.False(releases[1].CanDownload);
+    }
+
+    [Theory]
+    [InlineData("abc  outro.exe\n{0}  OpenWigiDash-Setup.exe\n")]
+    [InlineData("{0} *OpenWigiDash-Setup.exe\r\n")]
+    [InlineData("{0}  openwigidash-setup.exe")]
+    public void Acha_a_soma_no_formato_do_sha256sum(string format)
+    {
+        var hash = new string('A', 64);
+
+        Assert.Equal(hash.ToLowerInvariant(), AppReleaseFeed.FindChecksum(string.Format(format, hash), "OpenWigiDash-Setup.exe"));
+    }
+
+    [Fact]
+    public void Sem_a_linha_do_arquivo_nao_tem_soma()
+    {
+        Assert.Null(AppReleaseFeed.FindChecksum($"{new string('a', 64)}  OpenWigiDash.msi\nlixo", "OpenWigiDash-Setup.exe"));
+    }
+
+    [Fact]
+    public async Task Baixa_o_instalador_e_confere_o_SHA256()
+    {
+        byte[] setup = [1, 2, 3, 4, 5];
+        var sums = $"{Convert.ToHexStringLower(SHA256.HashData(setup))}  OpenWigiDash-Setup.exe\n";
+        var directory = Path.Combine(Path.GetTempPath(), "openwigi-update-tests", Guid.NewGuid().ToString("N"));
+        var feed = new AppReleaseFeed(new HttpClient(new FilesHandler(new() { [SetupUrl] = setup, [SumsUrl] = Encoding.ASCII.GetBytes(sums) })), Url);
+        var progress = new List<(long Done, long? Total)>();
+
+        try
+        {
+            var path = await feed.DownloadSetupAsync(Release(), directory, new SyncProgress(progress.Add));
+
+            Assert.Equal(Path.Combine(directory, "OpenWigiDash-Setup.exe"), path);
+            Assert.Equal(setup, await File.ReadAllBytesAsync(path));
+            Assert.Equal((5L, (long?)5), progress[^1]);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Instalador_que_nao_bate_com_a_soma_e_apagado()
+    {
+        var sums = $"{new string('0', 64)}  OpenWigiDash-Setup.exe\n";
+        var directory = Path.Combine(Path.GetTempPath(), "openwigi-update-tests", Guid.NewGuid().ToString("N"));
+        var feed = new AppReleaseFeed(new HttpClient(new FilesHandler(new() { [SetupUrl] = [9, 9, 9], [SumsUrl] = Encoding.ASCII.GetBytes(sums) })), Url);
+
+        try
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => feed.DownloadSetupAsync(Release(), directory));
+
+            Assert.Empty(Directory.GetFiles(directory));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Release_sem_somas_nao_baixa()
+    {
+        var feed = new AppReleaseFeed(new HttpClient(new FilesHandler([])), Url);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feed.DownloadSetupAsync(Release() with { ChecksumsUrl = null }, Path.GetTempPath()));
+    }
+
+    private const string SetupUrl = "https://github.test/d/v0.2.0/OpenWigiDash-Setup.exe";
+    private const string SumsUrl = "https://github.test/d/v0.2.0/SHA256SUMS.txt";
+
+    private static AppRelease Release() => new(PackageVersion.Parse("0.2.0"), "v0.2.0", "OpenWigiDash 0.2.0", false,
+        "https://github.test/r/v0.2.0", "", null, SetupUrl, SumsUrl);
+
+    /// <summary>Progress que chama na hora, na mesma thread (o Progress padrão manda para o pool).</summary>
+    private sealed class SyncProgress(Action<(long Done, long? Total)> report) : IProgress<(long Done, long? Total)>
+    {
+        public void Report((long Done, long? Total) value) => report(value);
+    }
+
+    private sealed class FilesHandler(Dictionary<string, byte[]> files) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(files.TryGetValue(request.RequestUri!.ToString(), out var body)
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
     }
 
     private sealed class StubHandler(HttpStatusCode status, string body) : HttpMessageHandler

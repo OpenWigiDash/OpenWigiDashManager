@@ -12,6 +12,7 @@
     <Project Path="src/OpenWigi.Plugins/OpenWigi.Plugins.csproj" />
     <Project Path="src/OpenWigi.Sdk/OpenWigi.Sdk.csproj" />
     <Project Path="src/OpenWigi.Service/OpenWigi.Service.csproj" />
+    <Project Path="src/OpenWigi.Updater/OpenWigi.Updater.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/OpenWigi.Device.Tests/OpenWigi.Device.Tests.csproj" />

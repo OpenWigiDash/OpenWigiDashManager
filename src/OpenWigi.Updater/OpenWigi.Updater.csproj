@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Roda o OpenWigiDash-Setup.exe de uma versão nova e abre o manager de novo no fim. Fica fora do
+       manager porque o MSI fecha o OpenWigiDashManager.exe e troca os arquivos dele; o manager copia
+       este exe para a pasta temporária antes de rodar. Nativo (AOT): um exe só, sem runtime do .NET. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>OpenWigiDash.Updater</AssemblyName>
+    <RootNamespace>OpenWigi.Updater</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon>..\..\assets\branding\openwigidash.ico</ApplicationIcon>
+  </PropertyGroup>
+
+</Project>
