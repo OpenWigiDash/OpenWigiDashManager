@@ -9,7 +9,7 @@
                 <MudText Typo="Typo.h6">@Item.Title</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">@Item.Id</MudText>
                 <div class="d-flex flex-wrap gap-1 mt-1">
-                    <VerifiedChip Verified="@Item.Verified" />
+                    <VerifiedChip Trust="@Item.Trust" />
                     @if (Item.Installed is { } installed)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined" Class="ma-0">
@@ -26,6 +26,10 @@
     </TitleContent>
     <DialogContent>
         <MudStack Spacing="3">
+            @if (Item.BlockReason is { } blocked)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">A versão instalada foi bloqueada pelos mantenedores: @blocked</MudAlert>
+            }
             @if (Item.Package is { } package)
             {
                 <MudText Typo="Typo.body1" Style="white-space: pre-line">@(package.Description is { Length: > 0 } d ? d : "Sem descrição.")</MudText>

@@ -21,6 +21,14 @@
         </MudButton>
     </div>
 
+    @foreach (var (plugin, reason) in Store.BlockedInstalled)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+            <b>@(plugin.PackageId) @(plugin.Version)</b> foi bloqueada pelos mantenedores: @reason
+            @(Store.UpdateFor(plugin.PackageId!) is { } update ? $"Atualize para a {update} ou remova o plugin." : "Remova o plugin até sair uma versão corrigida.")
+        </MudAlert>
+    }
+
     @if (Store.RestartNeeded)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
@@ -74,12 +82,18 @@
                         <div class="owd-store-text">
                             <div class="d-flex align-center gap-2">
                                 <MudText Typo="Typo.subtitle1" Class="owd-ellipsis">@i.Title</MudText>
-                                <VerifiedChip Verified="@i.Verified" />
+                                <VerifiedChip Trust="@i.Trust" />
                             </div>
                             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block owd-ellipsis">@Caption(i)</MudText>
                             @if (i.Package is { Description.Length: > 0 } package)
                             {
                                 <MudText Typo="Typo.body2" Class="owd-clamp-2">@package.Description</MudText>
+                            }
+                            @if (i.BlockReason is { } blocked)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block">
+                                    Versão instalada bloqueada: @blocked @(i.Update is null ? "Remova o plugin." : "Atualize ou remova.")
+                                </MudText>
                             }
                             @if (i.Incompatible)
                             {
@@ -149,13 +163,17 @@
     private List<StoreItem> Items => _filter switch
     {
         Filter.Todos => _results.Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
-        Filter.Verificados => _results.Where(p => p.Verified).Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
+        Filter.Verificados => _results.Where(p => Store.TrustOf(p) != PluginTrust.Community).Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
         Filter.Instalados => _installed.Select(p => Item(p.PackageId ?? p.Folder, null, p)).ToList(),
         _ => _installed.Where(p => p.PackageId is { } id && Store.UpdateFor(id) is not null).Select(p => Item(p.PackageId!, null, p)).ToList(),
     };
 
-    private StoreItem Item(string id, FeedPackage? package, InstalledPlugin? installed) =>
-        new(id, package ?? _known.GetValueOrDefault(id), installed, installed is null ? null : Store.UpdateFor(id));
+    private StoreItem Item(string id, FeedPackage? package, InstalledPlugin? installed)
+    {
+        package ??= _known.GetValueOrDefault(id);
+        return new(id, package, installed, installed is null ? null : Store.UpdateFor(id),
+            package is null ? PluginTrust.Community : Store.TrustOf(package), installed is null ? null : Store.BlockReason(installed));
+    }
 
     private InstalledPlugin? InstalledOf(string id) =>
         _installed.FirstOrDefault(p => id.Equals(p.PackageId, StringComparison.OrdinalIgnoreCase));
@@ -181,11 +199,13 @@
         Store.Changed += OnStoreChanged;
         _installed = Store.Installed;
         _ = LoadIconsAsync(_installed.Select(p => p.PackageId ?? p.Folder).ToList());
+        var policy = RefreshPolicyQuietly();
         var search = Search(null);
         // Ao abrir a Loja, confere as atualizações (se o usuário não desligou nos Ajustes).
         if (Store.UpdateCount == 0)
             _ = CheckUpdatesQuietly();
         await search;
+        await policy;
         await LoadInstalledMetadataAsync();
     }
 
@@ -265,6 +285,17 @@
         _installed = Store.Installed;
     }
 
+    private async Task RefreshPolicyQuietly()
+    {
+        try
+        {
+            await Store.RefreshPolicyAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+        }
+    }
+
     private async Task CheckUpdatesQuietly()
     {
         try
@@ -315,8 +346,8 @@
     {
         if (item.Package is not { } package)
             return;
-        // Verificado (conta confiável no nuget.org) instala direto; comunidade pede confirmação.
-        var confirmed = item.Verified ? true : await Dialogs.ShowMessageBoxAsync(
+        // Oficial ou verificado instala direto; comunidade pede confirmação.
+        var confirmed = item.Trusted ? true : await Dialogs.ShowMessageBoxAsync(
             $"Instalar {item.Title}?",
             (MarkupString)($"Este plugin é da <b>comunidade</b>: o código não foi revisado pelo OpenWigiDash. " +
                            $"Ele roda com o seu usuário do Windows e pode ler seus arquivos e usar a rede. " +

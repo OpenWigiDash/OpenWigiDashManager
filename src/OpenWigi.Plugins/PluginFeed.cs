@@ -27,11 +27,10 @@ public sealed record FeedPackage(
     public string GalleryUrl => $"https://www.nuget.org/packages/{Id}";
 
     /// <summary>
-    /// Publicado por uma conta confiável do nuget.org (<see cref="PluginFeed.VerifiedOwners"/>). Quem é dono
-    /// de um pacote no nuget.org não dá para falsificar, ao contrário do id ou dos autores.
+    /// Oficial: publicado por uma conta do projeto no nuget.org (<see cref="PluginFeed.OfficialOwners"/>). Quem é
+    /// dono de um pacote no nuget.org não dá para falsificar, ao contrário do id ou dos autores.
     /// </summary>
-    public bool Verified => Owners.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-        .Any(owner => PluginFeed.VerifiedOwners.Contains(owner, StringComparer.OrdinalIgnoreCase));
+    public bool Official => VerifiedList.Split(Owners).Any(owner => PluginFeed.OfficialOwners.Contains(owner, StringComparer.OrdinalIgnoreCase));
 }
 
 /// <summary>Uma versão publicada de um pacote, com o que precisa para decidir e baixar.</summary>
@@ -57,8 +56,14 @@ public sealed class PluginFeed
     public const string PackageType = "OpenWigiDashPlugin";
     public const string SdkPackageId = "victorperez2911.OpenWigi.Sdk";
 
-    /// <summary>Contas do nuget.org cujos pacotes a loja mostra como verificados (a lista curada é a #48).</summary>
-    public static readonly IReadOnlyList<string> VerifiedOwners = ["victorperez2911"];
+    /// <summary>
+    /// Contas do nuget.org do projeto: os pacotes delas aparecem como oficiais (e contam como verificados).
+    /// Plugins de outras contas entram como verificados pela <see cref="VerifiedList"/>.
+    /// </summary>
+    public static readonly IReadOnlyList<string> OfficialOwners = ["victorperez2911"];
+
+    /// <summary>Lista de verificados e versões bloqueadas: versão bloqueada não é escolhida para instalar nem atualizar.</summary>
+    public VerifiedList Policy { get; set; } = VerifiedList.Empty;
 
     private readonly HttpClient _http;
     private readonly string _indexUrl;
@@ -92,7 +97,7 @@ public sealed class PluginFeed
             if (item is null || (string?)item["id"] is not { } id || !PackageVersion.TryParse((string?)item["version"], out var latest))
                 continue;
             var versions = await GetVersionsAsync(id, cancellationToken);
-            var compatible = PickCompatible(versions);
+            var compatible = PickInstallable(versions);
             var listed = versions.Where(v => v.Listed).ToList();
             results.Add(new FeedPackage(
                 id,
@@ -149,6 +154,10 @@ public sealed class PluginFeed
     }
 
     /// <summary>A mais nova listada e compatível; null se nenhuma servir.</summary>
+    /// <summary>A mais nova listada, compatível e fora da lista de bloqueio (<see cref="Policy"/>).</summary>
+    public FeedVersion? PickInstallable(IEnumerable<FeedVersion> versions) =>
+        PickCompatible(versions.Where(v => !Policy.IsBlocked(v.Id, v.Version)));
+
     public static FeedVersion? PickCompatible(IEnumerable<FeedVersion> versions) =>
         versions.Where(v => v.Listed && v.IsCompatible).MaxBy(v => v.Version, Comparer<PackageVersion>.Default);
 

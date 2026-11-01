@@ -1,0 +1,18 @@
+{
+  "$schema": "./verified.schema.json",
+  "version": 1,
+  "plugins": [
+    {
+      "id": "victorperez2911.OpenWigiDash.Discord",
+      "owner": "victorperez2911",
+      "repository": "https://github.com/victorperez2911/WigiDash-DiscordWidGet",
+      "blockedVersions": []
+    },
+    {
+      "id": "victorperez2911.OpenWigiDash.StreamDeckMirror",
+      "owner": "victorperez2911",
+      "repository": "https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet",
+      "blockedVersions": []
+    }
+  ]
+}

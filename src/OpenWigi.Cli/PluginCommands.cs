@@ -20,6 +20,11 @@ internal static class PluginCommands
         var feed = new PluginFeed(http, feedUrl);
         var installer = new PluginInstaller(feed, widgets, PluginInstaller.DefaultCacheDirectory);
         var positional = Positional(rest);
+        // Lista de verificados e versões bloqueadas (com cópia offline); remover e list --offline não precisam.
+        if (sub is "search" or "install" or "update" or "list" && !rest.Contains("--offline"))
+            feed.Policy = await new VerifiedListSource(http, VerifiedListSource.DefaultCacheFile).LoadAsync();
+        else
+            feed.Policy = new VerifiedListSource(http, VerifiedListSource.DefaultCacheFile).LoadCached();
 
         try
         {
@@ -73,7 +78,13 @@ internal static class PluginCommands
         foreach (var p in results)
         {
             var version = p.CompatibleVersion?.ToString() ?? $"nenhuma compatível (mais nova: {p.LatestVersion})";
-            Console.WriteLine($"{p.Id}  {version}");
+            var trust = feed.Policy.TrustOf(p) switch
+            {
+                PluginTrust.Official => "oficial",
+                PluginTrust.Verified => "verificado",
+                _ => "comunidade",
+            };
+            Console.WriteLine($"{p.Id}  {version}  [{trust}]");
             Console.WriteLine($"    {p.Authors} · {p.TotalDownloads:N0} downloads");
             if (p.Description.Length > 0)
                 Console.WriteLine($"    {p.Description.ReplaceLineEndings(" ")}");
@@ -136,11 +147,14 @@ internal static class PluginCommands
             var update = "";
             if (!offline && p.PackageId is not null && p.Version is not null)
             {
-                var latest = PluginFeed.PickCompatible(await feed.GetVersionsAsync(p.PackageId));
+                var latest = feed.PickInstallable(await feed.GetVersionsAsync(p.PackageId));
                 if (latest is not null && latest.Version > p.Version)
                     update = $" · atualização: {latest.Version}";
             }
-            Console.WriteLine($"{p.Folder}  ({origin}){update}{status}");
+            var blocked = p.PackageId is not null && p.Version is not null && feed.Policy.BlockReason(p.PackageId, p.Version) is { } reason
+                ? $" · BLOQUEADA: {reason}"
+                : "";
+            Console.WriteLine($"{p.Folder}  ({origin}){blocked}{update}{status}");
         }
         return 0;
     }

@@ -59,7 +59,9 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 
 No manager, a tela **Loja de plugins** busca no nuget.org, mostra o ícone de cada pacote e instala,
 atualiza ou remove com um clique. Pacotes da conta `victorperez2911` no nuget.org aparecem como
-**Verificado**; os outros como **Comunidade**, com um aviso antes de instalar. Ela confere as atualizações ao abrir e uma vez por dia (dá para desligar
+**Oficial**, os da [lista de verificados](plugins/verified.json) como **Verificado**, e os outros como
+**Comunidade**, com um aviso antes de instalar. Para pedir a verificação de um plugin, veja o
+[CONTRIBUTING.md](CONTRIBUTING.md#verificação-de-plugins). Ela confere as atualizações ao abrir e uma vez por dia (dá para desligar
 em Ajustes), e o número de plugins com atualização aparece no menu. As mudanças valem quando o manager
 reabre; o botão "Reiniciar agora" faz isso. Sem internet, a aba Instalados continua funcionando.
 
