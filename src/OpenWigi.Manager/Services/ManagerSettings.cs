@@ -17,7 +17,8 @@ public sealed class ManagerSettings
     private Stored _stored;
 
     private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true, bool StartWithWindows = true,
-        WindowPlacement? Window = null, bool CheckPluginUpdates = true, DateTimeOffset? LastPluginUpdateCheck = null);
+        WindowPlacement? Window = null, bool CheckPluginUpdates = true, DateTimeOffset? LastPluginUpdateCheck = null,
+        bool CheckAppUpdates = true, bool BetaAppUpdates = false, DateTimeOffset? LastAppUpdateCheck = null, string? NotifiedAppUpdate = null);
 
     /// <summary>Onde a janela estava ao fechar: posição e tamanho fora do maximizado, e se estava maximizada.</summary>
     public sealed record WindowPlacement(double Left, double Top, double Width, double Height, bool Maximized);
@@ -77,6 +78,54 @@ public sealed class ManagerSettings
         set
         {
             _stored = _stored with { LastPluginUpdateCheck = value };
+            Save();
+        }
+    }
+
+    /// <summary>O manager confere uma vez por dia, no GitHub, se há versão nova do OpenWigiDash.</summary>
+    public bool CheckAppUpdates
+    {
+        get => _stored.CheckAppUpdates;
+        set
+        {
+            _stored = _stored with { CheckAppUpdates = value };
+            Save();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Avisa também das versões de teste (pré-release: beta, rc).</summary>
+    public bool BetaAppUpdates
+    {
+        get => _stored.BetaAppUpdates;
+        set
+        {
+            _stored = _stored with { BetaAppUpdates = value };
+            Save();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Quando a última checagem de versão nova do OpenWigiDash terminou.</summary>
+    public DateTimeOffset? LastAppUpdateCheck
+    {
+        get => _stored.LastAppUpdateCheck;
+        set
+        {
+            _stored = _stored with { LastAppUpdateCheck = value };
+            Save();
+        }
+    }
+
+    /// <summary>Tag da última versão avisada no tray, para o balão não repetir a cada checagem.</summary>
+    public string? NotifiedAppUpdate
+    {
+        get => _stored.NotifiedAppUpdate;
+        set
+        {
+            if (_stored.NotifiedAppUpdate == value)
+                return;
+            _stored = _stored with { NotifiedAppUpdate = value };
             Save();
         }
     }

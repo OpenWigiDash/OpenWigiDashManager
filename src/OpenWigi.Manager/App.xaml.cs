@@ -79,6 +79,9 @@ public partial class App : System.Windows.Application
         _services.GetRequiredService<PluginStore>().RestartRequested +=
             () => Dispatcher.BeginInvoke(new Action(RestartApp));
         _tray = new TrayIcon(agent, a => Dispatcher.BeginInvoke(a), ShowMainWindow, ShowPreviewWindow, ExitApp);
+        _services.GetRequiredService<AppUpdates>().Found += release => Dispatcher.BeginInvoke(new Action(() =>
+            _tray?.ShowNotice($"OpenWigiDash {release.Version} disponível", "Clique para ver as novidades em Ajustes.",
+                () => ShowMainWindow("/ajustes"))));
         if (!e.Args.Contains("--tray"))
         {
             var open = Array.IndexOf(e.Args, "--open");
@@ -99,6 +102,7 @@ public partial class App : System.Windows.Application
         services.AddMudServices();
         services.AddSingleton<ManagerSettings>();
         services.AddSingleton<AgentClient>();
+        services.AddSingleton<AppUpdates>();
         var index = Array.IndexOf(args, "--plugins");
         var plugins = index >= 0 && index + 1 < args.Length
             ? args[index + 1]

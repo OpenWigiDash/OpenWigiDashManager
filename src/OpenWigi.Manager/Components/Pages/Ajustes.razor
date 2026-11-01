@@ -1,6 +1,7 @@
 @page "/ajustes"
 @inject ManagerSettings Settings
 @inject AgentClient Agent
+@inject AppUpdates Updates
 @implements IDisposable
 
 <MudStack Spacing="4" Style="max-width: 720px">
@@ -41,7 +42,36 @@
 
     <MudPaper Class="pa-4" Outlined="true">
         <MudText Typo="Typo.overline" Color="Color.Secondary">Sobre</MudText>
-        <MudText Typo="Typo.body2">OpenWigiDash Manager @AppVersion.Display</MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">OpenWigiDash Manager @AppVersion.Display</MudText>
+        @if (Updates.Available is { } release)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                <MudText Typo="Typo.body2"><b>@release.Name</b> está disponível@(release.IsPrerelease ? " (versão de teste)" : "").</MudText>
+                <MudText Typo="Typo.caption" Class="d-block mb-2">
+                    Baixe o OpenWigiDash-Setup.exe na página da versão e rode: ele atualiza por cima, sem perder layout e plugins.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="Updates.OpenReleasePage"
+                           StartIcon="@Icons.Material.Filled.OpenInNew">Ver novidades e baixar</MudButton>
+            </MudAlert>
+        }
+        <MudSwitch T="bool" Value="Settings.CheckAppUpdates" ValueChanged="v => Settings.CheckAppUpdates = v" Color="Color.Primary">
+            Procurar versão nova do OpenWigiDash uma vez por dia
+        </MudSwitch>
+        <MudSwitch T="bool" Value="Settings.BetaAppUpdates" ValueChanged="SetBeta" Color="Color.Primary">
+            Avisar também das versões de teste (beta)
+        </MudSwitch>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-2">
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="CheckNow" Disabled="@(_checking || !AppUpdates.Supported)"
+                       StartIcon="@Icons.Material.Filled.Refresh">Procurar agora</MudButton>
+            @if (_checking)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@CheckStatus</MudText>
+        </MudStack>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+            A checagem só lê a lista de versões no GitHub (api.github.com); nada sobre você ou este PC é enviado.
+        </MudText>
     </MudPaper>
 </MudStack>
 
@@ -49,9 +79,52 @@
     // Antes do serviço informar o brilho real, o cursor fica no padrão de fábrica do WigiDash.
     private int Brightness => Agent.Brightness ?? 50;
 
-    protected override void OnInitialized() => Agent.Changed += OnAgentChanged;
+    private bool _checking;
+    private string? _checkError;
 
-    public void Dispose() => Agent.Changed -= OnAgentChanged;
+    protected override void OnInitialized()
+    {
+        Agent.Changed += OnAgentChanged;
+        Updates.Changed += OnAgentChanged;
+    }
+
+    public void Dispose()
+    {
+        Agent.Changed -= OnAgentChanged;
+        Updates.Changed -= OnAgentChanged;
+    }
+
+    private string CheckStatus =>
+        !AppUpdates.Supported ? "Esta build não tem versão para comparar."
+        : _checkError is not null ? $"Não deu para procurar: {_checkError}"
+        : _checking ? "Procurando..."
+        : Settings.LastAppUpdateCheck is not { } last ? "Ainda não procurou."
+        : Updates.Available is null ? $"Você está na versão mais nova (procurou {last.ToLocalTime():dd/MM HH:mm})."
+        : $"Procurou {last.ToLocalTime():dd/MM HH:mm}.";
+
+    private async Task CheckNow()
+    {
+        _checking = true;
+        _checkError = null;
+        try
+        {
+            await Updates.CheckAsync();
+        }
+        catch (Exception ex)
+        {
+            _checkError = ex.Message;
+        }
+        finally
+        {
+            _checking = false;
+        }
+    }
+
+    private Task SetBeta(bool value)
+    {
+        Settings.BetaAppUpdates = value;
+        return CheckNow();
+    }
 
     private void OnAgentChanged() => InvokeAsync(StateHasChanged);
 
