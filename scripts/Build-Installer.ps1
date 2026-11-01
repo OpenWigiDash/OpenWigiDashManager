@@ -34,6 +34,20 @@ if ($MsiPath) {
     return
 }
 
+# O updater é Native AOT: precisa do compilador C++ (MSVC). Sem ele o dotnet publish falha com
+# "Platform linker not found" depois de publicar o resto; melhor avisar antes.
+$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+$msvc = if (Test-Path $vswhere) {
+    & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+}
+if (-not $msvc) {
+    throw @'
+Falta o compilador C++ da Microsoft, que o updater (Native AOT) precisa. Instale uma vez e abra um terminal novo:
+  winget install Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+Ver docs\instalador.md.
+'@
+}
+
 if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
 
 function Publish([string]$project, [string]$target, [switch]$Plugin) {
