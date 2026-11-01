@@ -234,13 +234,13 @@ public sealed class HostTests : IAsyncLifetime
         var host = await StartAsync();
         var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
         var context = host.GetSettings(counter.InstanceId)!.Value.Context;
+        Assert.Equal(new PixelSize(200, 145), context.PixelSize); // padrão: sem folga, como antes
+
+        await host.SetPageFrameAsync(0, TileFrame.Framed);
+
         Assert.Equal(new PixelSize(190, 135), context.PixelSize);
-
-        await host.SetPageFrameAsync(0, TileFrame.None);
-
-        Assert.Equal(new PixelSize(200, 145), context.PixelSize);
-        Assert.Equal(TileFrame.None, context.Frame);
-        Assert.Equal(TileFrame.None, new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[0].Frame);
+        Assert.Equal(TileFrame.Framed, context.Frame);
+        Assert.Equal(TileFrame.Framed, new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[0].Frame);
     }
 
     [Fact]

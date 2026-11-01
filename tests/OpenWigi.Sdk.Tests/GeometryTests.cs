@@ -83,25 +83,26 @@ public class GeometryTests
     public void Moldura_tira_respiro_e_borda_de_cada_lado()
     {
         var cell = WidgetSize.Small.CellSpan;
-        Assert.Equal(new PixelSize(190, 135), TileFrame.Default.ContentSize(cell));
+        Assert.Equal(cell, TileFrame.Default.ContentSize(cell)); // padrão: igual a antes da moldura
+        Assert.Equal(new PixelSize(190, 135), TileFrame.Framed.ContentSize(cell));
         Assert.Equal(cell, TileFrame.None.ContentSize(cell));
-        Assert.Equal(new PixelSize(88, 60), TileFrame.Default.ContentSize(WidgetSize.Mini.CellSpan));
-        Assert.Equal(new PixelRect(107, 79, 88, 61), TileFrame.Default.ContentBounds(WidgetGrid.CellBounds(1, 1, WidgetSize.Mini)));
+        Assert.Equal(new PixelSize(88, 60), TileFrame.Framed.ContentSize(WidgetSize.Mini.CellSpan));
+        Assert.Equal(new PixelRect(107, 79, 88, 61), TileFrame.Framed.ContentBounds(WidgetGrid.CellBounds(1, 1, WidgetSize.Mini)));
     }
 
     [Fact]
     public void Moldura_so_aceita_os_valores_da_lista()
     {
-        Assert.Equal([0, 1, 2, 3, 4, 5], TileFrame.InsetOptions);
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7], TileFrame.InsetOptions);
         Assert.Throws<ArgumentOutOfRangeException>(() => new TileFrame { Spacing = 4 });
-        Assert.Throws<ArgumentOutOfRangeException>(() => new TileFrame { Border = 3 });
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TileFrame { Border = 5 });
         Assert.Throws<ArgumentOutOfRangeException>(() => TileFrame.Default with { Spacing = -1 });
     }
 
     [Fact]
     public void Canto_arredondado_encolhe_em_tile_pequeno()
     {
-        var frame = TileFrame.Default;
+        var frame = TileFrame.Framed;
         Assert.Equal(12, frame.OuterRadius(new PixelSize(194, 139)));
         Assert.Equal(12, frame.OuterRadius(new PixelSize(92, 64))); // botão 1x1: 64 / 4 = 16, fica 12
         Assert.Equal(0, (frame with { Rounded = false }).OuterRadius(new PixelSize(194, 139)));
