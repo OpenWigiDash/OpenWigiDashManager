@@ -420,6 +420,41 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Ao_abrir_guarda_copia_do_layout()
+    {
+        var host = await StartAsync(); // primeira vez: não havia layout, nada a copiar
+        var store = new LayoutStore(Path.Combine(Data, "layout.json"));
+        Assert.Empty(store.Backups());
+        await host.AddPageAsync("Música");
+        await host.DisposeAsync();
+
+        await StartAsync();
+        var copy = Assert.Single(store.Backups());
+        Assert.Contains(store.Load().Pages, p => p.Name == "Música");
+        Assert.Equal(File.ReadAllText(store.Path), File.ReadAllText(copy));
+    }
+
+    [Fact]
+    public void Copias_do_layout_ficam_so_as_mais_novas()
+    {
+        var store = new LayoutStore(Path.Combine(Data, "layout.json"));
+        var start = new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+        Assert.Null(store.Backup(start)); // sem layout
+
+        for (var i = 0; i < 5; i++)
+        {
+            store.Save(new DashboardLayout { Pages = [new LayoutPage { Name = $"P{i}" }] });
+            Assert.NotNull(store.Backup(start.AddMinutes(i), keep: 3));
+        }
+        Assert.Null(store.Backup(start.AddMinutes(10), keep: 3)); // igual à última: não repete
+
+        var backups = store.Backups();
+        Assert.Equal(3, backups.Count);
+        Assert.Contains("\"P4\"", File.ReadAllText(backups[0]));
+        Assert.Contains("\"P2\"", File.ReadAllText(backups[2]));
+    }
+
+    [Fact]
     public async Task Catalogo_usa_a_previa_do_plugin_como_icone()
     {
         var host = await StartAsync();

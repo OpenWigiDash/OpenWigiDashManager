@@ -21,6 +21,16 @@ Por usuário, nada muda em relação ao dev: layout e ajustes em `%APPDATA%\Open
 usuário em `%LOCALAPPDATA%\OpenWigiDash\Widgets`. Um widget com o mesmo nome de pasta lá ganha do que
 veio com o instalador. Desinstalar não apaga nada disso.
 
+Toda vez que abre, o manager guarda uma cópia do `layout.json` em `%APPDATA%\OpenWigiDash\backups`
+(`layout-AAAAMMDD-HHMMSS.json`, as 10 mais novas; se nada mudou desde a última, não copia de novo). Para
+voltar a uma delas, feche o manager pela bandeja e copie o arquivo por cima do `layout.json`.
+
+Aberto de dentro de um app da Microsoft Store (o Claude Desktop, por exemplo), o manager roda no pacote
+daquele app, e o Windows desvia o que ele grava em `%APPDATA%` e `%LOCALAPPDATA%` para
+`%LOCALAPPDATA%\Packages\<app>\LocalCache`. O manager aberto pelo menu Iniciar não vê essa cópia, então
+páginas e plugins parecem sumir. Nesse caso a janela mostra um aviso no topo; feche pela bandeja e abra
+pelo menu Iniciar.
+
 O "Abrir ao entrar no Windows" de Ajustes, com o app instalado, fica guardado no `manager.json` do
 usuário: o manager abre pela entrada da máquina e sai na hora se o usuário desligou. Sem instalador
 (dev), continua sendo a chave `Run` do usuário.

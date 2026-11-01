@@ -113,6 +113,20 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
     private int _currentPage;
 
+    /// <summary>Cópia do layout antes de abrir, para voltar a ele se for sobrescrito. Falhar aqui não impede de abrir.</summary>
+    private void BackupLayout()
+    {
+        try
+        {
+            if (_store.Backup(_time.GetLocalNow()) is { } copy)
+                _logger.LogInformation("Cópia do layout em {Path}", copy);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Cópia do layout em {Directory} falhou", _store.BackupDirectory);
+        }
+    }
+
     /// <summary>Carrega plugins e layout, cria as instâncias. Ainda não desenha: isso vem com <see cref="ActivateAsync"/>.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -122,6 +136,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         await _catalog.LoadAllAsync(roots, this, cancellationToken);
         _known.Load();
         _known.Remember(_catalog.Widgets);
+        BackupLayout();
         _layout = _store.Load();
         if (FixDuplicatePageNames())
             _store.Save(_layout);

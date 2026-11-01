@@ -46,6 +46,15 @@
     </MudDrawer>
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-4">
+            @if (PackageContext.PackageFamilyName is { } package)
+            {
+                @* Aberto de dentro de um app da Store: o que gravar aqui vai para a cópia daquele app (PackageContext). *@
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    O OpenWigiDash foi aberto de dentro de outro app (@package). Nesse modo o Windows grava páginas, ajustes
+                    e plugins numa cópia separada, em <code>@PackageContext.RedirectedAppData</code>, que o OpenWigiDash
+                    aberto pelo menu Iniciar não enxerga. Feche pela bandeja e abra pelo menu Iniciar.
+                </MudAlert>
+            }
             @Body
         </MudContainer>
     </MudMainContent>
