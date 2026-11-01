@@ -57,9 +57,11 @@ public sealed class TrayIcon : IDisposable
                 post(click);
         };
         _icon.BalloonTipClosed += (_, _) => _balloonClick = null;
-        Update();
+        // Assina antes de desenhar: o agente já está conectado e pode virar dono enquanto o ícone nasce. Com o
+        // Update antes da assinatura, esse aviso se perdia e o ícone ficava cinza com o painel no aparelho.
         agent.Changed += _onChanged;
         SystemEvents.UserPreferenceChanged += _onTheme;
+        Update();
     }
 
     public void ShowBalloon(string text)
