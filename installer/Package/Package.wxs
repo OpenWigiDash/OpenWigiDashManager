@@ -29,15 +29,6 @@
     <Property Id="ARPHELPLINK" Value="https://github.com/OpenWigiDash/OpenWigiDashManager/issues" />
     <Property Id="ARPNOMODIFY" Value="1" />
 
-    <!-- O serviço de dev (scripts\Setup-DevService.ps1) ou o do Install-Service.ps1 usa o mesmo nome.
-         O MSI não consegue registrar por cima de um serviço que não é dele: pede para remover antes.
-         Num upgrade o serviço é da versão anterior deste MSI, e aí pode. -->
-    <Property Id="OWDSERVICEIMAGE">
-      <RegistrySearch Id="ExistingService" Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\OpenWigiDash" Name="ImagePath" Type="raw" Bitness="always64" />
-    </Property>
-    <Launch Condition="Installed OR WIX_UPGRADE_DETECTED OR NOT OWDSERVICEIMAGE"
-            Message="Já existe um serviço OpenWigiDash que não veio deste instalador (provavelmente o de desenvolvimento). Remova-o antes, num PowerShell como administrador: scripts\Setup-DevService.ps1 -Remove (ou scripts\Install-Service.ps1 -Uninstall)." />
-
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenWigiDash">
         <Directory Id="ServiceFolder" Name="Service" />
@@ -93,6 +84,10 @@
                               ResetPeriodInDays="1" />
         </ServiceInstall>
         <ServiceControl Id="ServiceControl" Name="OpenWigiDash" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+        <!-- Um serviço OpenWigiDash que não é desta instalação (o de dev do Setup-DevService.ps1, ou o
+             registro que sobrou de uma desinstalação) é parado e removido antes do InstallServices, e o
+             instalador registra o seu no lugar. No upgrade o antigo já saiu com a versão anterior. -->
+        <ServiceControl Id="ReplaceExistingService" Name="OpenWigiDash" Stop="install" Remove="install" Wait="yes" />
         <!-- Origem do Log de Eventos que o serviço usa (Program.cs); criar exige admin. -->
         <util:EventSource Name="OpenWigiDash" Log="Application"
                           EventMessageFile="[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll" />

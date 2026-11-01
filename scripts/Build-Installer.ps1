@@ -6,8 +6,8 @@
 #   scripts\Build-Installer.ps1 -Version 0.2.0 -MsiPath x.msi   só o Setup.exe, em volta de um MSI pronto
 #                                                                (a release usa com o MSI já assinado)
 #
-# Instalar no PC de desenvolvimento: o serviço de dev tem o mesmo nome; remova antes
-# (scripts\Setup-DevService.ps1 -Remove, como admin). Ver docs\instalador.md.
+# Instalar no PC de desenvolvimento: o serviço de dev tem o mesmo nome; o instalador para, remove e
+# registra o dele no lugar. Ver docs\instalador.md.
 
 param(
     [string]$Version = '0.0.1',
