@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Artifact configuration "engine" no SignPath: o motor do Burn, separado do OpenWigiDash-Setup.exe com
+  `wix burn detach`. Depois de assinado ele volta para o bundle com `wix burn reattach`.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="engine.exe">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

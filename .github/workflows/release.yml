@@ -2,6 +2,11 @@ name: Release
 
 # Tag vX.Y.Z: gera o instalador (MSI + OpenWigiDash-Setup.exe) e publica a Release.
 # Em PR que mexe no instalador, só gera e guarda como artefato, para ver que o WiX ainda compila.
+#
+# Assinatura (SignPath Foundation, ver docs/assinatura.md): liga quando a variável do repositório
+# SIGNPATH_ORGANIZATION_ID existe, em tag ou no workflow_dispatch com "assinar". São três pedidos ao
+# SignPath, cada um com aprovação no site: o MSI (com os .exe/.dll do projeto dentro), o motor do Burn
+# e o OpenWigiDash-Setup.exe. Sem a variável, a release sai sem assinatura, como antes.
 on:
   push:
     tags:
@@ -12,6 +17,11 @@ on:
       - 'scripts/Build-Installer.ps1'
       - '.github/workflows/release.yml'
   workflow_dispatch:
+    inputs:
+      assinar:
+        description: Mandar para o SignPath (precisa de aprovação no site)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -19,6 +29,10 @@ permissions:
 jobs:
   installer:
     runs-on: windows-latest
+    env:
+      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && (github.ref_type == 'tag' || inputs.assinar) }}
+      SIGNPATH_PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG || 'OpenWigiDashManager' }}
+      SIGNPATH_POLICY: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +53,121 @@ jobs:
         shell: pwsh
         run: scripts/Build-Installer.ps1 -Version $env:VERSION
 
+      # Em PR, sem SignPath: confere o caminho da assinatura com o MSI sem assinatura (bundle em volta de
+      # um MSI pronto, e o motor saindo e voltando com o wix burn).
+      - name: Ensaio do caminho da assinatura
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .artifacts/ensaio | Out-Null
+          Copy-Item .artifacts/installer/OpenWigiDash.msi .artifacts/ensaio/
+          scripts/Build-Installer.ps1 -Version $env:VERSION -MsiPath .artifacts/ensaio/OpenWigiDash.msi
+          dotnet tool install --global wix --version 6.0.2
+          wix burn detach .artifacts/installer/OpenWigiDash-Setup.exe -engine .artifacts/ensaio/engine.exe
+          if ($LASTEXITCODE -ne 0) { throw 'wix burn detach falhou.' }
+          wix burn reattach .artifacts/installer/OpenWigiDash-Setup.exe -engine .artifacts/ensaio/engine.exe -o .artifacts/ensaio/OpenWigiDash-Setup.exe
+          if ($LASTEXITCODE -ne 0) { throw 'wix burn reattach falhou.' }
+          Get-ChildItem .artifacts/ensaio | ForEach-Object { '{0}  {1:N1} MB' -f $_.Name, ($_.Length / 1MB) }
+
+      # --- Assinatura, rodada 1: o MSI, com os .exe/.dll do projeto dentro (.signpath/artifact-configurations/msi.xml).
+      - name: MSI sem assinatura
+        id: msi-unsigned
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-unsigned
+          path: .artifacts/installer/OpenWigiDash.msi
+
+      - name: Assinar o MSI
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: msi
+          github-artifact-id: ${{ steps.msi-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: .artifacts/signed/msi
+
+      # --- Rodada 2: o motor do Burn. O bundle é gerado de novo em volta do MSI assinado, e o motor sai dele.
+      - name: Bundle com o MSI assinado
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          scripts/Build-Installer.ps1 -Version $env:VERSION -MsiPath .artifacts/signed/msi/OpenWigiDash.msi
+          dotnet tool install --global wix --version 6.0.2
+          New-Item -ItemType Directory -Force .artifacts/signed/engine-unsigned | Out-Null
+          wix burn detach .artifacts/installer/OpenWigiDash-Setup.exe -engine .artifacts/signed/engine-unsigned/engine.exe
+          if ($LASTEXITCODE -ne 0) { throw 'wix burn detach falhou.' }
+
+      - name: Motor sem assinatura
+        id: engine-unsigned
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-unsigned
+          path: .artifacts/signed/engine-unsigned/engine.exe
+
+      - name: Assinar o motor
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: engine
+          github-artifact-id: ${{ steps.engine-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: .artifacts/signed/engine
+
+      # --- Rodada 3: o Setup.exe, com o motor assinado de volta no lugar.
+      - name: Recolocar o motor
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .artifacts/signed/setup-unsigned | Out-Null
+          wix burn reattach .artifacts/installer/OpenWigiDash-Setup.exe -engine .artifacts/signed/engine/engine.exe `
+            -o .artifacts/signed/setup-unsigned/OpenWigiDash-Setup.exe
+          if ($LASTEXITCODE -ne 0) { throw 'wix burn reattach falhou.' }
+
+      - name: Setup sem assinatura
+        id: setup-unsigned
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-unsigned
+          path: .artifacts/signed/setup-unsigned/OpenWigiDash-Setup.exe
+
+      - name: Assinar o Setup
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: setup
+          github-artifact-id: ${{ steps.setup-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: .artifacts/signed/setup
+
+      - name: Conferir assinaturas
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item .artifacts/signed/msi/OpenWigiDash.msi, .artifacts/signed/setup/OpenWigiDash-Setup.exe .artifacts/installer -Force
+          foreach ($f in 'OpenWigiDash-Setup.exe', 'OpenWigiDash.msi') {
+            $sig = Get-AuthenticodeSignature (Join-Path .artifacts/installer $f)
+            "{0}: {1} ({2})" -f $f, $sig.Status, $sig.SignerCertificate.Subject
+            if ($sig.Status -ne 'Valid') { throw "$f sem assinatura válida." }
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: OpenWigiDash-${{ env.VERSION }}
@@ -52,5 +181,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ github.ref_name }}' --title "OpenWigiDash $env:VERSION" --generate-notes `
+          # O SignPath pede a política de assinatura também na página de download.
+          $notes = if ($env:SIGN -eq 'true') {
+            "Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). " +
+            "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)"
+          } else { "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)" }
+          gh release create '${{ github.ref_name }}' --title "OpenWigiDash $env:VERSION" --notes $notes --generate-notes `
             .artifacts/installer/OpenWigiDash-Setup.exe .artifacts/installer/OpenWigiDash.msi

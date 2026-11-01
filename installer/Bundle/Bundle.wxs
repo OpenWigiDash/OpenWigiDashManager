@@ -14,10 +14,10 @@
           AboutUrl="https://github.com/victorperez2911/OpenWigiDashManager">
 
     <BootstrapperApplication>
-      <!-- O tema exige um link de licença. O repositório ainda não tem LICENSE: aponta para ele até ter. -->
+      <!-- O tema exige um link de licença: a MIT do repositório. -->
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
                                               ThemeFile="Theme.xml"
-                                              LicenseUrl="https://github.com/victorperez2911/OpenWigiDashManager"
+                                              LicenseUrl="https://github.com/victorperez2911/OpenWigiDashManager/blob/main/LICENSE"
                                               LogoFile="$(BrandingDir)png\openwigidash-64.png"
                                               SuppressOptionsUI="yes"
                                               ShowVersion="yes" />
@@ -49,7 +49,11 @@
                   Vital="yes"
                   Cache="remove"
                   DetectCondition="(WebView2MachineVersion AND WebView2MachineVersion &lt;&gt; &quot;0.0.0.0&quot;) OR (WebView2UserVersion AND WebView2UserVersion &lt;&gt; &quot;0.0.0.0&quot;)" />
+      <?ifdef MsiPath?>
+      <MsiPackage SourceFile="$(MsiPath)" />
+      <?else?>
       <MsiPackage SourceFile="$(Package.TargetPath)" />
+      <?endif?>
     </Chain>
   </Bundle>
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Artifact configuration "msi" no SignPath: assina os .exe e .dll do projeto dentro do MSI e depois o
+  próprio MSI. O GitHub entrega o artefato como zip, por isso a raiz é um zip-file.
+  As bibliotecas de terceiros (runtime do .NET, MudBlazor etc.) ficam como vieram.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <msi-file path="OpenWigiDash.msi">
+      <pe-file-set>
+        <include path="**/OpenWigi*.exe" max-matches="unbounded" />
+        <include path="**/OpenWigi*.dll" max-matches="unbounded" />
+        <for-each>
+          <authenticode-sign />
+        </for-each>
+      </pe-file-set>
+      <authenticode-sign />
+    </msi-file>
+  </zip-file>
+</artifact-configuration>
