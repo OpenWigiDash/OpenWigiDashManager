@@ -59,6 +59,11 @@ public sealed class WidgetPlacement
     [JsonIgnore]
     public PixelRect Bounds => WidgetGrid.CellBounds(Column, Row, Size);
 
+    /// <summary>Cabe inteiro na grade? Layout editado à mão ou com defeito pode ter widget saindo da tela.</summary>
+    [JsonIgnore]
+    public bool FitsGrid =>
+        Column >= 0 && Row >= 0 && Column + Size.Columns <= WidgetGrid.Columns && Row + Size.Rows <= WidgetGrid.Rows;
+
     public bool Overlaps(int column, int row, WidgetSize size) =>
         column < Column + Size.Columns && Column < column + size.Columns &&
         row < Row + Size.Rows && Row < row + size.Rows;
@@ -124,7 +129,7 @@ public sealed class LayoutStore(string path)
         }
         if (root is not JsonObject obj || obj["pages"] is not JsonArray)
             throw new InvalidDataException("O arquivo não é um layout do OpenWigiDash.");
-        var grid = obj["grid"]?.GetValue<int>() ?? 1;
+        var grid = GridOf(obj) ?? throw new InvalidDataException("O layout está com defeito: o campo \"grid\" não é um número.");
         if (grid > DashboardLayout.CurrentGrid)
             throw new InvalidDataException($"O layout é de uma versão mais nova do OpenWigiDash (grade {grid}).");
         if (grid < DashboardLayout.CurrentGrid)
@@ -134,9 +139,18 @@ public sealed class LayoutStore(string path)
         {
             layout = JsonSerializer.Deserialize<DashboardLayout>(text, Json) ?? new DashboardLayout();
         }
-        catch (JsonException ex)
+        // Valor fora do esperado (tamanho maior que a grade, cor inválida...) sai como ArgumentException ou
+        // FormatException do próprio tipo, sem passar pelo JsonException.
+        catch (Exception ex) when (ex is JsonException or ArgumentException or FormatException or InvalidOperationException)
         {
             throw new InvalidDataException($"O layout está com defeito: {ex.Message}", ex);
+        }
+        // Página nula ou widget fora da grade não derrubam o resto: saem, e o que sobra abre.
+        layout.Pages.RemoveAll(p => p is null);
+        foreach (var page in layout.Pages)
+        {
+            page.Widgets ??= [];
+            page.Widgets.RemoveAll(w => w is null || !w.FitsGrid);
         }
         if (layout.Pages.Count == 0)
             layout.Pages.Add(new LayoutPage { Name = "Página 1" });
@@ -147,8 +161,43 @@ public sealed class LayoutStore(string path)
     public static string Serialize(DashboardLayout layout) => JsonSerializer.Serialize(layout, Json);
 
     /// <summary>Layout gravado antes da grade 10x8? Quem abre grava de volta depois de converter.</summary>
-    public bool NeedsMigration() =>
-        File.Exists(Path) && (JsonNode.Parse(File.ReadAllText(Path))?["grid"]?.GetValue<int>() ?? 1) < DashboardLayout.CurrentGrid;
+    /// <remarks>Arquivo ilegível dá false: quem diz o que está errado é o <see cref="Load"/>.</remarks>
+    public bool NeedsMigration()
+    {
+        if (!File.Exists(Path))
+            return false;
+        try
+        {
+            return JsonNode.Parse(File.ReadAllText(Path)) is JsonObject obj && GridOf(obj) < DashboardLayout.CurrentGrid;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    // Sem o campo é a grade 5x4 (1); campo que não é número inteiro dá null.
+    private static int? GridOf(JsonObject root)
+    {
+        if (root["grid"] is not { } node)
+            return 1;
+        return node is JsonValue value && value.TryGetValue<int>(out var grid) ? grid : null;
+    }
+
+    /// <summary>
+    /// Tira do caminho um layout que não abre (de versão mais nova ou com defeito): move para
+    /// <see cref="BackupDirectory"/> como <c>ilegivel-AAAAMMDD-HHMMSS.json</c>, para não ser sobrescrito pelo layout
+    /// novo. Devolve o caminho para onde foi, ou null se não havia arquivo.
+    /// </summary>
+    public string? SetAside(DateTimeOffset now)
+    {
+        if (!File.Exists(Path))
+            return null;
+        Directory.CreateDirectory(BackupDirectory);
+        var target = System.IO.Path.Combine(BackupDirectory, $"ilegivel-{now.LocalDateTime:yyyyMMdd-HHmmss}.json");
+        File.Move(Path, target, overwrite: true);
+        return target;
+    }
 
     // Grade 5x4 → 10x8: cada célula vira 2x2 meias células, então posição e tamanho dobram e nada muda de
     // lugar na tela. As páginas ficam sem o campo "frame" e ganham a moldura padrão.

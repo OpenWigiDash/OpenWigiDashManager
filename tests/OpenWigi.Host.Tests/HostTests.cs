@@ -491,6 +491,65 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Equal(File.ReadAllText(store.Path), File.ReadAllText(copy));
     }
 
+    [Theory]
+    [InlineData("""{ "grid": 99, "pages": [] }""", "versão mais nova")]
+    [InlineData("isto não é json", "não é um layout")]
+    [InlineData("""{ "grid": 2, "pages": [ { "name": "P", "widgets": [ { "size": "banana" } ] } ] }""", "defeito")]
+    public async Task Layout_que_nao_abre_vai_para_o_lado_e_o_manager_abre_vazio_avisando(string json, string reason)
+    {
+        Directory.CreateDirectory(Data);
+        var path = Path.Combine(Data, "layout.json");
+        File.WriteAllText(path, json);
+
+        var host = await StartAsync();
+
+        Assert.NotNull(host.LayoutProblem);
+        Assert.Contains(reason, host.LayoutProblem);
+        var aside = Assert.Single(Directory.GetFiles(Path.Combine(Data, "backups"), "ilegivel-*.json"));
+        Assert.Contains(aside, host.LayoutProblem);
+        Assert.Equal(json, File.ReadAllText(aside)); // o arquivo original fica intacto
+        Assert.Single(host.Layout.Pages);
+        Assert.Contains("\"grid\": 2", File.ReadAllText(path)); // layout novo no lugar
+    }
+
+    [Fact]
+    public async Task Layout_bom_abre_sem_aviso()
+    {
+        var host = await StartAsync();
+        Assert.Null(host.LayoutProblem);
+    }
+
+    [Fact]
+    public async Task Widget_fora_da_grade_sai_e_o_resto_do_layout_abre()
+    {
+        Directory.CreateDirectory(Data);
+        File.WriteAllText(Path.Combine(Data, "layout.json"), $$"""
+            { "grid": 2, "pages": [ { "name": "P", "widgets": [
+              { "widgetId": "{{Counter}}", "column": 0, "row": 0, "size": "2x2" },
+              { "widgetId": "{{Counter}}", "column": 9, "row": 0, "size": "2x2" }
+            ] } ] }
+            """);
+
+        var host = await StartAsync();
+
+        Assert.Null(host.LayoutProblem);
+        var widget = Assert.Single(host.Layout.Pages[0].Widgets);
+        Assert.Equal(0, widget.Column);
+    }
+
+    [Fact]
+    public async Task Plugin_com_plugin_json_quebrado_vira_erro_e_os_outros_carregam()
+    {
+        var broken = Path.Combine(Plugins, "Quebrado");
+        Directory.CreateDirectory(broken);
+        File.WriteAllText(Path.Combine(broken, "plugin.json"), "{ isto não é json");
+
+        var host = await StartAsync();
+
+        Assert.Contains(host.PluginErrors, e => e.PluginDirectory == broken);
+        Assert.Equal(2, host.AvailableWidgets.Count);
+    }
+
     [Fact]
     public void Copias_do_layout_ficam_so_as_mais_novas()
     {
