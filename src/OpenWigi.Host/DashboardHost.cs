@@ -39,6 +39,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     private readonly Compositor _compositor;
     private readonly PluginCatalog _catalog;
     private readonly LayoutStore _store;
+    private readonly KnownWidgets _known;
     private readonly Dictionary<Guid, WidgetRuntime> _runtimes = [];
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(Guid WidgetId, WidgetSize Size), Task<WidgetFrame?>> _icons = [];
     private readonly SemaphoreSlim _state = new(1, 1);
@@ -58,6 +59,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         _compositor = new Compositor(sink);
         _catalog = new PluginCatalog(loggerFactory);
         _store = new LayoutStore(Path.Combine(options.DataDirectory, "layout.json"));
+        _known = new KnownWidgets(Path.Combine(options.DataDirectory, "known-widgets.json"));
     }
 
     public IReadOnlyList<LoadedWidget> AvailableWidgets => _catalog.Widgets;
@@ -118,6 +120,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             ? [_options.PluginsDirectory, bundled]
             : [_options.PluginsDirectory];
         await _catalog.LoadAllAsync(roots, this, cancellationToken);
+        _known.Load();
+        _known.Remember(_catalog.Widgets);
         _layout = _store.Load();
         if (FixDuplicatePageNames())
             _store.Save(_layout);
@@ -243,7 +247,31 @@ public event Action? LayoutChanged;
     {
         var placement = _layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId);
         return placement?.Name is { Length: > 0 } name ? name
-            : NameOf(instanceId) ?? _catalog.Find(placement?.WidgetId ?? Guid.Empty)?.Manifest.Name ?? "Widget não instalado";
+            : NameOf(instanceId) ?? _catalog.Find(placement?.WidgetId ?? Guid.Empty)?.Manifest.Name
+                ?? _known.Find(placement?.WidgetId ?? Guid.Empty)?.Name ?? "Widget não instalado";
+    }
+
+    /// <summary>
+    /// Por que a instância não está desenhando: plugin removido, plugin que não carregou (com o motivo) ou
+    /// erro da própria instância. null = está funcionando (ou a instância não existe no layout).
+    /// </summary>
+    public WidgetProblem? ProblemOf(Guid instanceId)
+    {
+        if (_runtimes.ContainsKey(instanceId) || _layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId) is not { } placement)
+            return null;
+        if (_catalog.Find(placement.WidgetId) is { } loaded)
+            return new WidgetProblem(WidgetProblemKind.InstanceFailed, loaded.Manifest.Name,
+                Path.GetFileName(loaded.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+                "O widget deu erro ao abrir. Tente remover e adicionar de novo, ou atualizar o plugin na Loja.");
+        var known = _known.Find(placement.WidgetId);
+        var error = known is null
+            ? null
+            : _catalog.Errors.LastOrDefault(e => string.Equals(
+                Path.GetFileName(e.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+                known.PluginFolder, StringComparison.OrdinalIgnoreCase));
+        return error is null
+            ? new WidgetProblem(WidgetProblemKind.NotInstalled, known?.Name, known?.PluginFolder, null)
+            : new WidgetProblem(WidgetProblemKind.PluginFailed, known?.Name, known?.PluginFolder, error.Reason);
     }
 
     /// <summary>Muda o nome da instância (vazio volta ao nome do widget).</summary>

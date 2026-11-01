@@ -461,6 +461,73 @@ public sealed class HostTests : IAsyncLifetime
             await Task.Delay(20);
     }
 
+    [Fact]
+    public async Task Widget_que_funciona_nao_tem_problema()
+    {
+        var host = await StartAsync();
+
+        Assert.All(host.Layout.AllPlacements, p => Assert.Null(host.ProblemOf(p.InstanceId)));
+    }
+
+    [Fact]
+    public async Task Plugin_removido_aparece_como_nao_instalado_com_o_nome_que_tinha()
+    {
+        var first = await StartAsync();
+        var placement = first.Layout.AllPlacements.First(p => p.WidgetId == Clock);
+        var name = first.NameOf(placement.InstanceId);
+        await first.DisposeAsync();
+
+        // Outra pasta de plugins, vazia: como se o plugin tivesse sido removido.
+        _host = new DashboardHost(new DashboardOptions { PluginsDirectory = Path.Combine(_root, "Vazia"), DataDirectory = Data },
+            _sink, NullLoggerFactory.Instance);
+        await _host.StartAsync();
+
+        var problem = _host.ProblemOf(placement.InstanceId);
+        Assert.NotNull(problem);
+        Assert.Equal(WidgetProblemKind.NotInstalled, problem.Kind);
+        Assert.Equal(name, problem.WidgetName);
+        Assert.Equal("OpenWigi.Samples.Clock", problem.PluginFolder);
+        Assert.Equal(name, _host.DisplayNameOf(placement.InstanceId));
+    }
+
+    [Fact]
+    public async Task Plugin_que_nao_carrega_mais_mostra_o_motivo_no_widget()
+    {
+        var first = await StartAsync();
+        var placement = first.Layout.AllPlacements.First(p => p.WidgetId == Clock);
+        await first.DisposeAsync();
+
+        // Mesma pasta do plugin, mas com uma DLL que não carrega (como uma feita para outro SDK).
+        var broken = Path.Combine(_root, "Quebrados", "OpenWigi.Samples.Clock");
+        Directory.CreateDirectory(broken);
+        await File.WriteAllBytesAsync(Path.Combine(broken, "OpenWigi.Samples.Clock.dll"), [1, 2, 3, 4]);
+        _host = new DashboardHost(new DashboardOptions { PluginsDirectory = Path.Combine(_root, "Quebrados"), DataDirectory = Data },
+            _sink, NullLoggerFactory.Instance);
+        await _host.StartAsync();
+
+        var problem = _host.ProblemOf(placement.InstanceId);
+        Assert.NotNull(problem);
+        Assert.Equal(WidgetProblemKind.PluginFailed, problem.Kind);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Reason));
+        Assert.Equal(_host.PluginErrors.Single().Reason, problem.Reason);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("2.0.0.0", null)]
+    [InlineData("1.0.0.0", "Loja")]
+    [InlineData("3.0.0.0", "Atualize o OpenWigiDash")]
+    [InlineData("2.9.0.0", "Atualize o OpenWigiDash")]
+    public void Plugin_feito_para_outro_SDK_tem_mensagem_clara(string? referenced, string? expected)
+    {
+        var problem = PluginCatalog.SdkProblem(referenced is null ? null : Version.Parse(referenced));
+
+        if (expected is null)
+            Assert.Null(problem);
+        else
+            Assert.Contains(expected, problem);
+    }
+
     private sealed class FakeSink : IDisplaySink
     {
         private readonly Lock _gate = new();

@@ -69,6 +69,26 @@ html, body {
     opacity: 0.35;
 }
 
+/* Widget que não está funcionando (plugin removido ou que não carregou): aviso no próprio tile. */
+.owd-widget-problem {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 6px;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--mud-palette-warning);
+    border: 1px dashed var(--mud-palette-warning);
+    border-radius: 6px;
+    background: repeating-linear-gradient(45deg, rgba(255, 167, 38, 0.08) 0 8px, transparent 8px 16px);
+    pointer-events: none;
+}
+
 /* Prévia ao vivo: o quadro do widget ocupa o tile inteiro, na mesma proporção do aparelho. */
 .owd-live {
     position: absolute;
