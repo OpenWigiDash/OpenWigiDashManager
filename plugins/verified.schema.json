@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/victorperez2911/OpenWigiDashManager/main/plugins/verified.schema.json",
+  "$id": "https://raw.githubusercontent.com/OpenWigiDash/OpenWigiDashManager/main/plugins/verified.schema.json",
   "title": "Plugins verificados e versões bloqueadas do OpenWigiDash",
   "type": "object",
   "required": ["version", "plugins"],

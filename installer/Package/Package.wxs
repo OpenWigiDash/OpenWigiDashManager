@@ -25,8 +25,8 @@
 
     <Icon Id="AppIcon" SourceFile="$(BrandingDir)openwigidash.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/victorperez2911/OpenWigiDashManager" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/victorperez2911/OpenWigiDashManager/issues" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/OpenWigiDash/OpenWigiDashManager" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/OpenWigiDash/OpenWigiDashManager/issues" />
     <Property Id="ARPNOMODIFY" Value="1" />
 
     <!-- O serviço de dev (scripts\Setup-DevService.ps1) ou o do Install-Service.ps1 usa o mesmo nome.

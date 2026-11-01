@@ -1,6 +1,6 @@
 name: Publicar SDK no NuGet
 
-# Publica o pacote victorperez2911.OpenWigi.Sdk (o contrato dos widgets) no nuget.org.
+# Publica o pacote OpenWigiDash.Sdk (o contrato dos widgets) no nuget.org.
 # Tag própria (sdk-vX.Y.Z) para não se misturar com as releases do manager (vX.Y.Z).
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 # Trusted Publishing do nuget.org (OIDC): sem API key guardada. A política no nuget.org aponta para
-# victorperez2911/OpenWigiDashManager + sdk-publish.yml; NUGET_USER (variável do repo) é o perfil lá.
+# OpenWigiDash/OpenWigiDashManager + sdk-publish.yml (dona: Org OpenWigiDash); NUGET_USER (variável do repo) é o perfil lá.
 permissions:
   contents: read
   id-token: write

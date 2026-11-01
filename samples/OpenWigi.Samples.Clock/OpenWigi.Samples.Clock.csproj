@@ -23,6 +23,6 @@
   </ItemGroup>
 
   <!-- Pelo pacote, o NuGet importa este arquivo sozinho; pela referência de projeto, importamos à mão. -->
-  <Import Project="..\..\src\OpenWigi.Sdk\build\victorperez2911.OpenWigi.Sdk.targets" />
+  <Import Project="..\..\src\OpenWigi.Sdk\build\OpenWigiDash.Sdk.targets" />
 
 </Project>

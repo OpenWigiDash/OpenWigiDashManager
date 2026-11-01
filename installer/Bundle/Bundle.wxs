@@ -11,13 +11,13 @@
           Version="$(Version)"
           UpgradeCode="743de56b-2795-4f3c-a099-52059d01f3bc"
           IconSourceFile="$(BrandingDir)openwigidash.ico"
-          AboutUrl="https://github.com/victorperez2911/OpenWigiDashManager">
+          AboutUrl="https://github.com/OpenWigiDash/OpenWigiDashManager">
 
     <BootstrapperApplication>
       <!-- O tema exige um link de licença: a MIT do repositório. -->
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
                                               ThemeFile="Theme.xml"
-                                              LicenseUrl="https://github.com/victorperez2911/OpenWigiDashManager/blob/main/LICENSE"
+                                              LicenseUrl="https://github.com/OpenWigiDash/OpenWigiDashManager/blob/main/LICENSE"
                                               LogoFile="$(BrandingDir)png\openwigidash-64.png"
                                               SuppressOptionsUI="yes"
                                               ShowVersion="yes" />

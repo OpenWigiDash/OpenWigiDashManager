@@ -61,7 +61,7 @@ hora por rodada). A página da release ganha o crédito ao SignPath e o link par
 Rascunho em inglês para o formulário do SignPath Foundation:
 
 - **Project name:** OpenWigiDash Manager
-- **Repository:** https://github.com/victorperez2911/OpenWigiDashManager
+- **Repository:** https://github.com/OpenWigiDash/OpenWigiDashManager
 - **License:** MIT
 - **Description:** Open source replacement for the discontinued G.SKILL WigiDash Manager, the software for
   the WigiDash USB touch panel. It runs a Windows service that owns the device over WinUSB, a tray app
@@ -74,6 +74,6 @@ Rascunho em inglês para o formulário do SignPath Foundation:
   (both Microsoft-signed, shipped unmodified) and MudBlazor (MIT). They are not signed by the project.
   Question for the reviewers: is shipping the WebView2 bootstrapper inside the bundle acceptable as a
   system library?
-- **Releases:** https://github.com/victorperez2911/OpenWigiDashManager/releases
-- **Code signing policy:** https://github.com/victorperez2911/OpenWigiDashManager#code-signing-policy
+- **Releases:** https://github.com/OpenWigiDash/OpenWigiDashManager/releases
+- **Code signing policy:** https://github.com/OpenWigiDash/OpenWigiDashManager#code-signing-policy
 - **Team:** Victor Perez (author, reviewer and approver), MFA enabled on GitHub and SignPath.

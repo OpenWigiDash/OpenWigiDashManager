@@ -54,11 +54,11 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 
 | Plugin | Pacote |
 | --- | --- |
-| [Discord](https://github.com/victorperez2911/WigiDash-DiscordWidGet): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `victorperez2911.OpenWigiDash.Discord` |
-| [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
+| [Discord](https://github.com/OpenWigiDash/WigiDash-DiscordWidGet): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `OpenWigiDash.Discord` |
+| [Stream Deck Mirror](https://github.com/OpenWigiDash/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `OpenWigiDash.StreamDeckMirror` |
 
 No manager, a tela **Loja de plugins** busca no nuget.org, mostra o ícone de cada pacote e instala,
-atualiza ou remove com um clique. Pacotes da conta `victorperez2911` no nuget.org aparecem como
+atualiza ou remove com um clique. Pacotes da Org [OpenWigiDash](https://www.nuget.org/profiles/OpenWigiDash) no nuget.org aparecem como
 **Oficial**, os da [lista de verificados](plugins/verified.json) como **Verificado**, e os outros como
 **Comunidade**, com um aviso antes de instalar. Para pedir a verificação de um plugin, veja o
 [CONTRIBUTING.md](CONTRIBUTING.md#verificação-de-plugins). Ela confere as atualizações ao abrir e uma vez por dia (dá para desligar
@@ -72,10 +72,10 @@ rode do repositório com `dotnet run --project src/OpenWigi.Cli -- plugin ...`:
 
 ```powershell
 owd plugin search discord
-owd plugin install victorperez2911.OpenWigiDash.Discord
+owd plugin install OpenWigiDash.Discord
 owd plugin list            # instalados, versão e se há atualização
 owd plugin update --all
-owd plugin remove victorperez2911.OpenWigiDash.Discord
+owd plugin remove OpenWigiDash.Discord
 ```
 
 O `owd` escolhe a versão mais nova compatível com o SDK deste manager, confere o hash do pacote e instala
@@ -84,7 +84,7 @@ não apaga as configurações dos widgets.
 
 ### Escrever um plugin
 
-O contrato é o pacote [`victorperez2911.OpenWigi.Sdk`](https://www.nuget.org/packages/victorperez2911.OpenWigi.Sdk)
+O contrato é o pacote [`OpenWigiDash.Sdk`](https://www.nuget.org/packages/OpenWigiDash.Sdk)
 (hoje 2.0.0-preview.3, `net10.0-windows`). A referência para autores é [docs/sdk.md](docs/sdk.md): widgets,
 quadros, toques, configurações em Razor, como montar e publicar o pacote, e o ícone (PNG quadrado com o
 desenho do widget; os plugins oficiais levam o selo do OpenWigiDash no canto). Os widgets de exemplo estão
@@ -155,7 +155,7 @@ layout do seu usuário.
 | Tag | O que sai |
 | --- | --- |
 | `vX.Y.Z` | Release do GitHub com o `OpenWigiDash-Setup.exe` e o MSI (`scripts\Build-Installer.ps1` faz o mesmo localmente), assinados pelo SignPath quando ele estiver configurado ([docs/assinatura.md](docs/assinatura.md)) |
-| `sdk-vX.Y.Z` | O pacote `victorperez2911.OpenWigi.Sdk` no nuget.org, por Trusted Publishing |
+| `sdk-vX.Y.Z` | O pacote `OpenWigiDash.Sdk` no nuget.org, por Trusted Publishing |
 
 ## Code signing policy
 
