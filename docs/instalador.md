@@ -47,7 +47,14 @@ aparece no canvas como "Não funciona nesta versão".
 ## Gerar
 
 ```powershell
-scripts\Build-Installer.ps1 -Version 0.1.0
+scripts\Build-Installer.ps1 -Version 0.2.0
+```
+
+Precisa do .NET 10 SDK e, por causa do updater (Native AOT), do compilador C++ da Microsoft (workload
+"Desktop development with C++" do Visual Studio, ou só as Build Tools):
+
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
 Sai em `.artifacts\installer\`. No GitHub, o workflow `Release` faz o mesmo a cada tag `vX.Y.Z` e cria a
