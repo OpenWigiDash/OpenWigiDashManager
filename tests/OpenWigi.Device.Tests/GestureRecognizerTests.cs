@@ -65,6 +65,17 @@ public class GestureRecognizerTests
     }
 
     [Fact]
+    public void Up_repetido_depois_do_long_press_nao_vira_tap()
+    {
+        Hold(200, 200, TimeSpan.FromMilliseconds(700));
+        var release = Feed(Up(200, 200), Up(200, 200), Up(200, 200), None);
+        Assert.Equal([GestureKind.PressEnded], release);
+
+        _time.Advance(TimeSpan.FromMilliseconds(500));
+        Assert.Contains(GestureKind.Tap, Feed(Down(200, 200), Up(200, 200))); // o próximo toque ainda funciona
+    }
+
+    [Fact]
     public void Long_press_sai_uma_vez_so()
     {
         var kinds = Hold(200, 200, TimeSpan.FromSeconds(2));
