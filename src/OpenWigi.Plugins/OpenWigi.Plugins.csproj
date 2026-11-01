@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Repositório de plugins (nuget.org): busca, compatibilidade, download e instalação. Usado pela CLI
+       (owd plugin) e pela loja do manager. Sem NuGet.Protocol: são quatro chamadas HTTP. -->
+  <PropertyGroup>
+    <RootNamespace>OpenWigi.Plugins</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenWigi.Sdk\OpenWigi.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenWigi.Plugins.Tests" />
+  </ItemGroup>
+
+</Project>

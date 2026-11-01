@@ -7,8 +7,9 @@ using OpenWigi.Device.Gestures;
 using OpenWigi.Device.Protocol;
 using OpenWigi.Device.Usb;
 
-// owd: ferramenta de diagnóstico do WigiDash. Precisa do manager oficial fechado,
-// porque só um processo consegue abrir o dispositivo WinUSB de cada vez.
+// owd: ferramenta de diagnóstico do WigiDash. Os comandos do aparelho precisam do manager fechado,
+// porque só um processo consegue abrir o dispositivo WinUSB de cada vez. `owd plugin` não abre o
+// aparelho e funciona com o manager aberto.
 
 var command = args.FirstOrDefault()?.ToLowerInvariant() ?? "help";
 var rest = args.Skip(1).ToArray();
@@ -27,6 +28,7 @@ try
         "sleep" => WithDevice(d => d.Sleep()),
         "wake" => WithDevice(d => d.Wake()),
         "welcome" => WithDevice(d => d.ShowWelcome()),
+        "plugin" => OpenWigi.Cli.PluginCommands.Run(rest),
         _ => Help(),
     };
 }
@@ -53,7 +55,8 @@ static int Help()
           owd touch [--raw] [--long MS]    mostra gestos ao vivo (Ctrl+C para sair)
           owd peek 0xNN TAMANHO [--repeat N]
                                            lê um comando de controle cru (investigação)
-        """);
+
+        """ + OpenWigi.Cli.PluginCommands.HelpText);
     return 1;
 }
 

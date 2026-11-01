@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenWigi.Device\OpenWigi.Device.csproj" />
+    <ProjectReference Include="..\OpenWigi.Plugins\OpenWigi.Plugins.csproj" />
   </ItemGroup>
 
   <ItemGroup>
