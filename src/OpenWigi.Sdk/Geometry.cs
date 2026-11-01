@@ -144,7 +144,7 @@ public sealed record TileFrame
     public static IReadOnlyList<int> SpacingOptions { get; } = [0, 1, 2, 3];
 
     /// <summary>Larguras de borda possíveis.</summary>
-    public static IReadOnlyList<int> BorderOptions { get; } = [0, 1, 2];
+    public static IReadOnlyList<int> BorderOptions { get; } = [0, 1, 2, 3, 4];
 
     /// <summary>Raio do canto de fora quando <see cref="Rounded"/>; o host reduz em tiles pequenos.</summary>
     public static readonly int CornerRadius = 12;

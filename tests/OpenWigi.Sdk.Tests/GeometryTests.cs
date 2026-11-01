@@ -93,9 +93,9 @@ public class GeometryTests
     [Fact]
     public void Moldura_so_aceita_os_valores_da_lista()
     {
-        Assert.Equal([0, 1, 2, 3, 4, 5], TileFrame.InsetOptions);
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7], TileFrame.InsetOptions);
         Assert.Throws<ArgumentOutOfRangeException>(() => new TileFrame { Spacing = 4 });
-        Assert.Throws<ArgumentOutOfRangeException>(() => new TileFrame { Border = 3 });
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TileFrame { Border = 5 });
         Assert.Throws<ArgumentOutOfRangeException>(() => TileFrame.Default with { Spacing = -1 });
     }
 

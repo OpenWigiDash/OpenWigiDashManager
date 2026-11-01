@@ -44,7 +44,7 @@ Cada página tem uma moldura (`TileFrame`), escolhida pela pessoa no manager ent
 | Opção | Valores |
 |---|---|
 | `Spacing` (respiro em volta do tile, além dos 4 px da grade) | 0, 1, 2 ou 3 px |
-| `Border` | 0, 1 ou 2 px |
+| `Border` | 0, 1, 2, 3 ou 4 px |
 | `Rounded` | cantos retos ou arredondados (raio fixo de 12 px, menor em tile pequeno) |
 | `BorderColor`, `Background` | cores escolhidas pela pessoa |
 
@@ -58,8 +58,8 @@ desenha só a área de conteúdo, que é a célula menos `Spacing + Border` de c
 margem para a moldura. O host corta o canto do conteúdo, então deixe uns pixels livres nos cantos
 se tiver texto ali. `WidgetTheme.CornerRadius` é só para painéis dentro do widget.
 
-**Teste todos os tamanhos:** a folga (`TileFrame.Inset`) vai de 0 a 5 px (`TileFrame.InsetOptions`),
-então um `Small` pode receber de 190x135 a 200x145. Use `TileFrame.ContentSize(celula)` para gerar os
+**Teste todos os tamanhos:** a folga (`TileFrame.Inset`) vai de 0 a 7 px (`TileFrame.InsetOptions`),
+então um `Small` pode receber de 186x131 a 200x145. Use `TileFrame.ContentSize(celula)` para gerar os
 tamanhos nos testes. Em tela cheia não há moldura e `PixelSize` é a tela inteira.
 
 **Quando o tamanho muda:** a pessoa troca a moldura da página, ou move um widget de número ímpar de
