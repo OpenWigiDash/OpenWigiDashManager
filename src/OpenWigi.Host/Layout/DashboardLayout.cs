@@ -1,12 +1,18 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using OpenWigi.Sdk;
 
 namespace OpenWigi.Host.Layout;
 
-/// <summary>Onde cada instância fica: páginas, e em cada uma, widgets presos à grade 5x4.</summary>
+/// <summary>Onde cada instância fica: páginas, e em cada uma, widgets presos à grade 10x8.</summary>
 public sealed class DashboardLayout
 {
+    /// <summary>Versão da grade: 2 = 10x8 meias células. Layout sem este campo é da grade 5x4 e é convertido ao abrir.</summary>
+    public const int CurrentGrid = 2;
+
+    public int Grid { get; set; } = CurrentGrid;
+
     public List<LayoutPage> Pages { get; set; } = [new LayoutPage { Name = "Página 1" }];
 
     /// <summary>Página que estava no aparelho: o manager volta nela ao abrir. Pelo Id, para sobreviver a mover páginas.</summary>
@@ -20,6 +26,9 @@ public sealed class LayoutPage
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public List<WidgetPlacement> Widgets { get; set; } = [];
+
+    /// <summary>Moldura dos tiles desta página (respiro, borda, cantos e cores).</summary>
+    public TileFrame Frame { get; set; } = TileFrame.Default;
 
     /// <summary>Primeira posição livre (linha a linha) que cabe o tamanho, ou null.</summary>
     public (int Column, int Row)? FindFreeCell(WidgetSize size)
@@ -46,37 +55,53 @@ public sealed class WidgetPlacement
     [JsonConverter(typeof(WidgetSizeJsonConverter))]
     public WidgetSize Size { get; set; } = WidgetSize.Small;
 
-    /// <summary>Retângulo na tela, em pixels. Calculado: não vai para o layout.json.</summary>
+    /// <summary>Retângulo das células na tela, em pixels, com a moldura. Calculado: não vai para o layout.json.</summary>
     [JsonIgnore]
-    public PixelRect Bounds
-    {
-        get
-        {
-            var (x, y) = WidgetGrid.CellOrigin(Column, Row);
-            var pixels = Size.PixelSize;
-            return new PixelRect(x, y, pixels.Width, pixels.Height);
-        }
-    }
+    public PixelRect Bounds => WidgetGrid.CellBounds(Column, Row, Size);
 
     public bool Overlaps(int column, int row, WidgetSize size) =>
         column < Column + Size.Columns && Column < column + size.Columns &&
         row < Row + Size.Rows && Row < row + size.Rows;
 }
 
-/// <summary>Grava "2x1", o mesmo formato do manager antigo e do <see cref="WidgetSize.ToString"/>.</summary>
+/// <summary>Grava "4x2", o mesmo formato do <see cref="WidgetSize.ToString"/>.</summary>
 internal sealed class WidgetSizeJsonConverter : JsonConverter<WidgetSize>
 {
     public override WidgetSize Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        WidgetSize.Parse(reader.GetString() ?? "1x1");
+        WidgetSize.Parse(reader.GetString() ?? "2x2");
 
     public override void Write(Utf8JsonWriter writer, WidgetSize value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.ToString());
 }
 
+/// <summary>Grava a cor como "#RRGGBB".</summary>
+internal sealed class WidgetColorJsonConverter : JsonConverter<WidgetColor>
+{
+    public override WidgetColor Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        TryParse(reader.GetString(), out var color) ? color : throw new JsonException($"Cor inválida: '{reader.GetString()}'.");
+
+    public override void Write(Utf8JsonWriter writer, WidgetColor value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.ToString());
+
+    public static bool TryParse(string? text, out WidgetColor color)
+    {
+        color = default;
+        if (text is not { Length: 7 } || text[0] != '#' ||
+            !uint.TryParse(text.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out var rgb))
+            return false;
+        color = new WidgetColor((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+        return true;
+    }
+}
+
 /// <summary>Lê e grava o layout em JSON. Gravação atômica: escreve ao lado e troca.</summary>
 public sealed class LayoutStore(string path)
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters = { new WidgetColorJsonConverter() },
+    };
 
     public string Path { get; } = path;
 
@@ -84,10 +109,47 @@ public sealed class LayoutStore(string path)
     {
         if (!File.Exists(Path))
             return new DashboardLayout();
-        var layout = JsonSerializer.Deserialize<DashboardLayout>(File.ReadAllText(Path), Json) ?? new DashboardLayout();
+        var text = File.ReadAllText(Path);
+        var grid = JsonNode.Parse(text)?["grid"]?.GetValue<int>() ?? 1;
+        if (grid > DashboardLayout.CurrentGrid)
+            throw new InvalidDataException($"O layout é de uma versão mais nova do OpenWigiDash (grade {grid}).");
+        if (grid < DashboardLayout.CurrentGrid)
+            text = MigrateFromGrid1(text);
+        var layout = JsonSerializer.Deserialize<DashboardLayout>(text, Json) ?? new DashboardLayout();
         if (layout.Pages.Count == 0)
             layout.Pages.Add(new LayoutPage { Name = "Página 1" });
         return layout;
+    }
+
+    /// <summary>Layout gravado antes da grade 10x8? Quem abre grava de volta depois de converter.</summary>
+    public bool NeedsMigration() =>
+        File.Exists(Path) && (JsonNode.Parse(File.ReadAllText(Path))?["grid"]?.GetValue<int>() ?? 1) < DashboardLayout.CurrentGrid;
+
+    // Grade 5x4 → 10x8: cada célula vira 2x2 meias células, então posição e tamanho dobram e nada muda de
+    // lugar na tela. As páginas ficam sem o campo "frame" e ganham a moldura padrão.
+    private static string MigrateFromGrid1(string text)
+    {
+        var root = JsonNode.Parse(text)!.AsObject();
+        foreach (var page in root["pages"]?.AsArray() ?? [])
+            foreach (var widget in page?["widgets"]?.AsArray() ?? [])
+            {
+                if (widget is not JsonObject w)
+                    continue;
+                w["column"] = (w["column"]?.GetValue<int>() ?? 0) * 2;
+                w["row"] = (w["row"]?.GetValue<int>() ?? 0) * 2;
+                var size = WidgetSize5x4(w["size"]?.GetValue<string>() ?? "1x1");
+                w["size"] = $"{size.Columns * 2}x{size.Rows * 2}";
+            }
+        root["grid"] = DashboardLayout.CurrentGrid;
+        return root.ToJsonString();
+    }
+
+    private static (int Columns, int Rows) WidgetSize5x4(string text)
+    {
+        var parts = text.Split('x', 'X');
+        return parts.Length == 2 && int.TryParse(parts[0], out var c) && int.TryParse(parts[1], out var r)
+            ? (Math.Clamp(c, 1, 5), Math.Clamp(r, 1, 4))
+            : (1, 1);
     }
 
     public void Save(DashboardLayout layout)

@@ -96,10 +96,10 @@ public class ContractTests
     }
 
     [Theory]
-    [InlineData(2, 0, true)]
-    [InlineData(1, 0, false)]
-    [InlineData(2, 99, false)]
-    [InlineData(3, 0, false)]
+    [InlineData(3, 0, true)]
+    [InlineData(2, 0, false)]
+    [InlineData(3, 99, false)]
+    [InlineData(4, 0, false)]
     public void Compatibilidade_pelo_major_e_minor(int major, int minor, bool compatible)
     {
         Assert.Equal(compatible, OpenWigiSdk.IsCompatible(new Version(major, minor)));
@@ -111,12 +111,13 @@ public class ContractTests
         var context = new FakeWidgetContext(WidgetSize.Small);
         IWidget widget = new CounterWidget();
         await widget.LoadAsync(context, default);
-        Assert.Null(await widget.GetPreviewAsync(WidgetSize.Small, default));
+        Assert.Null(await widget.GetPreviewAsync(WidgetSize.Small, context.PixelSize, default));
 
         IWidgetInstance instance = await widget.CreateInstanceAsync(context, default);
         await instance.OnSleepAsync(default);
         await instance.OnWakeAsync(default);
         await instance.OnThemeChangedAsync(default);
+        await instance.OnSizeChangedAsync(new PixelSize(100, 60), default);
         await instance.OnActionAsync(Guid.NewGuid(), default);
         await instance.OnRemovedAsync(default);
         await instance.DisposeAsync();
@@ -129,7 +130,8 @@ public class ContractTests
         IWidgetInstance instance = await new CounterWidget().CreateInstanceAsync(context, default);
 
         var first = await instance.RenderAsync(RenderReason.Initial, default);
-        Assert.Equal(new PixelSize(404, 145), first.Size);
+        // Moldura padrão (3 px de respiro + 2 de borda) tira 5 px de cada lado dos 404x145 do 4x2.
+        Assert.Equal(new PixelSize(394, 135), first.Size);
 
         await instance.OnTouchAsync(new TouchEvent(TouchKind.Tap, 10, 10, TimeSpan.FromMilliseconds(80)), default);
         Assert.Single(context.Presented);

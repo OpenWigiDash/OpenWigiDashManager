@@ -20,7 +20,7 @@ public sealed class PluginInstallerTests : IDisposable
     {
         _feed.Publish("Autor.OpenWigiDash.Teste", "1.0.0-preview.1");
         _feed.Publish("Autor.OpenWigiDash.Teste", "1.0.0-preview.2");
-        _feed.Publish("Autor.OpenWigiDash.Teste", "2.0.0-preview.1", sdk: "2.1.0"); // pede um host mais novo
+        _feed.Publish("Autor.OpenWigiDash.Teste", "2.0.0-preview.1", sdk: "3.1.0"); // pede um host mais novo
 
         var result = await Installer().InstallAsync("Autor.OpenWigiDash.Teste");
 
@@ -41,11 +41,11 @@ public sealed class PluginInstallerTests : IDisposable
     [Fact]
     public async Task So_versoes_incompativeis_da_erro_com_o_requisito()
     {
-        _feed.Publish("Autor.OpenWigiDash.Novo", "1.0.0", sdk: "3.0.0");
+        _feed.Publish("Autor.OpenWigiDash.Novo", "1.0.0", sdk: "4.0.0");
 
         var error = await Assert.ThrowsAsync<PluginInstallException>(() => Installer().InstallAsync("Autor.OpenWigiDash.Novo"));
 
-        Assert.Contains("requer OpenWigiDash com SDK 3.0", error.Message);
+        Assert.Contains("requer OpenWigiDash com SDK 4.0", error.Message);
         Assert.False(Directory.Exists(Path.Combine(Widgets, "Autor.OpenWigiDash.Novo")));
     }
 
@@ -181,7 +181,7 @@ public sealed class PluginInstallerTests : IDisposable
     public async Task Busca_traz_a_versao_compativel()
     {
         _feed.Publish("Autor.OpenWigiDash.Teste", "1.0.0");
-        _feed.Publish("Autor.OpenWigiDash.Teste", "1.1.0", sdk: "2.5.0");
+        _feed.Publish("Autor.OpenWigiDash.Teste", "1.1.0", sdk: "3.5.0");
 
         var results = await _feed.CreateFeed().SearchAsync("teste");
 

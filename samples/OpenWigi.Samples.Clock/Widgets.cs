@@ -33,8 +33,8 @@ public sealed class ClockWidget : IWidget
     }
 
     /// <summary>Ícone do catálogo: um relógio parado. O Contador não tem e ganha o ícone genérico.</summary>
-    public ValueTask<WidgetFrame?> GetPreviewAsync(WidgetSize size, CancellationToken cancellationToken) =>
-        ValueTask.FromResult<WidgetFrame?>(Painter.Paint(size.PixelSize, _theme, (g, pixels) =>
+    public ValueTask<WidgetFrame?> GetPreviewAsync(WidgetSize size, PixelSize pixelSize, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<WidgetFrame?>(Painter.Paint(pixelSize, _theme, (g, pixels) =>
         {
             using var font = new Font(_theme.PrimaryFontFamily, pixels.Height * 0.42f, FontStyle.Bold, GraphicsUnit.Pixel);
             using var center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -103,7 +103,7 @@ public sealed class CounterWidget : IWidget
         Version = new(1, 0),
         Author = "OpenWigiDashManager",
         Description = "Tap soma um, long-press zera. Exemplo de toques ricos.",
-        SupportedSizes = [WidgetSize.Small, WidgetSize.Wide],
+        SupportedSizes = [WidgetSize.Small, WidgetSize.Wide, WidgetSize.Mini],
     };
 
     public ValueTask<IWidgetInstance> CreateInstanceAsync(IWidgetContext context, CancellationToken cancellationToken) =>
@@ -118,6 +118,9 @@ public sealed class CounterInstance(IWidgetContext context) : IWidgetInstance
     private string? _label;
 
     public int Count => _count ?? 0;
+
+    /// <summary>Último gesto recebido, como aparece no quadro.</summary>
+    public string LastGesture => _last;
 
     /// <summary>Tela de configurações em Razor (CounterSettings.razor).</summary>
     public Type? SettingsComponent => typeof(CounterSettings);
@@ -205,11 +208,9 @@ internal static class Painter
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            // O quadro inteiro é conteúdo: a moldura e o canto arredondado são do host.
             var bg = theme.PrimaryBackground;
-            g.Clear(Color.Black);
-            using var brush = new SolidBrush(Color.FromArgb(bg.R, bg.G, bg.B));
-            using var path = RoundedRect(new RectangleF(0, 0, size.Width - 1, size.Height - 1), theme.CornerRadius);
-            g.FillPath(brush, path);
+            g.Clear(Color.FromArgb(bg.R, bg.G, bg.B));
             draw(g, size);
         }
 
@@ -224,17 +225,5 @@ internal static class Painter
         {
             bitmap.UnlockBits(data);
         }
-    }
-
-    private static GraphicsPath RoundedRect(RectangleF r, float radius)
-    {
-        var path = new GraphicsPath();
-        var d = Math.Max(1, radius * 2);
-        path.AddArc(r.X, r.Y, d, d, 180, 90);
-        path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-        path.CloseFigure();
-        return path;
     }
 }

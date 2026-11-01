@@ -24,7 +24,25 @@ internal sealed class WidgetContext : IWidgetContext
     public Guid InstanceId { get; }
     public IWidgetHost Host { get; }
     public WidgetSize Size { get; }
-    public PixelSize PixelSize => IsFullscreen ? WidgetGrid.Screen : Size.PixelSize;
+    public PixelSize PixelSize => IsFullscreen ? WidgetGrid.Screen : ContentSize;
+
+    /// <summary>Área de conteúdo fora de tela cheia: a célula menos a moldura da página. O host mantém.</summary>
+    public PixelSize ContentSize
+    {
+        get => _contentSize;
+        set
+        {
+            if (value == _contentSize)
+                return;
+            _staleSize = _contentSize;
+            _contentSize = value;
+        }
+    }
+
+    private PixelSize _contentSize;
+    private PixelSize _staleSize; // tamanho de antes da última troca de moldura ou posição
+
+    public TileFrame Frame { get; set; } = TileFrame.Default;
     public bool IsFullscreen { get; set; }
     public bool IsAsleep { get; set; }
     public WidgetTheme Theme => Host.Theme;
@@ -37,6 +55,10 @@ internal sealed class WidgetContext : IWidgetContext
 
     public ValueTask PresentAsync(WidgetFrame frame, CancellationToken cancellationToken = default)
     {
+        // Quadro que já estava sendo desenhado quando a moldura mudou: descarta em silêncio. O widget
+        // recebe OnSizeChangedAsync e um RenderAsync(SizeChanged) logo em seguida.
+        if (frame.Size != PixelSize && !IsFullscreen && frame.Size == _staleSize)
+            return ValueTask.CompletedTask;
         if (frame.Size != PixelSize)
             throw new ArgumentException($"Quadro {frame.Size}, esperado {PixelSize}.", nameof(frame));
         return _owner.PresentAsync(this, frame, cancellationToken);

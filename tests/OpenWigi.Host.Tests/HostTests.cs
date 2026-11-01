@@ -162,9 +162,10 @@ public sealed class HostTests : IAsyncLifetime
         await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, counter.X + 10, counter.Y + 10, TimeSpan.FromMilliseconds(80)));
         await WaitForWriteAsync();
 
+        // Só a área de conteúdo do contador (dentro da moldura) é reenviada.
         var write = _sink.Writes.First();
-        Assert.Equal(counter.Y * Compositor.RowBytes, write.Offset);
-        Assert.True(write.Length <= counter.Height * Compositor.RowBytes);
+        Assert.Equal((counter.Y + TileFrame.Default.Inset) * Compositor.RowBytes, write.Offset);
+        Assert.True(write.Length <= (counter.Height - 2 * TileFrame.Default.Inset) * Compositor.RowBytes);
 
         var settings = Directory.GetFiles(Path.Combine(Data, "instances"), "settings.json", SearchOption.AllDirectories);
         Assert.Contains(settings, f => File.ReadAllText(f).Contains("\"value\": \"1\""));
@@ -184,6 +185,62 @@ public sealed class HostTests : IAsyncLifetime
 
         var settings = Directory.GetFiles(Path.Combine(Data, "instances"), "settings.json", SearchOption.AllDirectories);
         Assert.Contains(settings, f => File.ReadAllText(f).Contains("\"value\": \"0\""));
+    }
+
+    [Fact]
+    public async Task Toque_no_espaco_entre_widgets_vai_para_o_mais_perto()
+    {
+        var host = await StartAsync();
+        await host.ActivateAsync(true);
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).Bounds;
+        var clock = host.Layout.AllPlacements.Single(p => p.WidgetId == Clock).Bounds;
+        Assert.Equal(clock.Right + 4, counter.X); // vizinhos, com os 4 px da grade entre eles
+
+        // 2 px antes do contador (3 px depois do relógio): é do contador.
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, counter.X - 2, counter.Y + 10, TimeSpan.Zero));
+
+        var settings = Directory.GetFiles(Path.Combine(Data, "instances"), "settings.json", SearchOption.AllDirectories);
+        Assert.Contains(settings, f => File.ReadAllText(f).Contains("\"value\": \"1\""));
+    }
+
+    [Fact]
+    public async Task Toque_duplo_so_vale_se_os_dois_toques_foram_no_mesmo_widget()
+    {
+        var host = await StartAsync();
+        await host.ActivateAsync(true);
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).Bounds;
+        var clock = host.Layout.AllPlacements.Single(p => p.WidgetId == Clock).Bounds;
+
+        // Primeiro toque no relógio, segundo no contador ao lado: o contador ganha só o toque simples.
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, clock.Right - 5, clock.Y + 10, TimeSpan.Zero));
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, counter.X + 5, counter.Y + 10, TimeSpan.Zero));
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.DoubleTap, counter.X + 5, counter.Y + 10, TimeSpan.Zero));
+        var counterId = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).InstanceId;
+        // O plugin vive no contexto dele: lê pelo nome da propriedade.
+        var instance = host.GetSettings(counterId)!.Value.Instance;
+        object? Read(string name) => instance.GetType().GetProperty(name)!.GetValue(instance);
+        Assert.Equal(1, Read("Count"));
+        Assert.NotEqual("double tap", Read("LastGesture"));
+
+        // Dois toques no contador: aí sim o toque duplo chega.
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, counter.X + 5, counter.Y + 10, TimeSpan.Zero));
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.DoubleTap, counter.X + 5, counter.Y + 10, TimeSpan.Zero));
+        Assert.Equal("double tap", Read("LastGesture"));
+    }
+
+    [Fact]
+    public async Task Moldura_da_pagina_muda_a_area_de_conteudo_e_fica_gravada()
+    {
+        var host = await StartAsync();
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var context = host.GetSettings(counter.InstanceId)!.Value.Context;
+        Assert.Equal(new PixelSize(190, 135), context.PixelSize);
+
+        await host.SetPageFrameAsync(0, TileFrame.None);
+
+        Assert.Equal(new PixelSize(200, 145), context.PixelSize);
+        Assert.Equal(TileFrame.None, context.Frame);
+        Assert.Equal(TileFrame.None, new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[0].Frame);
     }
 
     [Fact]
@@ -274,7 +331,7 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Equal(WidgetSize.Wide, resized.Size);
         var settings = Directory.GetFiles(Path.Combine(Data, "instances", id.ToString("D")), "settings.json");
         Assert.Contains("\"value\": \"1\"", File.ReadAllText(Assert.Single(settings)));
-        Assert.Equal(WidgetSize.Wide.PixelSize, host.GetSettings(id)!.Value.Context.PixelSize);
+        Assert.Equal(TileFrame.Default.ContentSize(WidgetSize.Wide.CellSpan), host.GetSettings(id)!.Value.Context.PixelSize);
     }
 
     [Fact]
@@ -311,7 +368,7 @@ public sealed class HostTests : IAsyncLifetime
         // Mesmo numa página que não está no aparelho, o editor já tem o quadro do tamanho do widget.
         var frame = host.FrameOf(id);
         Assert.NotNull(frame);
-        Assert.Equal(WidgetSize.Small.PixelSize, frame.Size);
+        Assert.Equal(TileFrame.Default.ContentSize(WidgetSize.Small.CellSpan), frame.Size);
         lock (changed)
             Assert.Contains(id, changed);
         Assert.Null(host.FrameOf(Guid.NewGuid()));
@@ -461,7 +518,7 @@ public sealed class HostTests : IAsyncLifetime
 
         var clock = await host.GetCatalogIconAsync(Clock);
         Assert.NotNull(clock);
-        Assert.Equal(WidgetSize.Small.PixelSize, clock.Size);
+        Assert.Equal(DashboardHost.PreviewPixelSize(WidgetSize.Small), clock.Size);
         Assert.Same(clock, await host.GetCatalogIconAsync(Clock));
 
         // O contador não implementa GetPreviewAsync: a UI mostra o ícone genérico.
@@ -549,10 +606,10 @@ public sealed class HostTests : IAsyncLifetime
 
     [Theory]
     [InlineData(null, null)]
-    [InlineData("2.0.0.0", null)]
-    [InlineData("1.0.0.0", "Loja")]
-    [InlineData("3.0.0.0", "Atualize o OpenWigiDash")]
-    [InlineData("2.9.0.0", "Atualize o OpenWigiDash")]
+    [InlineData("3.0.0.0", null)]
+    [InlineData("2.0.0.0", "Loja")]
+    [InlineData("4.0.0.0", "Atualize o OpenWigiDash")]
+    [InlineData("3.9.0.0", "Atualize o OpenWigiDash")]
     public void Plugin_feito_para_outro_SDK_tem_mensagem_clara(string? referenced, string? expected)
     {
         var problem = PluginCatalog.SdkProblem(referenced is null ? null : Version.Parse(referenced));

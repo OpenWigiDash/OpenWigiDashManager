@@ -73,8 +73,11 @@ public interface IWidget
     /// <summary>Chamado ao descarregar o plugin, depois de todas as instâncias serem descartadas.</summary>
     ValueTask UnloadAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    /// <summary>Ícone do catálogo. <c>null</c> = o host desenha um genérico.</summary>
-    ValueTask<WidgetFrame?> GetPreviewAsync(WidgetSize size, CancellationToken cancellationToken) =>
+    /// <summary>
+    /// Ícone do catálogo, do tamanho <paramref name="pixelSize"/> (a área de conteúdo de um widget de
+    /// <paramref name="size"/> na moldura padrão). <c>null</c> = o host desenha um genérico.
+    /// </summary>
+    ValueTask<WidgetFrame?> GetPreviewAsync(WidgetSize size, PixelSize pixelSize, CancellationToken cancellationToken) =>
         ValueTask.FromResult<WidgetFrame?>(null);
 
     /// <summary>

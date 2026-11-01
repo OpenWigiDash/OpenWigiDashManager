@@ -1,4 +1,4 @@
-# OpenWigi.Sdk — contrato dos widgets (v2.0)
+# OpenWigi.Sdk — contrato dos widgets (v3.0)
 
 Pacote `OpenWigiDash.Sdk` no nuget.org (assembly `OpenWigi.Sdk`, `net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
 compatibilidade binária: plugin antigo precisa ser portado.
@@ -9,16 +9,57 @@ compatibilidade binária: plugin antigo precisa ser portado.
 |---|---|---|
 | `[assembly: OpenWigiWidget(typeof(X))]` | O host acha a entrada do plugin sem varrer o assembly | varredura por `IWidgetObject` |
 | `IWidget` + `WidgetManifest` | Ficha (id, nome, versão, tamanhos, tela cheia) e fábrica de instâncias | `IWidgetObject` / `IWidgetBase` |
-| `IWidget.GetPreviewAsync` | Ícone do widget no assistente "Adicionar widget", pedido no menor tamanho suportado; sem ele o manager usa um genérico | `WidgetThumbnail` |
+| `IWidget.GetPreviewAsync` | Ícone do widget no assistente "Adicionar widget", pedido no menor tamanho suportado e já no tamanho em pixels da área de conteúdo; sem ele o manager usa um genérico | `WidgetThumbnail` |
 | `IWidgetInstance` | Widget na tela: quadros, toques, repouso, tela cheia, ações, remoção | `IWidgetInstance` + `WithRemoval` + `WithFullscreen` |
 | `IWidgetContext` | O que o host oferece a uma instância | `IWidgetManager` (global) |
 | `WidgetSettingsComponent<T>` | Tela de configurações em Razor (MudBlazor) | `UserControl` WPF |
 
 ## Grade
 
-Células de **200x145** com **4 px** de espaçamento; 5x4 células fecham os 1016x592 da tela.
-`WidgetSize(colunas, linhas)` vai de 1x1 a 5x4 e `PixelSize` faz a conta
-(`2x1` = 404x145, `2x2` = 404x294).
+**10 colunas por 8 linhas de meias células**, com **4 px** entre elas, fechando os 1016x592 da tela.
+As colunas têm 98 px. As linhas alternam 70 px (pares) e 71 px (ímpares), então duas linhas somam
+sempre 145 px: os tamanhos da grade 5x4 antiga continuam com os mesmos pixels.
+
+| `WidgetSize` | Meias células | Células em pixels |
+|---|---|---|
+| `Mini` | 1x1 | 98x70 (ou 98x71 numa linha ímpar) |
+| `Small` | 2x2 | 200x145 |
+| `Wide` | 4x2 | 404x145 |
+| `Large` | 4x4 | 404x294 |
+| `FullScreen` | 10x8 | 1016x592 |
+
+Qualquer tamanho de 1x1 a 10x8 vale (ex.: `new WidgetSize(3, 2)` = 302x145). `WidgetSize.CellSpan` dá
+os pixels das células começando numa linha par; `WidgetGrid.CellBounds(coluna, linha, tamanho)` dá o
+retângulo exato. Os valores de `WidgetGrid` são `static readonly`, não `const`, para não ficarem
+copiados dentro do plugin.
+
+## Moldura e área de conteúdo
+
+Cada página tem uma moldura (`TileFrame`), escolhida pela pessoa no manager entre valores fixos:
+
+| Opção | Valores |
+|---|---|
+| `Spacing` (respiro em volta do tile, além dos 4 px da grade) | 0, 1, 2 ou 3 px |
+| `Border` | 0, 1 ou 2 px |
+| `Rounded` | cantos retos ou arredondados (raio fixo de 12 px, menor em tile pequeno) |
+| `BorderColor`, `Background` | cores escolhidas pela pessoa |
+
+O padrão (`TileFrame.Default`) é 3 px de respiro, borda de 2 px e cantos arredondados.
+
+**Quem desenha o quê:** o host pinta o fundo da página, a borda e o canto arredondado. O widget
+desenha só a área de conteúdo, que é a célula menos `Spacing + Border` de cada lado:
+`context.PixelSize`. Desenhe o quadro inteiro nessa área, sem canto arredondado próprio e sem
+margem para a moldura. O host corta o canto do conteúdo, então deixe uns pixels livres nos cantos
+se tiver texto ali. `WidgetTheme.CornerRadius` é só para painéis dentro do widget.
+
+**Teste todos os tamanhos:** a folga (`TileFrame.Inset`) vai de 0 a 5 px (`TileFrame.InsetOptions`),
+então um `Small` pode receber de 190x135 a 200x145. Use `TileFrame.ContentSize(celula)` para gerar os
+tamanhos nos testes. Em tela cheia não há moldura e `PixelSize` é a tela inteira.
+
+**Quando o tamanho muda:** a pessoa troca a moldura da página, ou move um widget de número ímpar de
+linhas para uma linha de outra paridade. O host chama `OnSizeChangedAsync(novoTamanho)` e depois
+`RenderAsync(SizeChanged)`. Quem guarda bitmap em cache do tamanho antigo deve refazer aí.
+`context.Frame` diz a moldura atual, se o widget quiser combinar cores com ela.
 
 ## Quadros
 
@@ -26,7 +67,7 @@ Células de **200x145** com **4 px** de espaçamento; 5x4 células fecham os 101
 (nativo da tela, vai sem conversão), com `Stride` opcional e região suja opcional.
 
 - **Puxado:** o host chama `RenderAsync(reason)` e recebe o quadro inteiro (`Initial`, `Requested`,
-  `Resumed`, `FullscreenChanged`, `ThemeChanged`). Widget estático só implementa isso.
+  `Resumed`, `FullscreenChanged`, `ThemeChanged`, `SizeChanged`). Widget estático só implementa isso.
 - **Empurrado:** a instância chama `context.PresentAsync(frame)` quando tem novidade (captura, animação).
   O quadro é sempre completo; `Dirty` diz o que mudou para o host mandar só esse pedaço pelo USB.
   O `ValueTask` completa quando o host aceitou: quem gera mais rápido que o USB espera ali.
@@ -35,7 +76,8 @@ Células de **200x145** com **4 px** de espaçamento; 5x4 células fecham os 101
 
 ## Toques
 
-`TouchEvent(Kind, X, Y, Duration, Progress)`, com X/Y relativos ao widget. `TouchKind` tem os mesmos
+`TouchEvent(Kind, X, Y, Duration, Progress)`, com X/Y relativos à área de conteúdo e sempre dentro
+dela: um toque na moldura ou no espaço até o widget vizinho chega como a beirada mais perto. `TouchKind` tem os mesmos
 nomes e ordem do `GestureKind` do `OpenWigi.Device` (um teste guarda isso):
 
 `PressStarted` → `PressProgress` (0..1, para desenhar o anel do long-press) → `LongPress` (dedo ainda
@@ -48,7 +90,8 @@ eventos de pressão.
 1. Host carrega o assembly, lê o atributo, valida `Manifest.Validate()` e chama `IWidget.LoadAsync(host)`.
 2. Para cada widget no layout: `CreateInstanceAsync(context)` e logo `RenderAsync(Initial)`.
 3. Durante a vida: `OnTouchAsync`, `OnSleepAsync`/`OnWakeAsync` (+ `RenderAsync(Resumed)`),
-   `OnFullscreenChangedAsync` (+ `RenderAsync(FullscreenChanged)`), `OnThemeChangedAsync`, `OnActionAsync`.
+   `OnFullscreenChangedAsync` (+ `RenderAsync(FullscreenChanged)`), `OnSizeChangedAsync` (+ `RenderAsync(SizeChanged)`),
+   `OnThemeChangedAsync`, `OnActionAsync`.
 4. Pessoa tirou o widget: `OnRemovedAsync` e depois `DisposeAsync`. Descarregar o plugin só chama `DisposeAsync`.
 
 O host nunca chama dois métodos da mesma instância ao mesmo tempo. Todos os ganchos, exceto
@@ -63,7 +106,7 @@ O host nunca chama dois métodos da mesma instância ao mesmo tempo. Todos os ga
 - `Actions`: gatilhos que o widget dispara (`RegisterTriggerAsync`/`FireTriggerAsync`), ações que ele
   executa (`RegisterActionAsync` → `OnActionAsync`), ações que a pessoa ligou à instância
   (`GetBoundActionsAsync(setId)`) e `InvokeAsync` para rodar qualquer ação da central.
-- `RequestFullscreenAsync(bool)`, `IsFullscreen`, `PixelSize` (muda em tela cheia), `IsAsleep`.
+- `RequestFullscreenAsync(bool)`, `IsFullscreen`, `PixelSize` (área de conteúdo; muda em tela cheia e com a moldura), `Frame`, `IsAsleep`.
 - `Logger` (`Microsoft.Extensions.Logging`), `Theme`, `Stopping`, e via `Host`: `ResourceDirectory`,
   `LoggerFactory`, `Time` (`TimeProvider`, para testes).
 
@@ -86,13 +129,19 @@ O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Component
 cópia na pasta:
 
 ```xml
-<PackageReference Include="OpenWigiDash.Sdk" Version="2.0.0-preview.4" ExcludeAssets="runtime" />
+<PackageReference Include="OpenWigiDash.Sdk" Version="3.0.0-preview.1" ExcludeAssets="runtime" />
 <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
 ```
 
 ## Versão
 
-`OpenWigiSdk.Version` = 2.0. O host carrega widget com o mesmo major e minor menor ou igual ao dele.
+`OpenWigiSdk.Version` = 3.0. O host carrega widget com o mesmo major e minor menor ou igual ao dele.
+
+**De 2.0 para 3.0:** a grade passou a 10x8 meias células e `PixelSize` passou a ser a área de conteúdo.
+Para portar: troque `WidgetSize.PixelSize` por `context.PixelSize` (ou `CellSpan` só para posição),
+`GetPreviewAsync(size, ct)` por `GetPreviewAsync(size, pixelSize, ct)` e desenhe nesse `pixelSize`,
+tire o canto arredondado que o widget pintava por conta própria e recompile contra o SDK 3.0.
+`Small`, `Wide`, `Large` e `FullScreen` continuam com os mesmos pixels de célula.
 
 ## Exemplo mínimo
 
@@ -159,7 +208,7 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
     <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="OpenWigiDash.Sdk" Version="2.0.0-preview.4" ExcludeAssets="runtime" />
+    <PackageReference Include="OpenWigiDash.Sdk" Version="3.0.0-preview.1" ExcludeAssets="runtime" />
     <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="icon.png" Pack="true" PackagePath="\" />
