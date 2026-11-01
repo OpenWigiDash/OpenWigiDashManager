@@ -101,6 +101,23 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Equal(new HashSet<Guid> { Clock, Counter }, _host.AvailableWidgets.Select(w => w.Manifest.Id).ToHashSet());
     }
 
+    [Fact]
+    public async Task Instalacao_pendente_entra_antes_de_carregar_e_pastas_com_ponto_sao_ignoradas()
+    {
+        // Como o owd plugin deixa um plugin que estava em uso: pasta nova em .pending, aplicada no início.
+        var staged = OpenWigi.Plugins.PendingChanges.StagingDirectory(Plugins, "OpenWigi.Samples.Clock");
+        Directory.CreateDirectory(OpenWigi.Plugins.PendingChanges.PendingDirectory(Plugins));
+        Directory.Move(Path.Combine(Plugins, "OpenWigi.Samples.Clock"), staged);
+        Directory.CreateDirectory(Path.Combine(Plugins, ".cache", "lixo"));
+
+        var host = await StartAsync();
+
+        Assert.Empty(host.PluginErrors);
+        Assert.Equal(2, host.AvailableWidgets.Count);
+        Assert.True(Directory.Exists(Path.Combine(Plugins, "OpenWigi.Samples.Clock")));
+        Assert.False(Directory.Exists(OpenWigi.Plugins.PendingChanges.PendingDirectory(Plugins)));
+    }
+
     private static void CopyDirectory(string source, string target)
     {
         foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))

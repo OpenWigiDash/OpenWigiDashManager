@@ -53,13 +53,24 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 
 | Plugin | Pacote |
 | --- | --- |
-| [Discord](https://github.com/victorperez2911/WigiDash-DiscordWidGet/tree/net10): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `victorperez2911.OpenWigiDash.Discord` |
-| [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet/tree/net10): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
+| [Discord](https://github.com/victorperez2911/WigiDash-DiscordWidGet): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `victorperez2911.OpenWigiDash.Discord` |
+| [Stream Deck Mirror](https://github.com/victorperez2911/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `victorperez2911.OpenWigiDash.StreamDeckMirror` |
 
-A loja de plugins dentro do manager ([#47](../../issues/47)) e o `owd plugin` para instalar pela linha de
-comando ([#46](../../issues/46)) ainda estão planejados. Por enquanto, instale com o `deploy.ps1` do
-repositório do plugin ou extraia o zip da release dele em `%LOCALAPPDATA%\OpenWigiDash\Widgets\`.
-Feche o manager pelo tray antes de trocar a DLL.
+Pela linha de comando, com o `owd` (funciona com o manager aberto). O instalador ainda não traz o `owd`;
+rode do repositório com `dotnet run --project src/OpenWigi.Cli -- plugin ...`:
+
+```powershell
+owd plugin search discord
+owd plugin install victorperez2911.OpenWigiDash.Discord
+owd plugin list            # instalados, versão e se há atualização
+owd plugin update --all
+owd plugin remove victorperez2911.OpenWigiDash.Discord
+```
+
+O `owd` escolhe a versão mais nova compatível com o SDK deste manager, confere o hash do pacote e instala
+em `%LOCALAPPDATA%\OpenWigiDash\Widgets\<id>`. Plugin em uso é trocado quando o manager reabre. Remover
+não apaga as configurações dos widgets. A loja dentro do manager ([#47](../../issues/47)) ainda está
+planejada.
 
 ### Escrever um plugin
 

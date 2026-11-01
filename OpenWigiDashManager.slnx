@@ -9,12 +9,14 @@
     <Project Path="src/OpenWigi.Host/OpenWigi.Host.csproj" />
     <Project Path="src/OpenWigi.Ipc/OpenWigi.Ipc.csproj" />
     <Project Path="src/OpenWigi.Manager/OpenWigi.Manager.csproj" />
+    <Project Path="src/OpenWigi.Plugins/OpenWigi.Plugins.csproj" />
     <Project Path="src/OpenWigi.Sdk/OpenWigi.Sdk.csproj" />
     <Project Path="src/OpenWigi.Service/OpenWigi.Service.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/OpenWigi.Device.Tests/OpenWigi.Device.Tests.csproj" />
     <Project Path="tests/OpenWigi.Host.Tests/OpenWigi.Host.Tests.csproj" />
+    <Project Path="tests/OpenWigi.Plugins.Tests/OpenWigi.Plugins.Tests.csproj" />
     <Project Path="tests/OpenWigi.Sdk.Tests/OpenWigi.Sdk.Tests.csproj" />
     <Project Path="tests/OpenWigi.Service.Tests/OpenWigi.Service.Tests.csproj" />
   </Folder>

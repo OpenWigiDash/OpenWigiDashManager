@@ -48,7 +48,12 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
                 continue;
             }
 
-            foreach (var directory in Directory.GetDirectories(root).Order(StringComparer.OrdinalIgnoreCase))
+            // Instalações, atualizações e remoções feitas pelo owd plugin/loja enquanto o plugin estava em uso.
+            foreach (var (directory, reason) in OpenWigi.Plugins.PendingChanges.Apply(root))
+                Fail(directory, reason);
+
+            // Pastas com ponto (.pending e outras) não são plugins.
+            foreach (var directory in Directory.GetDirectories(root).Where(d => !Path.GetFileName(d).StartsWith('.')).Order(StringComparer.OrdinalIgnoreCase))
             {
                 if (loaded.Add(Path.GetFileName(directory)))
                     await LoadAsync(directory, hosts, cancellationToken);
