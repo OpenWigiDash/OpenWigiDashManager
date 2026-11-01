@@ -63,6 +63,8 @@ atualiza ou remove com um clique. Pacotes da conta `victorperez2911` no nuget.or
 em Ajustes), e o número de plugins com atualização aparece no menu. As mudanças valem quando o manager
 reabre; o botão "Reiniciar agora" faz isso. Sem internet, a aba Instalados continua funcionando.
 
+![Loja de plugins no tema escuro](docs/images/loja-escuro.png)
+
 Pela linha de comando, com o `owd` (funciona com o manager aberto). O instalador ainda não traz o `owd`;
 rode do repositório com `dotnet run --project src/OpenWigi.Cli -- plugin ...`:
 
