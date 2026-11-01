@@ -44,10 +44,13 @@ function Publish([string]$project, [string]$target, [switch]$Plugin) {
     if ($LASTEXITCODE -ne 0) { throw "Publicação de $project falhou." }
 }
 
-Write-Host '[1/3] Publicando serviço, manager e widgets (self-contained, win-x64)...' -ForegroundColor Green
+Write-Host '[1/3] Publicando serviço, manager, updater e widgets (self-contained, win-x64)...' -ForegroundColor Green
 Publish 'src\OpenWigi.Service\OpenWigi.Service.csproj' (Join-Path $publish 'service')
 Publish 'src\OpenWigi.Manager\OpenWigi.Manager.csproj' (Join-Path $publish 'manager')
 Publish 'samples\OpenWigi.Samples.Clock\OpenWigi.Samples.Clock.csproj' (Join-Path $publish 'widgets\OpenWigi.Samples.Clock') -Plugin
+# O updater é nativo (AOT, um exe só) e vai na pasta do manager, que o chama para instalar versão nova.
+Publish 'src\OpenWigi.Updater\OpenWigi.Updater.csproj' (Join-Path $publish 'updater')
+Copy-Item (Join-Path $publish 'updater\OpenWigiDash.Updater.exe') (Join-Path $publish 'manager')
 
 Write-Host '[2/3] Bootstrapper do WebView2 Runtime...' -ForegroundColor Green
 $webView2 = Join-Path $out 'MicrosoftEdgeWebview2Setup.exe'

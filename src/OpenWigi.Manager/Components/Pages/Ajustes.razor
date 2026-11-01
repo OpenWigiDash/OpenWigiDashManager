@@ -47,11 +47,36 @@
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
                 <MudText Typo="Typo.body2"><b>@release.Name</b> está disponível@(release.IsPrerelease ? " (versão de teste)" : "").</MudText>
-                <MudText Typo="Typo.caption" Class="d-block mb-2">
-                    Baixe o OpenWigiDash-Setup.exe na página da versão e rode: ele atualiza por cima, sem perder layout e plugins.
-                </MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="Updates.OpenReleasePage"
-                           StartIcon="@Icons.Material.Filled.OpenInNew">Ver novidades e baixar</MudButton>
+                @if (Updates.CanInstall)
+                {
+                    <MudText Typo="Typo.caption" Class="d-block mb-2">
+                        O OpenWigiDash baixa a versão nova, fecha, o Windows pede permissão de administrador e ele abre de novo
+                        quando terminar. Layout, ajustes e plugins continuam.
+                    </MudText>
+                    @if (Updates.DownloadProgress is { } progress)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Value="@(progress * 100)" Class="mb-2" />
+                        <MudText Typo="Typo.caption" Class="d-block mb-2">Baixando... @((int)(progress * 100))%</MudText>
+                    }
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="Install"
+                                   Disabled="@(Updates.DownloadProgress is not null)" StartIcon="@Icons.Material.Filled.Download">Atualizar agora</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="Updates.OpenReleasePage"
+                                   StartIcon="@Icons.Material.Filled.OpenInNew">Ver novidades</MudButton>
+                    </MudStack>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="d-block mb-2">
+                        Baixe o OpenWigiDash-Setup.exe na página da versão e rode: ele atualiza por cima, sem perder layout e plugins.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="Updates.OpenReleasePage"
+                               StartIcon="@Icons.Material.Filled.OpenInNew">Ver novidades e baixar</MudButton>
+                }
+                @if (_installError is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block mt-2">Não deu para atualizar: @_installError</MudText>
+                }
             </MudAlert>
         }
         <MudSwitch T="bool" Value="Settings.CheckAppUpdates" ValueChanged="v => Settings.CheckAppUpdates = v" Color="Color.Primary">
@@ -117,6 +142,21 @@
         finally
         {
             _checking = false;
+        }
+    }
+
+    private string? _installError;
+
+    private async Task Install()
+    {
+        _installError = null;
+        try
+        {
+            await Updates.InstallAsync();
+        }
+        catch (Exception ex)
+        {
+            _installError = ex.Message;
         }
     }
 

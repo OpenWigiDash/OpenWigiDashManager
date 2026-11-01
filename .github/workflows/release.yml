@@ -168,12 +168,23 @@ jobs:
             if ($sig.Status -ne 'Valid') { throw "$f sem assinatura válida." }
           }
 
+      # Depois da assinatura: o manager confere o Setup.exe baixado contra esta soma antes de instalar.
+      - name: Somas SHA-256
+        shell: pwsh
+        run: |
+          $lines = foreach ($f in 'OpenWigiDash-Setup.exe', 'OpenWigiDash.msi') {
+            '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 (Join-Path .artifacts/installer $f)).Hash.ToLowerInvariant(), $f
+          }
+          Set-Content -Path .artifacts/installer/SHA256SUMS.txt -Value $lines -Encoding ascii
+          Get-Content .artifacts/installer/SHA256SUMS.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: OpenWigiDash-${{ env.VERSION }}
           path: |
             .artifacts/installer/OpenWigiDash-Setup.exe
             .artifacts/installer/OpenWigiDash.msi
+            .artifacts/installer/SHA256SUMS.txt
 
       - name: Release
         if: github.ref_type == 'tag'
@@ -187,4 +198,4 @@ jobs:
             "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)"
           } else { "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)" }
           gh release create '${{ github.ref_name }}' --title "OpenWigiDash $env:VERSION" --notes $notes --generate-notes `
-            .artifacts/installer/OpenWigiDash-Setup.exe .artifacts/installer/OpenWigiDash.msi
+            .artifacts/installer/OpenWigiDash-Setup.exe .artifacts/installer/OpenWigiDash.msi .artifacts/installer/SHA256SUMS.txt
