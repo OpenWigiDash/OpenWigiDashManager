@@ -35,7 +35,7 @@ internal sealed class FakeFeed : HttpMessageHandler
     public PluginFeed CreateFeed() => new(new HttpClient(this), Index);
 
     /// <summary>Publica uma versão. <paramref name="sdk"/> null = sem dependência do SDK.</summary>
-    public void Publish(string id, string version, string? sdk = "2.0.0-preview.3", bool listed = true, bool plugin = true,
+    public void Publish(string id, string version, string? sdk = "3.0.0-preview.3", bool listed = true, bool plugin = true,
         IDictionary<string, string>? files = null, string? wrongHash = null, string sdkId = PluginFeed.SdkPackageId, bool deprecated = false)
     {
         var lower = id.ToLowerInvariant();

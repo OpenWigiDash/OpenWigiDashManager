@@ -38,15 +38,15 @@ public sealed class PluginStoreTests : IDisposable
 
         var versions = await _feed.CreateFeed().GetVersionsAsync(Id);
 
-        Assert.Equal("2.0.0-preview.3", Assert.Single(versions).SdkVersion!.ToString());
+        Assert.Equal("3.0.0-preview.3", Assert.Single(versions).SdkVersion!.ToString());
     }
 
     [Fact]
     public async Task Busca_traz_dono_links_seguros_versoes_e_o_sdk_que_falta()
     {
-        _feed.Publish(Id, "1.0.0", sdk: "2.4.0");
-        _feed.Publish(Id, "1.1.0", sdk: "2.5.0");
-        _feed.Publish(Id, "1.2.0", sdk: "2.6.0", listed: false);
+        _feed.Publish(Id, "1.0.0", sdk: "3.4.0");
+        _feed.Publish(Id, "1.1.0", sdk: "3.5.0");
+        _feed.Publish(Id, "1.2.0", sdk: "3.6.0", listed: false);
         _feed.SearchExtras[Id] = new JsonObject
         {
             ["owners"] = new JsonArray("victorperez2911"),
@@ -64,7 +64,7 @@ public sealed class PluginStoreTests : IDisposable
         Assert.Null(hit.LicenseUrl);
         Assert.Null(hit.IconUrl);
         Assert.Null(hit.CompatibleVersion);
-        Assert.Equal("2.5.0", hit.RequiredSdk!.ToString()); // a mais nova listada
+        Assert.Equal("3.5.0", hit.RequiredSdk!.ToString()); // a mais nova listada
         Assert.Equal(new[] { "1.1.0", "1.0.0" }, hit.Versions!.Select(v => v.ToString()));
         Assert.Equal($"https://www.nuget.org/packages/{Id}", hit.GalleryUrl);
     }
@@ -146,7 +146,7 @@ public sealed class PluginStoreTests : IDisposable
         await installer.InstallAsync("Autor.OpenWigiDash.Outro");
         Directory.CreateDirectory(Path.Combine(Widgets, "Manual"));
         _feed.Publish(Id, "1.1.0");
-        _feed.Publish("Autor.OpenWigiDash.Outro", "2.0.0", sdk: "3.0.0");
+        _feed.Publish("Autor.OpenWigiDash.Outro", "2.0.0", sdk: "4.0.0");
 
         var updates = await installer.CheckUpdatesAsync();
 

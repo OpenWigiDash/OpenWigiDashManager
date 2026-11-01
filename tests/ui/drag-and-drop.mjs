@@ -11,10 +11,11 @@ const before = await counter.getAttribute('style');
 console.log('antes:', before);
 
 // Vai para o canto inferior direito, ou para o inferior esquerdo se já estiver lá.
-const atCorner = before.includes('grid-column: 5') && before.includes('grid-row: 4');
+// Grade 10x8 de meias células; o contador (2x2) no canto começa na coluna 9, linha 7.
+const atCorner = before.includes('grid-column: 9') && before.includes('grid-row: 7');
 const grid = await page.locator('.owd-grid').boundingBox();
-const cellW = grid.width / 5, cellH = grid.height / 4;
-const target = { x: grid.x + cellW * (atCorner ? 0.5 : 4.5), y: grid.y + cellH * 3.5 };
+const cellW = grid.width / 10, cellH = grid.height / 8;
+const target = { x: grid.x + cellW * (atCorner ? 0.5 : 8.5), y: grid.y + cellH * 6.5 };
 
 // Mouse "de verdade" pelo CDP: dispara pointerdown e o arrastar nativo do HTML5.
 const from = await counter.boundingBox();

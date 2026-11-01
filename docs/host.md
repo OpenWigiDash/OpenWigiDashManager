@@ -24,10 +24,11 @@ Tudo fica no perfil do usuário do Windows, então cada pessoa da casa tem o pr�
 
 ## Tela
 
-- **Grade:** 5x4 células de 200x145 com 4 px de espaço.
+- **Grade:** 10x8 meias células com 4 px de espaço (colunas de 98 px, linhas de 70 e 71 px alternadas). O `layout.json` da grade 5x4 é convertido na primeira abertura (posição e tamanho dobram, nada muda de lugar) e ganha `"grid": 2`.
+- **Moldura:** cada página tem a sua (`LayoutPage.Frame`): respiro, borda, cantos e cores. O compositor pinta fundo, borda e canto arredondado (com suavização) ao montar a página, e corta de novo o canto do conteúdo depois de cada quadro do widget. Tela cheia fica sem moldura. Trocar a moldura chama `OnSizeChangedAsync` nos widgets cuja área mudou e redesenha a página.
 - **Primeira execução:** sem layout, o host põe um de cada widget instalado na primeira posição livre.
 - **Páginas do hardware:** o compositor usa as páginas 0 e 1. A página que está na tela vive numa delas, e a próxima é montada inteira na outra antes da troca. A página 2 é do serviço.
-- **Envio:** a cada ~33 ms vão ao aparelho só as linhas que mudaram. Quadro empurrado com região suja manda menos ainda.
+- **Envio:** a cada ~33 ms vão ao aparelho só as linhas que mudaram, uma escrita por faixa: dois widgets longe um do outro não levam as linhas do meio. Faixas a menos de 8 linhas uma da outra vão juntas. Quadro empurrado com região suja manda menos ainda.
 - **Repouso:** widget fora da página visível, ou com a tela em outra sessão, recebe `OnSleepAsync`. Na volta recebe `OnWakeAsync` e `RenderAsync(Resumed)`.
 
 ## Toques
@@ -35,9 +36,12 @@ Tudo fica no perfil do usuário do Windows, então cada pessoa da casa tem o pr�
 | Gesto | Para onde vai |
 | --- | --- |
 | Swipe para os lados, fora de tela cheia, com mais de uma página | Troca de página (para a esquerda = próxima) |
-| `PressStarted` | Widget sob o dedo, que fica marcado como alvo |
+| `PressStarted` | Widget sob o dedo, que fica marcado como alvo. Vale a célula com a moldura e até 2 px além dela (metade do espaço da grade); se dois servem, o mais perto |
 | `PressProgress`, `LongPress`, `PressEnded` | O alvo marcado no `PressStarted`, mesmo que o dedo saia dele |
-| Tap, double tap, swipe vertical | Widget sob o ponto |
+| Tap, swipe vertical | Widget sob o ponto, pela mesma regra |
+| Double tap | Só se o toque anterior foi no mesmo widget; dois botões pequenos vizinhos recebem cada um o seu tap e nenhum double tap |
+
+X/Y chegam relativos à área de conteúdo e presos dentro dela.
 | Qualquer gesto em tela cheia | O widget em tela cheia |
 
 As coordenadas chegam relativas ao widget.

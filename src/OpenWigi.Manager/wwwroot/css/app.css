@@ -23,16 +23,19 @@ html, body {
     right: 0.75rem;
 }
 
-/* Grade do editor: 5x4 células, mesma proporção do aparelho. */
+/* Grade do editor: 10x8 meias células, mesma proporção do aparelho. O fundo é o da página.
+   --owd-px é um pixel do aparelho na escala da grade, para desenhar a moldura dos tiles. */
 .owd-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(4, 1fr);
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(8, 1fr);
     gap: 0.4%;
     aspect-ratio: 1016 / 592;
-    background: #0e0f13;
+    background: var(--owd-page-bg, #0e0f13);
     border-radius: 10px;
     padding: 6px;
+    container-type: inline-size;
+    --owd-px: calc(100cqw / 1016);
 }
 
 .owd-cell-empty {
@@ -42,11 +45,51 @@ html, body {
 
 .owd-widget {
     border-radius: 6px;
-    background: #23252d;
-    border: 1px solid #3a3e4a;
+    background: transparent;
+    border: 1px solid transparent;
     padding: 6px 8px;
     overflow: hidden;
     cursor: pointer;
+}
+
+/* O tile como no aparelho: respiro, borda e cantos da moldura da página, com a prévia dentro. */
+.owd-tile {
+    position: absolute;
+    inset: calc(var(--owd-spacing, 0) * var(--owd-px, 1px));
+    border: calc(var(--owd-border, 0) * var(--owd-px, 1px)) solid var(--owd-border-color, transparent);
+    border-radius: calc(var(--owd-radius, 0) * var(--owd-px, 1px));
+    background: #23252d;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Cores da moldura: o seletor nativo do sistema, pequeno, com o nome ao lado. */
+.owd-frame-colors {
+    display: flex;
+    gap: 16px;
+}
+
+.owd-color {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.owd-color input[type="color"] {
+    width: 32px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.owd-color.off {
+    opacity: 0.45;
+    cursor: default;
 }
 
 .owd-widget {
@@ -201,6 +244,7 @@ html, body {
 .owd-occupied {
     cursor: default;
     opacity: 0.7;
+    background: #23252d;
 }
 
 /* Alça de redimensionar no canto inferior direito do widget. */
@@ -312,14 +356,16 @@ html, body {
 /* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. */
 .owd-thumb-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(4, 1fr);
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(8, 1fr);
     gap: 1px;
     width: 100%;
     height: 94px;
     padding: 0;
     border: 0;
-    background: #0e0f13;
+    background: var(--owd-page-bg, #0e0f13);
+    container-type: inline-size;
+    --owd-px: calc(100cqw / 1016);
     border-radius: 4px;
     overflow: hidden;
     cursor: pointer;
@@ -327,7 +373,7 @@ html, body {
 
 .owd-thumb-widget {
     position: relative;
-    background: #23252d;
+    background: transparent;
 }
 
 .owd-page-add {

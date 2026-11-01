@@ -2,6 +2,7 @@
 @page "/widgets"
 @implements IAsyncDisposable
 @using OpenWigi.Host.Plugins
+@using OpenWigi.Host.Display
 @inject AgentClient Agent
 @inject ManagerSettings Settings
 @inject ISnackbar Snackbar
@@ -14,7 +15,7 @@
         <div class="flex-grow-1">
             <MudText Typo="Typo.h5">Widgets e páginas</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Monte cada página na grade 5x4 do WigiDash. Arraste um widget para movê-lo; selecione para configurar ou tirar.
+                Monte cada página na grade do WigiDash (10 colunas por 8 linhas de meias células). Arraste um widget para movê-lo; selecione para configurar ou tirar.
             </MudText>
         </div>
         <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Outlined" OnClick="Settings.RequestPreviewWindow">
@@ -75,6 +76,7 @@
                 @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
                    de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
                 <div class="owd-grid owd-canvas @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
+                     style="@PageStyle(CurrentPage)"
                      @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                     @foreach (var cell in FreeCells())
                     {
@@ -84,11 +86,11 @@
                     {
                         var p = placement;
                         <div @key="p.InstanceId" class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
-                             style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows"
+                             style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows; @TileStyle(p, CurrentPage)"
                              @onpointerdown="e => Press(p, e)"
                              @onclick="() => _selected = p.InstanceId">
-                            @* O tile mostra o que o widget desenha, como vai aparecer no aparelho. *@
-                            <WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" />
+                            @* O tile mostra o que o widget desenha, com a moldura da página, como vai aparecer no aparelho. *@
+                            <div class="owd-tile"><WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" /></div>
                             @if (Dashboard.ProblemOf(p.InstanceId) is { } problem)
                             {
                                 @* Sem isso o tile fica vazio, e não dá para saber que o plugin saiu ou não funciona nesta versão. *@
@@ -211,10 +213,72 @@
     
                 else
                 {
-                    <MudPaper Class="pa-4" Outlined="true">
+                    <MudPaper Class="pa-4 mb-4" Outlined="true">
                         <MudText Typo="Typo.body2" Color="Color.Secondary">
                             Clique num widget da grade para configurar, mudar o tamanho ou tirar.
                             Para pôr um novo, use "Adicionar widget".
+                        </MudText>
+                    </MudPaper>
+                }
+
+                @if (CurrentPage is { } framed)
+                {
+                    var frame = framed.Frame;
+                    @* Moldura dos tiles desta página: valores fixos do SDK, para os plugins saberem todos os tamanhos possíveis. *@
+                    <MudPaper Class="pa-3" Outlined="true">
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.overline" Color="Color.Secondary" Class="flex-grow-1">Moldura da página</MudText>
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(frame == TileFrame.Default)"
+                                       OnClick="() => SetFrame(TileFrame.Default)">Padrão</MudButton>
+                        </MudStack>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">Espaço entre os tiles</MudText>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var option in TileFrame.SpacingOptions)
+                            {
+                                var o = option;
+                                <MudChip T="string" Size="Size.Small" Variant="@(o == frame.Spacing ? Variant.Filled : Variant.Outlined)"
+                                         Color="@(o == frame.Spacing ? Color.Primary : Color.Default)"
+                                         OnClick="() => SetFrame(frame with { Spacing = o })">@(o == 0 ? "Sem espaço" : $"{o} px")</MudChip>
+                            }
+                        </div>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">Borda</MudText>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var option in TileFrame.BorderOptions)
+                            {
+                                var o = option;
+                                <MudChip T="string" Size="Size.Small" Variant="@(o == frame.Border ? Variant.Filled : Variant.Outlined)"
+                                         Color="@(o == frame.Border ? Color.Primary : Color.Default)"
+                                         OnClick="() => SetFrame(frame with { Border = o })">@(o == 0 ? "Sem borda" : $"{o} px")</MudChip>
+                            }
+                        </div>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">Cantos</MudText>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var rounded in new[] { false, true })
+                            {
+                                var r = rounded;
+                                <MudChip T="string" Size="Size.Small" Variant="@(r == frame.Rounded ? Variant.Filled : Variant.Outlined)"
+                                         Color="@(r == frame.Rounded ? Color.Primary : Color.Default)"
+                                         OnClick="() => SetFrame(frame with { Rounded = r })">@(r ? "Arredondados" : "Retos")</MudChip>
+                            }
+                        </div>
+
+                        <div class="owd-frame-colors mt-3">
+                            <label class="owd-color" title="Cor do fundo da página, entre os tiles">
+                                <input type="color" value="@frame.Background.ToString()" aria-label="Cor do fundo"
+                                       @onchange="e => SetColor(e, (f, c) => f with { Background = c })" />
+                                <span>Fundo</span>
+                            </label>
+                            <label class="owd-color @(frame.Border == 0 ? "off" : "")" title="Cor da borda dos tiles">
+                                <input type="color" value="@frame.BorderColor.ToString()" aria-label="Cor da borda" disabled="@(frame.Border == 0)"
+                                       @onchange="e => SetColor(e, (f, c) => f with { BorderColor = c })" />
+                                <span>Borda</span>
+                            </label>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
+                            Cada widget perde @(frame.Inset) px de cada lado para a moldura. Vale só para esta página; tela cheia fica sem moldura.
                         </MudText>
                     </MudPaper>
                 }
@@ -232,12 +296,12 @@
                         var index = i;
                         var thumb = Dashboard.Layout.Pages[index];
                         <div @key="thumb.Id" class="owd-page-card @(index == _page ? "selected" : "")">
-                            <div class="owd-thumb-grid" role="button" tabindex="0" @onclick="() => SelectPage(index)" title="Mostrar @thumb.Name">
+                            <div class="owd-thumb-grid" style="@PageStyle(thumb)" role="button" tabindex="0" @onclick="() => SelectPage(index)" title="Mostrar @thumb.Name">
                                 @foreach (var w in thumb.Widgets)
                                 {
                                     <div @key="w.InstanceId" class="owd-thumb-widget"
-                                         style="grid-column: @(w.Column + 1) / span @w.Size.Columns; grid-row: @(w.Row + 1) / span @w.Size.Rows">
-                                        <WidgetLiveFrame Dashboard="Dashboard" InstanceId="w.InstanceId" MaxPerSecond="1" />
+                                         style="grid-column: @(w.Column + 1) / span @w.Size.Columns; grid-row: @(w.Row + 1) / span @w.Size.Rows; @TileStyle(w, thumb)">
+                                        <div class="owd-tile"><WidgetLiveFrame Dashboard="Dashboard" InstanceId="w.InstanceId" MaxPerSecond="1" /></div>
                                     </div>
                                 }
                             </div>
@@ -348,9 +412,33 @@
     {
         for (var row = 0; row < WidgetGrid.Rows; row++)
             for (var column = 0; column < WidgetGrid.Columns; column++)
-                if (CurrentPage is null || !CurrentPage.Widgets.Any(w => w.Overlaps(column, row, WidgetSize.Small)))
+                if (CurrentPage is null || !CurrentPage.Widgets.Any(w => w.Overlaps(column, row, WidgetSize.Mini)))
                     yield return (column, row);
     }
+
+    // Fundo da página no editor e na miniatura: a mesma cor do aparelho.
+    private static string PageStyle(LayoutPage? page) =>
+        page is null ? "" : $"--owd-page-bg: {page.Frame.Background}";
+
+    // Moldura do tile em pixels do aparelho; o CSS converte para a escala da grade (--owd-px).
+    private static string TileStyle(WidgetPlacement placement, LayoutPage? page)
+    {
+        var shape = new TileShape(placement.Bounds, page?.Frame ?? TileFrame.Default);
+        var frame = shape.Frame!;
+        return $"--owd-spacing: {frame.Spacing}; --owd-border: {frame.Border}; --owd-radius: {shape.OuterRadius}; --owd-border-color: {frame.BorderColor}";
+    }
+
+    private Task SetFrame(TileFrame frame) => Dashboard.SetPageFrameAsync(_page, frame);
+
+    private Task SetColor(ChangeEventArgs e, Func<TileFrame, WidgetColor, TileFrame> apply) =>
+        CurrentPage is { } page && ParseColor(e.Value as string) is { } color
+            ? SetFrame(apply(page.Frame, color))
+            : Task.CompletedTask;
+
+    private static WidgetColor? ParseColor(string? text) =>
+        text is { Length: 7 } && text[0] == '#' && uint.TryParse(text.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out var rgb)
+            ? new WidgetColor((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb)
+            : null;
 
     private async Task OpenAddWidget()
     {

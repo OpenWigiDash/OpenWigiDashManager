@@ -48,6 +48,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
     private Task? _flushLoop;
     private WidgetRuntime? _fullscreen;
     private WidgetRuntime? _pressTarget;
+    private WidgetRuntime? _lastTap;
+    private WidgetRuntime? _previousTap;
     private bool _active;
 
     public DashboardHost(DashboardOptions options, IDisplaySink sink, ILoggerFactory loggerFactory, TimeProvider? time = null)
@@ -85,7 +87,8 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            return await widget.Widget.GetPreviewAsync(size, timeout.Token) is { } frame && frame.Size == size.PixelSize ? frame : null;
+            var pixels = PreviewPixelSize(size);
+            return await widget.Widget.GetPreviewAsync(size, pixels, timeout.Token) is { } frame && frame.Size == pixels ? frame : null;
         }
         catch (Exception ex)
         {
@@ -93,6 +96,10 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
             return null;
         }
     }
+
+    /// <summary>Tamanho da prévia: a área de conteúdo do widget na moldura padrão, começando numa linha par.</summary>
+    public static PixelSize PreviewPixelSize(WidgetSize size) => TileFrame.Default.ContentSize(size.CellSpan);
+
     public DashboardLayout Layout => _layout;
 
     /// <summary>Página do layout que está (ou estaria) no aparelho. É a mesma no editor e na prévia.</summary>
@@ -137,8 +144,11 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         _known.Load();
         _known.Remember(_catalog.Widgets);
         BackupLayout();
+        var migrated = _store.NeedsMigration();
         _layout = _store.Load();
-        if (FixDuplicatePageNames())
+        if (migrated)
+            _logger.LogInformation("Layout convertido da grade 5x4 para a 10x8; as páginas ganharam a moldura padrão");
+        if (FixDuplicatePageNames() | migrated)
             _store.Save(_layout);
         if (!_layout.AllPlacements.Any() && _catalog.Widgets.Count > 0)
             PlaceDefaults();
@@ -206,6 +216,7 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
         var kind = (TouchKind)(int)gesture.Kind;
         WidgetRuntime? target;
+        PixelRect bounds;
         await _state.WaitAsync(cancellationToken);
         try
         {
@@ -227,6 +238,14 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
                 TouchKind.PressEnded => Take(ref _pressTarget),
                 _ => HitTest(gesture.X, gesture.Y),
             };
+
+            if (kind == TouchKind.Tap)
+                (_previousTap, _lastTap) = (_lastTap, target);
+            // O toque duplo vem logo depois do segundo toque. Se os dois toques caíram em widgets
+            // diferentes (botões pequenos vizinhos), cada widget já recebeu o seu toque simples.
+            else if (kind == TouchKind.DoubleTap && (target is null || !ReferenceEquals(target, _lastTap) || !ReferenceEquals(_previousTap, _lastTap)))
+                target = null;
+            bounds = target is null ? default : ShapeOf(target).Content;
         }
         finally
         {
@@ -235,8 +254,12 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
 
         if (target is null)
             return;
-        var bounds = BoundsOf(target);
-        var touch = new TouchEvent(kind, gesture.X - bounds.X, gesture.Y - bounds.Y, gesture.Duration, gesture.Progress);
+        // Relativo à área de conteúdo e preso dentro dela: toque na moldura ou no espaço entre os tiles
+        // chega como a beirada do widget.
+        var touch = new TouchEvent(kind,
+            Math.Clamp(gesture.X - bounds.X, 0, Math.Max(0, bounds.Width - 1)),
+            Math.Clamp(gesture.Y - bounds.Y, 0, Math.Max(0, bounds.Height - 1)),
+            gesture.Duration, gesture.Progress);
         await target.CallAsync($"OnTouchAsync({kind})", (i, ct) => i.OnTouchAsync(touch, ct), cancellationToken);
     }
 
@@ -409,6 +432,8 @@ public event Action? LayoutChanged;
                 return false;
             placement.Column = column;
             placement.Row = row;
+            if (_runtimes.TryGetValue(instanceId, out var runtime))
+                await SyncGeometryAsync(runtime, cancellationToken);
             await CommitLayoutAsync(page, cancellationToken);
             return true;
         }
@@ -434,6 +459,9 @@ public event Action? LayoutChanged;
             if (_layout.Pages[page].Widgets.FirstOrDefault(w => w.InstanceId == second) is not { } b || a.Size != b.Size)
                 return false;
             (a.Column, a.Row, b.Column, b.Row) = (b.Column, b.Row, a.Column, a.Row);
+            foreach (var id in new[] { first, second })
+                if (_runtimes.TryGetValue(id, out var runtime))
+                    await SyncGeometryAsync(runtime, cancellationToken);
             await CommitLayoutAsync(page, cancellationToken);
             return true;
         }
@@ -496,6 +524,28 @@ public event Action? LayoutChanged;
         }
     }
 
+    /// <summary>
+    /// Troca a moldura dos tiles de uma página. Os widgets cuja área de conteúdo mudou recebem
+    /// <see cref="IWidgetInstance.OnSizeChangedAsync"/> e desenham de novo; a página é redesenhada inteira.
+    /// </summary>
+    public async Task SetPageFrameAsync(int page, TileFrame frame, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (page < 0 || page >= _layout.Pages.Count || _layout.Pages[page].Frame == frame)
+                return;
+            _layout.Pages[page].Frame = frame;
+            foreach (var runtime in RuntimesOn(page).ToList())
+                await SyncGeometryAsync(runtime, cancellationToken);
+            await CommitLayoutAsync(page, cancellationToken);
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
     /// <summary>Nova página. Sem nome (ou com um já usado), ganha o primeiro "Página N" livre.</summary>
     public async Task<int> AddPageAsync(string? name = null, CancellationToken cancellationToken = default)
     {
@@ -503,7 +553,12 @@ public event Action? LayoutChanged;
         try
         {
             name = name?.Trim();
-            _layout.Pages.Add(new LayoutPage { Name = string.IsNullOrEmpty(name) ? NextPageName() : UniquePageName(name) });
+            // A página nova copia a moldura da atual: quem mudou o visual não precisa repetir em cada página.
+            _layout.Pages.Add(new LayoutPage
+            {
+                Name = string.IsNullOrEmpty(name) ? NextPageName() : UniquePageName(name),
+                Frame = FrameOfPage(CurrentPage),
+            });
             await CommitLayoutAsync(-1, cancellationToken);
             return _layout.Pages.Count - 1;
         }
@@ -743,7 +798,7 @@ public event Action? LayoutChanged;
         if (!_active || runtime.Context.IsAsleep || !IsVisible(runtime))
             return;
         var drawn = wholeFrame && frame.Dirty is not null ? new WidgetFrame(frame.Size, frame.Format, frame.Pixels, frame.Stride) : frame;
-        _compositor.Draw(BoundsOf(runtime), drawn);
+        _compositor.Draw(ShapeOf(runtime), drawn);
     }
 
     private bool IsVisible(WidgetRuntime runtime) =>
@@ -752,17 +807,56 @@ public event Action? LayoutChanged;
     private int PageOf(WidgetRuntime runtime) =>
         _layout.Pages.FindIndex(p => p.Widgets.Contains(runtime.Placement));
 
-    private PixelRect BoundsOf(WidgetRuntime runtime) =>
-        runtime.Context.IsFullscreen ? PixelRect.FromSize(WidgetGrid.Screen) : runtime.Placement.Bounds;
+    // Lugar do widget na tela: as células com a moldura da página, ou a tela inteira sem moldura.
+    private TileShape ShapeOf(WidgetRuntime runtime) =>
+        runtime.Context.IsFullscreen
+            ? new TileShape(PixelRect.FromSize(WidgetGrid.Screen))
+            : new TileShape(runtime.Placement.Bounds, FrameOfPage(PageOf(runtime)));
 
+    private TileFrame FrameOfPage(int page) =>
+        page >= 0 && page < _layout.Pages.Count ? _layout.Pages[page].Frame : TileFrame.Default;
+
+    /// <summary>Folga do toque: até onde, fora das células, um toque ainda conta para o widget (metade do espaço da grade).</summary>
+    internal const int TouchSlop = 2;
+
+    // O toque vale para o widget cujas células, alargadas em TouchSlop, contêm o ponto; a moldura e o
+    // espaço entre dois widgets vizinhos contam. Se dois servem, ganha o mais perto.
     private WidgetRuntime? HitTest(int x, int y)
     {
         if (_fullscreen is not null)
             return _fullscreen;
         if (CurrentPage >= _layout.Pages.Count)
             return null;
-        var placement = _layout.Pages[CurrentPage].Widgets.FirstOrDefault(w => w.Bounds.Contains(x, y));
-        return placement is not null && _runtimes.TryGetValue(placement.InstanceId, out var runtime) ? runtime : null;
+        WidgetPlacement? best = null;
+        var bestDistance = int.MaxValue;
+        foreach (var placement in _layout.Pages[CurrentPage].Widgets)
+        {
+            var cell = placement.Bounds;
+            var dx = Math.Max(0, Math.Max(cell.X - x, x - (cell.Right - 1)));
+            var dy = Math.Max(0, Math.Max(cell.Y - y, y - (cell.Bottom - 1)));
+            if (dx > TouchSlop || dy > TouchSlop)
+                continue;
+            var distance = dx * dx + dy * dy;
+            if (distance < bestDistance)
+                (best, bestDistance) = (placement, distance);
+        }
+        return best is not null && _runtimes.TryGetValue(best.InstanceId, out var runtime) ? runtime : null;
+    }
+
+    // Acerta moldura e área de conteúdo do contexto depois de mudar a moldura da página ou a posição.
+    // Se a área mudou, avisa o widget e pede um quadro novo no tamanho certo.
+    private async Task SyncGeometryAsync(WidgetRuntime runtime, CancellationToken cancellationToken)
+    {
+        var frame = FrameOfPage(PageOf(runtime));
+        var size = frame.ContentSize(new PixelSize(runtime.Placement.Bounds.Width, runtime.Placement.Bounds.Height));
+        runtime.Context.Frame = frame;
+        if (runtime.Context.ContentSize == size)
+            return;
+        runtime.Context.ContentSize = size;
+        if (runtime.Context.IsFullscreen)
+            return; // ao sair da tela cheia o widget já desenha no tamanho novo
+        await runtime.CallAsync("OnSizeChangedAsync", (i, ct) => i.OnSizeChangedAsync(size, ct), cancellationToken);
+        runtime.LastFrame = await runtime.RenderAsync(RenderReason.SizeChanged, cancellationToken);
     }
 
     private static WidgetRuntime? Take(ref WidgetRuntime? slot)
@@ -807,9 +901,10 @@ public event Action? LayoutChanged;
     private Task ShowCurrentAsync(Transition transition, CancellationToken cancellationToken)
     {
         var widgets = _fullscreen is { } full
-            ? [(BoundsOf(full), full.LastFrame)]
-            : RuntimesOn(CurrentPage).Select(r => (BoundsOf(r), r.LastFrame)).ToList();
-        return _compositor.ShowPageAsync(widgets, transition, cancellationToken).AsTask();
+            ? [(ShapeOf(full), full.LastFrame)]
+            : RuntimesOn(CurrentPage).Select(r => (ShapeOf(r), r.LastFrame)).ToList();
+        var background = _fullscreen is null ? FrameOfPage(CurrentPage).Background : new WidgetColor(0, 0, 0);
+        return _compositor.ShowPageAsync(background, widgets, transition, cancellationToken).AsTask();
     }
 
     private IEnumerable<WidgetRuntime> RuntimesOn(int page) =>
@@ -832,6 +927,9 @@ public event Action? LayoutChanged;
         var context = new WidgetContext(placement.InstanceId, placement.Size,
             new WidgetHostInfo(widget.PluginDirectory, _loggerFactory, _time, _options.Theme),
             storage, new LoggingActions(logger), logger, this);
+        var page = _layout.Pages.FindIndex(p => p.Widgets.Contains(placement));
+        context.Frame = FrameOfPage(page);
+        context.ContentSize = context.Frame.ContentSize(new PixelSize(placement.Bounds.Width, placement.Bounds.Height));
         var runtime = new WidgetRuntime(widget, placement, context, logger) { FrameChanged = id => FrameChanged?.Invoke(id) };
         if (await runtime.CreateAsync(cancellationToken))
             _runtimes[placement.InstanceId] = runtime;

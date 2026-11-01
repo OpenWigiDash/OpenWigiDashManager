@@ -15,6 +15,8 @@ public enum RenderReason
     FullscreenChanged,
     /// <summary>O tema global mudou.</summary>
     ThemeChanged,
+    /// <summary>A área de conteúdo mudou de tamanho (moldura da página ou posição na grade).</summary>
+    SizeChanged,
 }
 
 /// <summary>
@@ -45,6 +47,13 @@ public interface IWidgetInstance : IAsyncDisposable
 
     /// <summary>Entrou ou saiu de tela cheia. O host pede um <see cref="RenderReason.FullscreenChanged"/> em seguida.</summary>
     ValueTask OnFullscreenChangedAsync(bool fullscreen, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// <see cref="IWidgetContext.PixelSize"/> mudou para <paramref name="pixelSize"/>: a moldura da página
+    /// mudou, o widget foi para outra página ou outra linha. O host pede um <see cref="RenderReason.SizeChanged"/>
+    /// em seguida. Ao entrar ou sair de tela cheia vem <see cref="OnFullscreenChangedAsync"/>, não este.
+    /// </summary>
+    ValueTask OnSizeChangedAsync(PixelSize pixelSize, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     /// <summary>O tema global mudou (<see cref="IWidgetContext.Theme"/> já tem o novo).</summary>
     ValueTask OnThemeChangedAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;

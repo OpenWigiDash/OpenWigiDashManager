@@ -11,11 +11,18 @@ public interface IWidgetContext
     Guid InstanceId { get; }
     IWidgetHost Host { get; }
 
-    /// <summary>Tamanho no layout. Em tela cheia o quadro usa <see cref="PixelSize"/>, não este.</summary>
+    /// <summary>Tamanho no layout, em meias células. Desenhe em <see cref="PixelSize"/>, não neste.</summary>
     WidgetSize Size { get; }
 
-    /// <summary>Tamanho que o quadro deve ter agora (o do widget, ou a tela inteira em tela cheia).</summary>
+    /// <summary>
+    /// Tamanho que o quadro deve ter agora: a área de conteúdo do widget (a célula menos a moldura da
+    /// página), ou a tela inteira em tela cheia. Muda com a moldura da página ou com a posição; o host
+    /// avisa por <see cref="IWidgetInstance.OnSizeChangedAsync"/>.
+    /// </summary>
     PixelSize PixelSize { get; }
+
+    /// <summary>Moldura da página onde o widget está. Em tela cheia o host não pinta moldura.</summary>
+    TileFrame Frame { get; }
 
     bool IsFullscreen { get; }
     bool IsAsleep { get; }
@@ -125,5 +132,6 @@ public sealed record WidgetTheme
     public WidgetColor SecondaryForeground { get; init; } = new(255, 0, 0);
     public WidgetColor PrimaryBackground { get; init; } = new(48, 48, 48);
     public WidgetColor SecondaryBackground { get; init; } = new(128, 128, 128);
+    /// <summary>Raio sugerido para painéis dentro do widget. O canto de fora do tile é do host.</summary>
     public int CornerRadius { get; init; } = 15;
 }

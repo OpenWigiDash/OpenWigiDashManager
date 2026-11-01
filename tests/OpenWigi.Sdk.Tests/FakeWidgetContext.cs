@@ -14,7 +14,8 @@ internal sealed class FakeWidgetContext(WidgetSize size) : IWidgetContext, IWidg
     public Guid InstanceId { get; } = Guid.NewGuid();
     public IWidgetHost Host => this;
     public WidgetSize Size { get; } = size;
-    public PixelSize PixelSize => IsFullscreen ? WidgetGrid.Screen : Size.PixelSize;
+    public PixelSize PixelSize => IsFullscreen ? WidgetGrid.Screen : Frame.ContentSize(Size.CellSpan);
+    public TileFrame Frame { get; set; } = TileFrame.Default;
     public bool IsFullscreen { get; set; }
     public bool IsAsleep { get; set; }
     public WidgetTheme Theme { get; } = new();

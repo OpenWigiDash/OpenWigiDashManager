@@ -2,7 +2,7 @@ namespace OpenWigi.Sdk.Tests;
 
 public class WidgetFrameTests
 {
-    private static readonly PixelSize Small = WidgetSize.Small.PixelSize;
+    private static readonly PixelSize Small = WidgetSize.Small.CellSpan;
 
     [Fact]
     public void Quadro_sem_regiao_suja_muda_inteiro()

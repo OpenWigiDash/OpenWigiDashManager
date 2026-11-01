@@ -34,7 +34,7 @@ Detalhes em [docs/multiusuario.md](docs/multiusuario.md#sem-o-aparelho-wigidash-
 ## Manager
 
 As telas:
-- **Widgets e páginas** (a tela inicial): estado do aparelho, grade 5x4 com cada widget desenhando ao vivo, e embaixo as páginas em miniatura. Dá para adicionar, mover, redimensionar e tirar widgets, e criar e renomear páginas. Com um widget selecionado, as configurações do plugin (em Razor) ficam no painel ao lado, e o que mudar já aparece no tile. "Destacar prévia" abre a tela do aparelho numa janela própria, onde o mouse vira toque.
+- **Widgets e páginas** (a tela inicial): estado do aparelho, grade 10x8 com cada widget desenhando ao vivo e a moldura de cada página (espaço, borda, cantos e cores), e embaixo as páginas em miniatura. Dá para adicionar, mover, redimensionar e tirar widgets, e criar e renomear páginas. Com um widget selecionado, as configurações do plugin (em Razor) ficam no painel ao lado, e o que mudar já aparece no tile. "Destacar prévia" abre a tela do aparelho numa janela própria, onde o mouse vira toque.
 - **Loja de plugins:** busca, instala, atualiza e remove plugins do nuget.org ([Plugins](#plugins)).
 - **Ajustes:** aparelho ativo (USB ou virtual), brilho, iniciar com o Windows, tema claro ou escuro e a checagem diária de atualização dos plugins.
 
@@ -85,7 +85,7 @@ não apaga as configurações dos widgets.
 ### Escrever um plugin
 
 O contrato é o pacote [`OpenWigiDash.Sdk`](https://www.nuget.org/packages/OpenWigiDash.Sdk)
-(hoje 2.0.0-preview.3, `net10.0-windows`). A referência para autores é [docs/sdk.md](docs/sdk.md): widgets,
+(3.0.0-preview.1, `net10.0-windows`). A referência para autores é [docs/sdk.md](docs/sdk.md): widgets,
 quadros, toques, configurações em Razor, como montar e publicar o pacote, e o ícone (PNG quadrado com o
 desenho do widget; os plugins oficiais levam o selo do OpenWigiDash no canto). Os widgets de exemplo estão
 em `samples/OpenWigi.Samples.Clock`.
