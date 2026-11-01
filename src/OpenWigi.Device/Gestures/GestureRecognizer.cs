@@ -190,8 +190,9 @@ public sealed class GestureRecognizer(GestureOptions? options = null, TimeProvid
         }
 
         events.Add(new GestureEvent(GestureKind.PressEnded, x, y, duration));
-        if (_dragging)
-            _waitForIdle = true;
+        // O firmware repete o Up por algumas leituras. Sem o bloqueio que o tap tem, o Up repetido
+        // depois de um long-press ou arraste caía no "Down rápido demais" e virava um tap.
+        _waitForIdle = true;
     }
 
     private void CheckLongPress(long now, List<GestureEvent> events)
