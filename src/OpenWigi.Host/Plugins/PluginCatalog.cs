@@ -77,6 +77,9 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
         try
         {
             var assembly = context.LoadFromAssemblyPath(entry);
+            // Antes de ler atributos e criar tipos: feito para outro SDK, o plugin quebraria com erro de tipo.
+            if (SdkProblem(assembly.GetReferencedAssemblies().FirstOrDefault(r => r.Name == typeof(IWidget).Assembly.GetName().Name)?.Version) is { } sdk)
+                throw new InvalidOperationException(sdk);
             var declared = assembly.GetCustomAttributes<OpenWigiWidgetAttribute>().ToList();
             if (declared.Count == 0)
                 throw new InvalidOperationException("O assembly não declara [assembly: OpenWigiWidget(typeof(...))].");
@@ -119,6 +122,20 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
             context.Unload();
         }
         _plugins.Clear();
+    }
+
+    /// <summary>
+    /// Mensagem para o plugin compilado contra um SDK que este host não carrega (o mesmo critério de
+    /// <see cref="OpenWigiSdk.IsCompatible"/>), ou null se serve. Sem referência ao SDK, quem decide é o resto da carga.
+    /// </summary>
+    internal static string? SdkProblem(Version? referenced)
+    {
+        if (referenced is null || OpenWigiSdk.IsCompatible(new Version(referenced.Major, referenced.Minor)))
+            return null;
+        var host = OpenWigiSdk.Version;
+        return referenced.Major > host.Major || (referenced.Major == host.Major && referenced.Minor > host.Minor)
+            ? $"Feito para o SDK {referenced.Major}.{referenced.Minor}, mais novo que o deste OpenWigiDash ({host.Major}.{host.Minor}). Atualize o OpenWigiDash."
+            : $"Feito para o SDK {referenced.Major}.{referenced.Minor}, que este OpenWigiDash não carrega mais (ele usa o {host.Major}.{host.Minor}). Procure uma versão nova do plugin na Loja.";
     }
 
     internal static string? FindEntry(string pluginDirectory)

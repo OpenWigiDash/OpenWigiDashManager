@@ -31,6 +31,11 @@ A versão vem da tag (`v0.2.0` vira 0.2.0). Instalar uma versão nova por cima f
 o manager em todas as sessões, para o serviço, troca os arquivos e inicia o serviço de novo. O manager
 volta no próximo login ou pelo atalho. Instalar uma versão mais velha por cima é recusado.
 
+Para voltar a uma versão anterior, desinstale o OpenWigiDash em Configurações > Aplicativos e rode o
+`OpenWigiDash-Setup.exe` da versão desejada, baixado da página de Releases. Layout, ajustes e plugins do
+usuário ficam no perfil e voltam junto. Um plugin feito para um SDK mais novo do que o dessa versão
+aparece no canvas como "Não funciona nesta versão".
+
 ## Gerar
 
 ```powershell
