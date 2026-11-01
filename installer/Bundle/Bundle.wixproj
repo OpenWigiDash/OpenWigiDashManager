@@ -7,13 +7,17 @@
     <WebView2Bootstrapper Condition="'$(WebView2Bootstrapper)' == ''">$(PublishRoot)..\MicrosoftEdgeWebview2Setup.exe</WebView2Bootstrapper>
     <DefineConstants>Version=$(Version);BrandingDir=$(BrandingDir);WebView2Bootstrapper=$(WebView2Bootstrapper)</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(MsiPath)' != ''">
+    <DefineConstants>$(DefineConstants);MsiPath=$(MsiPath)</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
     <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="6.0.2" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- MsiPath: usa um MSI pronto (o assinado, na release) em vez de gerar o MSI de novo. -->
+  <ItemGroup Condition="'$(MsiPath)' == ''">
     <ProjectReference Include="..\Package\Package.wixproj" />
   </ItemGroup>
 

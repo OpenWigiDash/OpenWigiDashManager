@@ -152,8 +152,46 @@ layout do seu usuário.
 
 | Tag | O que sai |
 | --- | --- |
-| `vX.Y.Z` | Release do GitHub com o `OpenWigiDash-Setup.exe` e o MSI (`scripts\Build-Installer.ps1` faz o mesmo localmente) |
+| `vX.Y.Z` | Release do GitHub com o `OpenWigiDash-Setup.exe` e o MSI (`scripts\Build-Installer.ps1` faz o mesmo localmente), assinados pelo SignPath quando ele estiver configurado ([docs/assinatura.md](docs/assinatura.md)) |
 | `sdk-vX.Y.Z` | O pacote `victorperez2911.OpenWigi.Sdk` no nuget.org, por Trusted Publishing |
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+O `OpenWigiDash-Setup.exe`, o `OpenWigiDash.msi` e os `.exe` e `.dll` do projeto que vão dentro dele são
+assinados pelo SignPath a partir do workflow [Release](.github/workflows/release.yml), que roda num runner
+do GitHub a cada tag `vX.Y.Z`. Nada é assinado fora desse build. Bibliotecas de terceiros que vão no
+instalador (o runtime do .NET, o bootstrapper do WebView2, o MudBlazor) não são assinadas pelo projeto:
+ficam com a assinatura dos próprios autores, quando têm.
+
+Papéis:
+
+| Papel | Quem |
+| --- | --- |
+| Autores (committers) e revisores | [victorperez2911](https://github.com/victorperez2911) |
+| Aprovadores (aprovam cada assinatura no SignPath) | [victorperez2911](https://github.com/victorperez2911) |
+
+Mudanças de outras pessoas entram só por pull request revisado por um revisor. Todos os membros usam
+autenticação em dois fatores no GitHub e no SignPath.
+
+### Política de privacidade
+
+Este programa não manda informação para outros sistemas na rede a não ser quando o usuário, ou quem
+instala ou opera o programa, pede. As exceções são as abaixo, todas para buscar dados públicos, sem
+conta, sem telemetria e sem identificador do usuário. Como em qualquer acesso à internet, o servidor vê
+o IP e o cabeçalho HTTP da requisição.
+
+| O quê | Para onde | Quando | Como desligar |
+| --- | --- | --- | --- |
+| Checagem de versão nova do OpenWigiDash | API do GitHub (`api.github.com`), [política de privacidade do GitHub](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) | Ao abrir o manager e uma vez por dia | Em **Ajustes**, desligando a checagem de atualização do OpenWigiDash |
+| Checagem de atualização dos plugins instalados (manda os ids dos plugins) | nuget.org (`api.nuget.org`), [política de privacidade da Microsoft](https://privacy.microsoft.com/privacystatement) | Uma vez por dia | Em **Ajustes**, desligando a checagem diária de atualização dos plugins |
+| Loja de plugins: busca, ícones e download de pacotes | nuget.org (`api.nuget.org`), [política de privacidade da Microsoft](https://privacy.microsoft.com/privacystatement) | Só quando o usuário abre a loja, busca, instala ou atualiza um plugin | Não abrir a loja |
+| Instalação do WebView2 Runtime | Microsoft, [política de privacidade da Microsoft](https://privacy.microsoft.com/privacystatement) | Só durante a instalação, e só se o WebView2 não estiver instalado | Instalar o WebView2 antes |
+
+O aparelho WigiDash é acessado só por USB, na própria máquina. Plugins de terceiros instalados pela loja
+são programas à parte, com as políticas dos seus autores; o OpenWigiDash não controla o que eles mandam
+para a rede.
 
 ## Estrutura
 
@@ -171,3 +209,8 @@ layout do seu usuário.
 | `samples/OpenWigi.Samples.Clock` | Widgets de exemplo: relógio e contador com long-press |
 | `tests/OpenWigi.*.Tests` | Testes do protocolo e dos gestos, do serviço e do IPC, do host e do SDK, com transporte e relógio falsos |
 | `tests/ui` | Testes da UI do manager (Playwright pelo WebView2) |
+
+## Licença
+
+[MIT](LICENSE). O WigiDash e o manager oficial são da G.SKILL; este projeto não inclui código nem binários
+deles.

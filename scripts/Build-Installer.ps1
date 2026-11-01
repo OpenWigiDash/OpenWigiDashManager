@@ -3,13 +3,16 @@
 #
 #   scripts\Build-Installer.ps1                  versão 0.0.1
 #   scripts\Build-Installer.ps1 -Version 0.2.0
+#   scripts\Build-Installer.ps1 -Version 0.2.0 -MsiPath x.msi   só o Setup.exe, em volta de um MSI pronto
+#                                                                (a release usa com o MSI já assinado)
 #
 # Instalar no PC de desenvolvimento: o serviço de dev tem o mesmo nome; remova antes
 # (scripts\Setup-DevService.ps1 -Remove, como admin). Ver docs\instalador.md.
 
 param(
     [string]$Version = '0.0.1',
-    [string]$Configuration = 'Release'
+    [string]$Configuration = 'Release',
+    [string]$MsiPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +21,18 @@ $out = Join-Path $root '.artifacts\installer'
 $publish = Join-Path $out 'publish'
 
 Write-Host "=== OpenWigiDash - instalador $Version ===" -ForegroundColor Cyan
+
+if ($MsiPath) {
+    $MsiPath = (Resolve-Path $MsiPath).Path
+    $webView2 = Join-Path $out 'MicrosoftEdgeWebview2Setup.exe'
+    if (-not (Test-Path $webView2)) { throw "Falta $webView2; rode o script sem -MsiPath antes." }
+    Write-Host "Só o bundle, com $MsiPath..." -ForegroundColor Green
+    dotnet build (Join-Path $root 'installer\Bundle\Bundle.wixproj') -c Release -nologo -v q `
+        "-p:Version=$Version" "-p:WebView2Bootstrapper=$webView2" "-p:MsiPath=$MsiPath" -o $out
+    if ($LASTEXITCODE -ne 0) { throw 'Build do WiX falhou.' }
+    Get-Item (Join-Path $out 'OpenWigiDash-Setup.exe') | ForEach-Object { '{0}  {1:N1} MB' -f $_.FullName, ($_.Length / 1MB) }
+    return
+}
 
 if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
 
