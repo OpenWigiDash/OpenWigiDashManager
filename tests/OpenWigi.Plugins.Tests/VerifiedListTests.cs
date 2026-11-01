@@ -123,6 +123,7 @@ public sealed class VerifiedListTests : IDisposable
         var list = List();
 
         Assert.Equal(PluginTrust.Official, list.TrustOf(official));
+        Assert.Equal(PluginTrust.Official, list.TrustOf(official with { Id = "OpenWigiDash.X", Owners = "OpenWigiDash" }));
         Assert.Equal(PluginTrust.Verified, list.TrustOf(listed));
         Assert.Equal(PluginTrust.Community, list.TrustOf(other));
     }
@@ -137,6 +138,6 @@ public sealed class VerifiedListTests : IDisposable
 
         var list = VerifiedList.Parse(File.ReadAllText(Path.Combine(dir!.FullName, "plugins", "verified.json")));
 
-        Assert.True(list.IsVerified("victorperez2911.OpenWigiDash.Discord", "victorperez2911"));
+        Assert.True(list.IsVerified("OpenWigiDash.Discord", "OpenWigiDash"));
     }
 }

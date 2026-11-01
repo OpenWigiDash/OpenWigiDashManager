@@ -29,7 +29,7 @@ public sealed record AppRelease(
 /// </summary>
 public sealed class AppReleaseFeed
 {
-    public const string Repository = "victorperez2911/OpenWigiDashManager";
+    public const string Repository = "OpenWigiDash/OpenWigiDashManager";
     public const string ReleasesUrl = $"https://api.github.com/repos/{Repository}/releases?per_page=20";
     public const string SetupAssetName = "OpenWigiDash-Setup.exe";
 

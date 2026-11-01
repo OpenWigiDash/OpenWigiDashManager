@@ -1,6 +1,6 @@
 # OpenWigi.Sdk — contrato dos widgets (v2.0)
 
-Pacote `victorperez2911.OpenWigi.Sdk` no nuget.org (assembly `OpenWigi.Sdk`, `net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
+Pacote `OpenWigiDash.Sdk` no nuget.org (assembly `OpenWigi.Sdk`, `net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
 compatibilidade binária: plugin antigo precisa ser portado.
 
 ## Peças
@@ -86,7 +86,7 @@ O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Component
 cópia na pasta:
 
 ```xml
-<PackageReference Include="victorperez2911.OpenWigi.Sdk" Version="2.0.0-preview.1" ExcludeAssets="runtime" />
+<PackageReference Include="OpenWigiDash.Sdk" Version="2.0.0-preview.4" ExcludeAssets="runtime" />
 <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
 ```
 
@@ -159,7 +159,7 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
     <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="victorperez2911.OpenWigi.Sdk" Version="2.0.0-preview.2" ExcludeAssets="runtime" />
+    <PackageReference Include="OpenWigiDash.Sdk" Version="2.0.0-preview.4" ExcludeAssets="runtime" />
     <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="icon.png" Pack="true" PackagePath="\" />
@@ -171,17 +171,17 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
 
 | Onde | O quê |
 | --- | --- |
-| `.nuspec` | `packageType` `OpenWigiDashPlugin`, tag `openwigidash-plugin`, dependência de `victorperez2911.OpenWigi.Sdk` |
+| `.nuspec` | `packageType` `OpenWigiDashPlugin`, tag `openwigidash-plugin`, dependência de `OpenWigiDash.Sdk` |
 | `plugin/` | a saída do `dotnet publish`, sem os assemblies compartilhados; vira `Widgets\<id do pacote>` na instalação |
 | `plugin/plugin.json` | `{ "entry": "<sua dll>" }`, gerado se o projeto não tiver um (a pasta instalada tem o nome do pacote, não da DLL) |
 
 O pacote não tem `lib/`: um plugin não é biblioteca e não pode ser referenciado por outro projeto.
 
-- **Id**: `<Autor>.OpenWigiDash.<Nome>`.
+- **Id**: `<Autor>.OpenWigiDash.<Nome>`. O prefixo `OpenWigiDash.` é dos plugins oficiais (publicados pela Org OpenWigiDash).
 - **Ícone**: PNG quadrado de 128x128 ou 256x256 (até 1 MB), com o desenho do próprio widget, em
   `PackageIcon`. É o ícone que aparece no nuget.org e na Loja do Manager. Sem ícone, os dois mostram o
   genérico.
-  - Plugins oficiais (publicados por `victorperez2911`) levam o logo do OpenWigiDash como selo no canto
+  - Plugins oficiais (publicados pela Org `OpenWigiDash`) levam o logo do OpenWigiDash como selo no canto
     inferior direito: cerca de 1/3 da largura do ícone, por cima do desenho, com uma borda fina da cor do
     fundo para destacar. Use `assets/branding/png/openwigidash-256.png` (ou o `.svg`) como fonte do selo.
   - Plugins da comunidade não usam o logo, para não parecer oficiais. Também não use logos de marcas de

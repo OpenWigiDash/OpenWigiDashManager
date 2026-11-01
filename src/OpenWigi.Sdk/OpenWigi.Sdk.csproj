@@ -12,7 +12,7 @@
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <PackageId>victorperez2911.OpenWigi.Sdk</PackageId>
+    <PackageId>OpenWigiDash.Sdk</PackageId>
     <!-- A versão publicada vem da tag sdk-vX.Y.Z (workflow sdk-publish.yml). -->
     <Version>2.0.0-preview.1</Version>
     <!-- Fixa a versão do assembly no contrato (OpenWigiSdk.Version), mesmo quando a build recebe outra
@@ -20,7 +20,7 @@
          instalado saía 0.1.x e nenhum plugin compilado contra o SDK 2.0 carregava. -->
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/victorperez2911/OpenWigiDashManager</RepositoryUrl>
+    <RepositoryUrl>https://github.com/OpenWigiDash/OpenWigiDashManager</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <Authors>Victor Perez</Authors>
@@ -42,7 +42,7 @@
     <None Include="..\..\docs\sdk.md" Pack="true" PackagePath="README.md" />
     <None Include="..\..\assets\branding\png\openwigidash-256.png" Pack="true" PackagePath="icon.png" />
     <!-- Entra no projeto de quem referencia o pacote: com OpenWigiDashPlugin=true, `dotnet pack` gera o pacote de plugin. -->
-    <None Include="build\victorperez2911.OpenWigi.Sdk.targets" Pack="true" PackagePath="build\" />
+    <None Include="build\OpenWigiDash.Sdk.targets" Pack="true" PackagePath="build\" />
   </ItemGroup>
 
   <ItemGroup>

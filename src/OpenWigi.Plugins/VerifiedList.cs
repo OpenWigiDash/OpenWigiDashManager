@@ -27,7 +27,7 @@ public sealed record VerifiedEntry(string Id, string? Owner, string? Repository,
 public sealed class VerifiedList
 {
     /// <summary>Endereço público (sem token) de onde o manager baixa a lista.</summary>
-    public const string DefaultUrl = "https://raw.githubusercontent.com/victorperez2911/OpenWigiDashManager/main/plugins/verified.json";
+    public const string DefaultUrl = "https://raw.githubusercontent.com/OpenWigiDash/OpenWigiDashManager/main/plugins/verified.json";
 
     public static readonly VerifiedList Empty = new([]);
 

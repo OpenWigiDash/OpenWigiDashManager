@@ -21,6 +21,16 @@ public sealed class PluginStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Plugin_publicado_contra_o_id_antigo_do_sdk_continua_compativel()
+    {
+        _feed.Publish(Id, "1.0.0", sdkId: PluginFeed.LegacySdkPackageId);
+
+        var versions = await _feed.CreateFeed().GetVersionsAsync(Id);
+
+        Assert.Equal("2.0.0-preview.3", Assert.Single(versions).SdkVersion!.ToString());
+    }
+
+    [Fact]
     public async Task Busca_traz_dono_links_seguros_versoes_e_o_sdk_que_falta()
     {
         _feed.Publish(Id, "1.0.0", sdk: "2.4.0");
@@ -51,8 +61,8 @@ public sealed class PluginStoreTests : IDisposable
     [Fact]
     public async Task So_dono_confiavel_no_nuget_org_conta_como_verificado_nao_o_id_nem_o_autor()
     {
-        _feed.Publish("victorperez2911.OpenWigiDash.Falso", "1.0.0");
-        _feed.SearchExtras["victorperez2911.OpenWigiDash.Falso"] = new JsonObject
+        _feed.Publish("OpenWigiDash.Falso", "1.0.0");
+        _feed.SearchExtras["OpenWigiDash.Falso"] = new JsonObject
         {
             ["owners"] = new JsonArray("outra-conta"),
             ["authors"] = new JsonArray("victorperez2911"),

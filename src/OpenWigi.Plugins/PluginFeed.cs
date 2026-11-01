@@ -54,13 +54,16 @@ public sealed class PluginFeed
 {
     public const string NuGetOrg = "https://api.nuget.org/v3/index.json";
     public const string PackageType = "OpenWigiDashPlugin";
-    public const string SdkPackageId = "victorperez2911.OpenWigi.Sdk";
+    public const string SdkPackageId = "OpenWigiDash.Sdk";
+
+    /// <summary>Id antigo do SDK (antes da Org OpenWigiDash). Plugins preview publicados contra ele continuam compatíveis.</summary>
+    public const string LegacySdkPackageId = "victorperez2911.OpenWigi.Sdk";
 
     /// <summary>
     /// Contas do nuget.org do projeto: os pacotes delas aparecem como oficiais (e contam como verificados).
     /// Plugins de outras contas entram como verificados pela <see cref="VerifiedList"/>.
     /// </summary>
-    public static readonly IReadOnlyList<string> OfficialOwners = ["victorperez2911"];
+    public static readonly IReadOnlyList<string> OfficialOwners = ["OpenWigiDash", "victorperez2911"];
 
     /// <summary>Lista de verificados e versões bloqueadas: versão bloqueada não é escolhida para instalar nem atualizar.</summary>
     public VerifiedList Policy { get; set; } = VerifiedList.Empty;
@@ -208,7 +211,8 @@ public sealed class PluginFeed
     {
         foreach (var group in entry["dependencyGroups"]?.AsArray() ?? [])
             foreach (var dependency in group?["dependencies"]?.AsArray() ?? [])
-                if (string.Equals((string?)dependency?["id"], SdkPackageId, StringComparison.OrdinalIgnoreCase))
+                if ((string?)dependency?["id"] is { } id
+                    && (string.Equals(id, SdkPackageId, StringComparison.OrdinalIgnoreCase) || string.Equals(id, LegacySdkPackageId, StringComparison.OrdinalIgnoreCase)))
                     return PackageVersion.LowerBound((string?)dependency!["range"]);
         return null;
     }

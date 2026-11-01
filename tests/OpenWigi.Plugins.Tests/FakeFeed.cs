@@ -36,7 +36,7 @@ internal sealed class FakeFeed : HttpMessageHandler
 
     /// <summary>Publica uma versão. <paramref name="sdk"/> null = sem dependência do SDK.</summary>
     public void Publish(string id, string version, string? sdk = "2.0.0-preview.3", bool listed = true, bool plugin = true,
-        IDictionary<string, string>? files = null, string? wrongHash = null)
+        IDictionary<string, string>? files = null, string? wrongHash = null, string sdkId = PluginFeed.SdkPackageId)
     {
         var lower = id.ToLowerInvariant();
         var v = version.ToLowerInvariant();
@@ -59,7 +59,7 @@ internal sealed class FakeFeed : HttpMessageHandler
             ["dependencyGroups"] = sdk is null ? new JsonArray() : new JsonArray(new JsonObject
             {
                 ["targetFramework"] = "net10.0-windows7.0",
-                ["dependencies"] = new JsonArray(new JsonObject { ["id"] = PluginFeed.SdkPackageId, ["range"] = $"[{sdk}, )" }),
+                ["dependencies"] = new JsonArray(new JsonObject { ["id"] = sdkId, ["range"] = $"[{sdk}, )" }),
             }),
         };
         if (!_leaves.TryGetValue(lower, out var leaves))
