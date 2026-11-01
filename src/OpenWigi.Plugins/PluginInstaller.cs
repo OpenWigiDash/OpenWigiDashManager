@@ -12,6 +12,9 @@ public sealed record InstalledPlugin(string Folder, string Directory, string? Pa
 /// <summary>Resultado de instalar/atualizar: <see cref="Applied"/> é false quando a troca espera o manager reabrir.</summary>
 public sealed record InstallResult(string Id, PackageVersion Version, PackageVersion? Previous, bool Applied);
 
+/// <summary>Versão mais nova e compatível no feed de um plugin instalado que está numa anterior.</summary>
+public sealed record PluginUpdate(InstalledPlugin Plugin, PackageVersion Version);
+
 /// <summary>Falha esperada (pacote inexistente, incompatível, hash errado...), com mensagem para o usuário.</summary>
 public sealed class PluginInstallException(string message) : Exception(message);
 
@@ -67,6 +70,34 @@ public sealed class PluginInstaller(PluginFeed feed, string widgetsDirectory, st
             return null;
         var applied = await InstallVersionAsync(latest, cancellationToken);
         return new InstallResult(latest.Id, latest.Version, installed.Version, applied);
+    }
+
+    /// <summary>
+    /// Plugins instalados pelo feed que têm versão compatível mais nova. Um pacote que falha (fora do feed,
+    /// rede) fica de fora sem derrubar os outros; sem rede nenhuma, a exceção sobe.
+    /// </summary>
+    public async Task<IReadOnlyList<PluginUpdate>> CheckUpdatesAsync(CancellationToken cancellationToken = default)
+    {
+        var updates = new List<PluginUpdate>();
+        HttpRequestException? failure = null;
+        var checkedAny = false;
+        foreach (var plugin in List().Where(p => p is { PackageId: not null, Version: not null, PendingRemoval: false }))
+        {
+            try
+            {
+                var latest = PluginFeed.PickCompatible(await feed.GetVersionsAsync(plugin.PackageId!, cancellationToken));
+                checkedAny = true;
+                if (latest is not null && latest.Version > plugin.Version!)
+                    updates.Add(new PluginUpdate(plugin, latest.Version));
+            }
+            catch (HttpRequestException ex)
+            {
+                failure = ex;
+            }
+        }
+        if (!checkedAny && failure is not null)
+            throw failure;
+        return updates;
     }
 
     /// <summary>Marca o plugin para sair e tenta tirar já. Dados e configurações das instâncias ficam.</summary>

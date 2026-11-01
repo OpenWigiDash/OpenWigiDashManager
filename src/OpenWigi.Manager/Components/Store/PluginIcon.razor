@@ -1,0 +1,16 @@
+@* Ícone quadrado do pacote; sem ícone, o genérico de widget (não o logo do OpenWigiDash). *@
+<div class="owd-store-icon" style="width: @(Size)px; height: @(Size)px">
+    @if (Url is { } url)
+    {
+        <img src="@url" alt="" loading="lazy" />
+    }
+    else
+    {
+        <MudIcon Icon="@Icons.Material.Filled.Widgets" Color="Color.Secondary" Style="@($"font-size: {Size * 0.6}px")" />
+    }
+</div>
+
+@code {
+    [Parameter] public string? Url { get; set; }
+    [Parameter] public int Size { get; set; } = 48;
+}

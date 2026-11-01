@@ -1,0 +1,394 @@
+@page "/loja"
+@using System.IO
+@using System.Net.Http
+@using System.Threading
+@inject PluginStore Store
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<MudStack Spacing="3">
+    <div class="d-flex align-center flex-wrap gap-2">
+        <MudText Typo="Typo.h5">Loja de plugins</MudText>
+        <MudSpacer />
+        @if (Store.UpdateCount > 1)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SystemUpdateAlt"
+                       Disabled="_busy.Count > 0" OnClick="UpdateAll">Atualizar todos (@Store.UpdateCount)</MudButton>
+        }
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_checking" OnClick="CheckUpdates">
+            Procurar atualizações
+        </MudButton>
+    </div>
+
+    @if (Store.RestartNeeded)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+            <div class="d-flex align-center flex-wrap gap-3">
+                <span>As mudanças nos plugins valem quando o manager reabrir.</span>
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" OnClick="Store.RequestRestart">Reiniciar agora</MudButton>
+            </div>
+        </MudAlert>
+    }
+
+    <div class="d-flex align-center flex-wrap gap-3">
+        <MudTextField T="string" @bind-Value="_query" DebounceInterval="400" OnDebounceIntervalElapsed="Search"
+                      Placeholder="Procurar plugins no nuget.org" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="max-width: 480px" Disabled="@(_filter is not (Filter.Todos or Filter.Verificados))" />
+        <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+            @foreach (var filter in Enum.GetValues<Filter>())
+            {
+                var f = filter;
+                <MudButton Variant="@(_filter == f ? Variant.Filled : Variant.Outlined)" Color="@(_filter == f ? Color.Primary : Color.Default)"
+                           OnClick="() => SetFilter(f)">@Label(f)</MudButton>
+            }
+        </MudButtonGroup>
+    </div>
+
+    @if (_error is not null && _filter is (Filter.Todos or Filter.Verificados))
+    {
+        <MudAlert Severity="Severity.Info">
+            @_error A aba Instalados continua funcionando.
+            <MudButton Size="Size.Small" Variant="Variant.Text" Class="ml-2" OnClick="() => Search(_query)">Tentar de novo</MudButton>
+        </MudAlert>
+    }
+
+    @if (_loading && _filter is (Filter.Todos or Filter.Verificados))
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+
+    @if (Items.Count == 0 && !_loading)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@Empty</MudText>
+    }
+
+    <MudGrid Spacing="2">
+        @foreach (var item in Items)
+        {
+            var i = item;
+            <MudItem xs="12" md="6" xl="4">
+                <MudCard Outlined="true" Class="owd-store-card">
+                    <MudCardContent Class="d-flex gap-3 owd-store-card-body" @onclick="() => Details(i)">
+                        <PluginIcon Url="@_icons.GetValueOrDefault(i.Id)" Size="48" />
+                        <div class="owd-store-text">
+                            <div class="d-flex align-center gap-2">
+                                <MudText Typo="Typo.subtitle1" Class="owd-ellipsis">@i.Title</MudText>
+                                <VerifiedChip Verified="@i.Verified" />
+                            </div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block owd-ellipsis">@Caption(i)</MudText>
+                            @if (i.Package is { Description.Length: > 0 } package)
+                            {
+                                <MudText Typo="Typo.body2" Class="owd-clamp-2">@package.Description</MudText>
+                            }
+                            @if (i.Incompatible)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Warning">@i.Requirement</MudText>
+                            }
+                        </div>
+                    </MudCardContent>
+                    <MudCardActions Class="pt-0">
+                        <MudButton Size="Size.Small" OnClick="() => Details(i)">Detalhes</MudButton>
+                        <MudSpacer />
+                        @if (_busy.Contains(i.Id))
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" Class="mr-2" />
+                        }
+                        else if (i.Update is { } update)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => Update(i)">Atualizar para @update</MudButton>
+                        }
+                        else if (i.Installed is { } installed)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Success" Class="mr-2">
+                                @(installed.PendingRemoval ? "Sai ao reiniciar" : installed.PendingUpdate ? "Entra ao reiniciar" : "Instalado")
+                            </MudText>
+                        }
+                        else if (i.Package is not null)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Disabled="i.Incompatible" OnClick="() => Install(i)">Instalar</MudButton>
+                        }
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+</MudStack>
+
+@code {
+    private enum Filter { Todos, Verificados, Instalados, Atualizacoes }
+
+    private Filter _filter = Filter.Todos;
+    private string? _query;
+    private bool _loading;
+    private bool _checking;
+    private string? _error;
+    private IReadOnlyList<FeedPackage> _results = [];
+    private IReadOnlyList<InstalledPlugin> _installed = [];
+    private readonly Dictionary<string, FeedPackage> _known = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string?> _icons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _busy = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _search;
+
+    private string Label(Filter filter) => filter switch
+    {
+        Filter.Verificados => "Verificados",
+        Filter.Instalados => $"Instalados ({_installed.Count(p => !p.PendingRemoval)})",
+        Filter.Atualizacoes => Store.UpdateCount > 0 ? $"Com atualização ({Store.UpdateCount})" : "Com atualização",
+        _ => "Todos",
+    };
+
+    private string Empty => _filter switch
+    {
+        Filter.Instalados => "Nenhum plugin instalado na sua pasta de widgets.",
+        Filter.Verificados when _error is null => "Nenhum plugin verificado nesta busca.",
+        Filter.Atualizacoes => "Todos os plugins instalados estão na versão mais nova que serve para este manager.",
+        _ => _error is null ? "Nenhum plugin encontrado." : "",
+    };
+
+    private List<StoreItem> Items => _filter switch
+    {
+        Filter.Todos => _results.Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
+        Filter.Verificados => _results.Where(p => p.Verified).Select(p => Item(p.Id, p, InstalledOf(p.Id))).ToList(),
+        Filter.Instalados => _installed.Select(p => Item(p.PackageId ?? p.Folder, null, p)).ToList(),
+        _ => _installed.Where(p => p.PackageId is { } id && Store.UpdateFor(id) is not null).Select(p => Item(p.PackageId!, null, p)).ToList(),
+    };
+
+    private StoreItem Item(string id, FeedPackage? package, InstalledPlugin? installed) =>
+        new(id, package ?? _known.GetValueOrDefault(id), installed, installed is null ? null : Store.UpdateFor(id));
+
+    private InstalledPlugin? InstalledOf(string id) =>
+        _installed.FirstOrDefault(p => id.Equals(p.PackageId, StringComparison.OrdinalIgnoreCase));
+
+    private static string Caption(StoreItem item)
+    {
+        var parts = new List<string>();
+        if (item.Publisher is { Length: > 0 } publisher)
+            parts.Add(publisher);
+        if (item.Package is { } package)
+            parts.Add(StoreItem.Downloads(package.TotalDownloads));
+        if (item.Installed?.Version is { } installed)
+            parts.Add($"instalado {installed}");
+        else if (item.Package?.CompatibleVersion is { } version)
+            parts.Add($"v{version}");
+        if (item.Manual)
+            parts.Add("copiado à mão");
+        return string.Join(" · ", parts);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnStoreChanged;
+        _installed = Store.Installed;
+        _ = LoadIconsAsync(_installed.Select(p => p.PackageId ?? p.Folder).ToList());
+        var search = Search(null);
+        // Ao abrir a Loja, confere as atualizações (se o usuário não desligou nos Ajustes).
+        if (Store.UpdateCount == 0)
+            _ = CheckUpdatesQuietly();
+        await search;
+        await LoadInstalledMetadataAsync();
+    }
+
+    private void OnStoreChanged() => InvokeAsync(() =>
+    {
+        _installed = Store.Installed;
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Store.Changed -= OnStoreChanged;
+        _search?.Cancel();
+    }
+
+    private async Task Search(string? query)
+    {
+        _search?.Cancel();
+        var cancel = _search = new CancellationTokenSource();
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+        try
+        {
+            var results = await Store.SearchAsync(query, cancel.Token);
+            if (cancel.IsCancellationRequested)
+                return;
+            // Sem texto: os mais baixados primeiro.
+            _results = string.IsNullOrWhiteSpace(query) ? results.OrderByDescending(p => p.TotalDownloads).ToList() : results;
+            foreach (var package in results)
+                _known[package.Id] = package;
+            _ = LoadIconsAsync(results.Select(p => p.Id).ToList());
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or System.Text.Json.JsonException)
+        {
+            _error = "Não foi possível falar com o nuget.org agora (sem internet ou o site fora do ar).";
+            _results = [];
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    // Instalados que a busca não trouxe: pede os dados de cada um (nome, ícone do feed) pelo id.
+    private async Task LoadInstalledMetadataAsync()
+    {
+        foreach (var id in _installed.Select(p => p.PackageId).OfType<string>().Where(id => !_known.ContainsKey(id)).ToList())
+        {
+            try
+            {
+                if ((await Store.SearchAsync($"packageid:{id}", CancellationToken.None)).FirstOrDefault(p => p.Id.Equals(id, StringComparison.OrdinalIgnoreCase)) is { } package)
+                    _known[id] = package;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+            {
+                return;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadIconsAsync(IReadOnlyList<string> ids)
+    {
+        foreach (var id in ids.Where(id => !_icons.ContainsKey(id)))
+        {
+            _icons[id] = await Store.IconAsync(id, _known.GetValueOrDefault(id));
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void SetFilter(Filter filter)
+    {
+        _filter = filter;
+        _installed = Store.Installed;
+    }
+
+    private async Task CheckUpdatesQuietly()
+    {
+        try
+        {
+            await Store.CheckUpdatesAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+        }
+    }
+
+    private async Task CheckUpdates()
+    {
+        _checking = true;
+        try
+        {
+            await Store.CheckUpdatesAsync();
+            Snackbar.Add(Store.UpdateCount == 0 ? "Todos os plugins estão em dia." : $"{Store.UpdateCount} plugin(s) com atualização.", Severity.Info);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            Snackbar.Add("Não foi possível falar com o nuget.org agora.", Severity.Warning);
+        }
+        _checking = false;
+    }
+
+    private async Task Details(StoreItem item)
+    {
+        var parameters = new DialogParameters<PluginDetailsDialog>
+        {
+            { d => d.Item, item },
+            { d => d.Icon, _icons.GetValueOrDefault(item.Id) },
+        };
+        var dialog = await Dialogs.ShowAsync<PluginDetailsDialog>(item.Title, parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
+        if (await dialog.Result is not { Canceled: false, Data: string action })
+            return;
+        await (action switch
+        {
+            "install" => Install(item),
+            "update" => Update(item),
+            "remove" => Remove(item),
+            _ => Task.CompletedTask,
+        });
+    }
+
+    private async Task Install(StoreItem item)
+    {
+        if (item.Package is not { } package)
+            return;
+        // Verificado (conta confiável no nuget.org) instala direto; comunidade pede confirmação.
+        var confirmed = item.Verified ? true : await Dialogs.ShowMessageBoxAsync(
+            $"Instalar {item.Title}?",
+            (MarkupString)($"Este plugin é da <b>comunidade</b>: o código não foi revisado pelo OpenWigiDash. " +
+                           $"Ele roda com o seu usuário do Windows e pode ler seus arquivos e usar a rede. " +
+                           $"Instale só se confiar em quem publicou ({System.Net.WebUtility.HtmlEncode(item.Publisher ?? package.Id)})."),
+            yesText: "Instalar mesmo assim", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
+        await Run(item, async () =>
+        {
+            var result = await Store.InstallAsync(package.Id);
+            Snackbar.Add($"{item.Title} {result.Version} instalado. Reinicie o manager para usar.", Severity.Success);
+        });
+    }
+
+    private Task Update(StoreItem item) => Run(item, async () =>
+    {
+        var result = await Store.UpdateAsync(item.Id);
+        Snackbar.Add(result is null ? $"{item.Title} já está na versão mais nova." : $"{item.Title} atualizado para {result.Version}. Reinicie o manager para usar.",
+            result is null ? Severity.Info : Severity.Success);
+    });
+
+    private async Task UpdateAll()
+    {
+        foreach (var plugin in Store.Installed.Where(p => p.PackageId is { } id && Store.UpdateFor(id) is not null).ToList())
+            await Update(Item(plugin.PackageId!, null, plugin));
+    }
+
+    private async Task Remove(StoreItem item)
+    {
+        if (item.Installed is not { } installed)
+            return;
+        var instances = Store.InstancesOf(installed);
+        var text = instances == 0
+            ? "Os arquivos do plugin saem da sua pasta de widgets."
+            : $"{instances} widget(s) deste plugin estão nas suas páginas. Eles ficam como ausentes, e as configurações não são apagadas: reinstalar traz tudo de volta.";
+        var confirmed = await Dialogs.ShowMessageBoxAsync($"Remover {item.Title}?", text, yesText: "Remover", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
+        await Run(item, async () =>
+        {
+            await Store.RemoveAsync(installed.PackageId ?? installed.Folder);
+            Snackbar.Add($"{item.Title} removido. Reinicie o manager para concluir.", Severity.Success);
+        });
+    }
+
+    private async Task Run(StoreItem item, Func<Task> action)
+    {
+        _busy.Add(item.Id);
+        StateHasChanged();
+        try
+        {
+            await action();
+        }
+        catch (PluginInstallException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Snackbar.Add($"Não foi possível baixar {item.Title}: sem conexão com o nuget.org.", Severity.Error);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Snackbar.Add($"Não foi possível gravar os arquivos de {item.Title}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _busy.Remove(item.Id);
+            _installed = Store.Installed;
+            _icons.Remove(item.Id);
+            _ = LoadIconsAsync([item.Id]);
+            StateHasChanged();
+        }
+    }
+}

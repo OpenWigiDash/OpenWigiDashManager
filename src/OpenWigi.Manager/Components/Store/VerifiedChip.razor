@@ -1,0 +1,15 @@
+@* "Verificado" para pacotes de contas confiáveis do nuget.org; "Comunidade" para o resto. *@
+@if (Verified)
+{
+    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.Verified" Class="ma-0"
+             title="Publicado por uma conta verificada do nuget.org">Verificado</MudChip>
+}
+else
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0"
+             title="Código não revisado pelo OpenWigiDash">Comunidade</MudChip>
+}
+
+@code {
+    [Parameter] public bool Verified { get; set; }
+}

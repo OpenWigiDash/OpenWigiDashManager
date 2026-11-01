@@ -14,6 +14,12 @@ internal sealed class FakeFeed : HttpMessageHandler
     private readonly Dictionary<string, List<JsonObject>> _leaves = new(StringComparer.OrdinalIgnoreCase);
     public List<string> Requests { get; } = [];
 
+    /// <summary>Campos a mais no resultado da busca de cada id (owners, iconUrl, projectUrl...).</summary>
+    public Dictionary<string, JsonObject> SearchExtras { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Sem rede: toda chamada falha como falharia sem internet.</summary>
+    public bool Offline { get; set; }
+
     public FakeFeed()
     {
         Json(Index, new JsonObject
@@ -63,18 +69,32 @@ internal sealed class FakeFeed : HttpMessageHandler
         {
             ["items"] = new JsonArray(new JsonObject { ["items"] = new JsonArray(leaves.Select(l => (JsonNode)l.DeepClone()).ToArray()) }),
         });
+        RefreshSearch();
+    }
+
+    /// <summary>Refaz o resultado da busca (depois de mexer em <see cref="SearchExtras"/>).</summary>
+    public void RefreshSearch() =>
         Json("https://feed.test/query", new JsonObject
         {
-            ["data"] = new JsonArray(_leaves.Select(kv => (JsonNode)new JsonObject
+            ["data"] = new JsonArray(_leaves.Select(kv =>
             {
-                ["id"] = (string?)kv.Value[^1]["catalogEntry"]!["id"],
-                ["version"] = (string?)kv.Value[^1]["catalogEntry"]!["version"],
-                ["description"] = "Plugin de teste",
-                ["authors"] = new JsonArray("Victor"),
-                ["totalDownloads"] = 42,
+                var id = (string)kv.Value[^1]["catalogEntry"]!["id"]!;
+                var item = new JsonObject
+                {
+                    ["id"] = id,
+                    ["version"] = (string?)kv.Value[^1]["catalogEntry"]!["version"],
+                    ["description"] = "Plugin de teste",
+                    ["authors"] = new JsonArray("Victor"),
+                    ["totalDownloads"] = 42,
+                };
+                foreach (var (key, value) in SearchExtras.GetValueOrDefault(id) ?? [])
+                    item[key] = value?.DeepClone();
+                return (JsonNode)item;
             }).ToArray()),
         });
-    }
+
+    /// <summary>Responde um endereço qualquer (ícones, por exemplo).</summary>
+    public void Route(string url, byte[] body, string type = "image/png") => _routes[url] = (body, type);
 
     /// <summary>Troca o conteúdo de um .nupkg já publicado (para testar arquivos maliciosos).</summary>
     public void ReplacePackage(string id, string version, byte[] nupkg, bool fixHash = true)
@@ -131,6 +151,8 @@ internal sealed class FakeFeed : HttpMessageHandler
     {
         var url = request.RequestUri!.GetLeftPart(UriPartial.Path);
         Requests.Add(request.RequestUri!.ToString());
+        if (Offline)
+            throw new HttpRequestException("Sem rede (teste).");
         if (!_routes.TryGetValue(url, out var route))
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         var content = new ByteArrayContent(route.Body);

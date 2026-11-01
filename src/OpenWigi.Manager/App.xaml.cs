@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -75,6 +76,8 @@ public partial class App : System.Windows.Application
 
         _services.GetRequiredService<ManagerSettings>().PreviewDetachRequested +=
             () => Dispatcher.BeginInvoke(new Action(ShowPreviewWindow));
+        _services.GetRequiredService<PluginStore>().RestartRequested +=
+            () => Dispatcher.BeginInvoke(new Action(RestartApp));
         _tray = new TrayIcon(agent, a => Dispatcher.BeginInvoke(a), ShowMainWindow, ShowPreviewWindow, ExitApp);
         if (!e.Args.Contains("--tray"))
         {
@@ -96,12 +99,12 @@ public partial class App : System.Windows.Application
         services.AddMudServices();
         services.AddSingleton<ManagerSettings>();
         services.AddSingleton<AgentClient>();
+        var index = Array.IndexOf(args, "--plugins");
+        var plugins = index >= 0 && index + 1 < args.Length
+            ? args[index + 1]
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenWigiDash", "Widgets");
         services.AddSingleton(sp =>
         {
-            var index = Array.IndexOf(args, "--plugins");
-            var plugins = index >= 0 && index + 1 < args.Length
-                ? args[index + 1]
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenWigiDash", "Widgets");
             // Instalado, os widgets que vêm junto ficam ao lado da pasta do manager (Program Files\OpenWigiDash\Widgets).
             var bundled = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Widgets"));
             var options = new DashboardOptions
@@ -112,6 +115,9 @@ public partial class App : System.Windows.Application
             };
             return new DashboardHost(options, sp.GetRequiredService<AgentClient>().Sink, sp.GetRequiredService<ILoggerFactory>());
         });
+        // A loja instala na mesma pasta de onde o manager carrega os plugins.
+        services.AddSingleton(sp => new PluginStore(sp.GetRequiredService<ManagerSettings>(), sp.GetRequiredService<DashboardHost>(),
+            plugins, sp.GetRequiredService<ILoggerFactory>()));
         return services.BuildServiceProvider();
     }
 
@@ -156,6 +162,25 @@ public partial class App : System.Windows.Application
             window.Navigate(route);
     }
 
+    // Mantém a pasta de plugins alternativa; troca a tela pedida pela Loja e tira o --tray e o --autostart.
+    private static IEnumerable<string> RestartArguments()
+    {
+        var args = Environment.GetCommandLineArgs().Skip(1).ToList();
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] is "--tray" or "--autostart" or "--preview")
+                continue;
+            if (args[i] == "--open")
+            {
+                i++;
+                continue;
+            }
+            yield return args[i];
+        }
+        yield return "--open";
+        yield return "/loja";
+    }
+
     private PreviewWindow? _preview;
 
     private void ShowPreviewWindow()
@@ -177,6 +202,18 @@ public partial class App : System.Windows.Application
             Dispatcher.BeginInvoke(new Action(ShowMainWindow));
     }
 
+    private bool _restart;
+
+    /// <summary>
+    /// Fecha e abre de novo na Loja, para os plugins instalados/atualizados/removidos valerem. A nova cópia
+    /// só sobe depois que esta solta o mutex de instância única (ver ExitApp).
+    /// </summary>
+    private void RestartApp()
+    {
+        _restart = true;
+        ExitApp();
+    }
+
     private async void ExitApp()
     {
         _tray?.Dispose();
@@ -189,6 +226,13 @@ public partial class App : System.Windows.Application
             await _services.DisposeAsync();
         }
         _single?.ReleaseMutex();
+        if (_restart && Environment.ProcessPath is { } exe)
+        {
+            var start = new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = false };
+            foreach (var arg in RestartArguments())
+                start.ArgumentList.Add(arg);
+            System.Diagnostics.Process.Start(start);
+        }
         Shutdown();
     }
 }

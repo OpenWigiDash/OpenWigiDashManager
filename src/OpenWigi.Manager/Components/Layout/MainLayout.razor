@@ -3,6 +3,7 @@
 @inject ManagerSettings Settings
 @inject AgentClient Agent
 @inject NavigationManager Navigation
+@inject PluginStore Store
 
 @* Tema só pela preferência do manager: sem seguir o Windows (ObserveSystemDarkModeChange), que na
    primeira renderização trocava para claro por conta própria e deixava a tela misturada. O bind
@@ -22,6 +23,15 @@
     <MudDrawer Open="true" Variant="DrawerVariant.Persistent" Elevation="0" ClipMode="DrawerClipMode.Always">
         <MudNavMenu Class="mt-2">
             <MudNavLink Href="/widgets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Widgets e páginas</MudNavLink>
+            <MudNavLink Href="/loja" Icon="@Icons.Material.Filled.Storefront">
+                <div class="d-flex align-center">
+                    Loja de plugins
+                    @if (Store.UpdateCount > 0)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ml-2 my-0" title="Plugins com atualização">@Store.UpdateCount</MudChip>
+                    }
+                </div>
+            </MudNavLink>
             <MudNavLink Href="/ajustes" Icon="@Icons.Material.Filled.Tune">Ajustes</MudNavLink>
         </MudNavMenu>
     </MudDrawer>
@@ -48,6 +58,7 @@
     protected override void OnInitialized()
     {
         Settings.Changed += Refresh;
+        Store.Changed += Refresh;
         Settings.NavigationRequested += Navigate;
         if (Settings.PendingRoute is { } route)
         {
@@ -63,6 +74,7 @@
     public void Dispose()
     {
         Settings.Changed -= Refresh;
+        Store.Changed -= Refresh;
         Settings.NavigationRequested -= Navigate;
     }
 }
