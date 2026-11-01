@@ -134,6 +134,88 @@ public sealed class DashboardHost : IAsyncDisposable, IWidgetContextOwner, IWidg
         }
     }
 
+    private string InstancesDirectory => Path.Combine(_options.DataDirectory, "instances");
+
+    /// <summary>Pasta das cópias automáticas do layout (uma por abertura do manager e antes de cada restauração).</summary>
+    public string LayoutBackupDirectory => _store.BackupDirectory;
+
+    /// <summary>As cópias automáticas do layout, da mais nova para a mais velha.</summary>
+    public IReadOnlyList<string> LayoutBackups() => _store.Backups();
+
+    /// <summary>
+    /// Grava uma cópia do layout em <paramref name="path"/> (.zip, ver <see cref="LayoutArchive"/>), com as configurações
+    /// e os arquivos dos widgets.
+    /// </summary>
+    public async Task ExportLayoutAsync(string path, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            LayoutArchive.Export(path, _layout, InstancesDirectory);
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>
+    /// Troca o layout pelo do arquivo: a cópia exportada (.zip, que traz também as configurações dos widgets) ou um
+    /// <c>layout.json</c> solto, como as cópias automáticas. Layout da grade 5x4 é convertido. Antes de trocar, o layout
+    /// atual vira uma cópia automática, então dá para voltar. Os dados dos widgets que saem não são apagados: voltando
+    /// a um layout que tem esses widgets, eles vêm configurados. Arquivo inválido dá <see cref="InvalidDataException"/>
+    /// e nada muda.
+    /// </summary>
+    public async Task RestoreLayoutAsync(string path, CancellationToken cancellationToken = default)
+    {
+        // Lê antes de mexer em qualquer coisa: arquivo ruim não derruba o layout atual.
+        var restored = LayoutArchive.Read(path);
+
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            BackupLayout();
+
+            // Descarrega os widgets atuais sem OnRemovedAsync e sem apagar os dados: eles não foram tirados pela pessoa.
+            foreach (var runtime in _runtimes.Values)
+            {
+                if (!runtime.Context.IsAsleep)
+                    await SleepAsync(runtime, cancellationToken);
+                await runtime.DisposeAsync();
+            }
+            _runtimes.Clear();
+            _fullscreen = _pressTarget = _lastTap = _previousTap = null;
+
+            LayoutArchive.ExtractInstances(path, InstancesDirectory, restored.AllPlacements.Select(p => p.InstanceId));
+            _layout = restored;
+            FixDuplicatePageNames();
+            _currentPage = Math.Max(0, _layout.Pages.FindIndex(p => p.Id == _layout.CurrentPageId));
+            _layout.CurrentPageId = _layout.Pages[_currentPage].Id;
+            _store.Save(_layout);
+
+            foreach (var placement in _layout.AllPlacements.ToList())
+                await CreateRuntimeAsync(placement, cancellationToken);
+            foreach (var runtime in _runtimes.Values)
+            {
+                runtime.Context.IsAsleep = true;
+                runtime.LastFrame = await runtime.RenderAsync(RenderReason.Initial, cancellationToken);
+                await runtime.CallAsync("OnSleepAsync", (i, ct) => i.OnSleepAsync(ct), cancellationToken);
+            }
+            if (_active)
+            {
+                await WakePageAsync(CurrentPage, cancellationToken);
+                await ShowCurrentAsync(Transition.None, cancellationToken);
+            }
+        }
+        finally
+        {
+            _state.Release();
+        }
+        _logger.LogInformation("Layout restaurado de {Path}", path);
+        PageChanged?.Invoke();
+        LayoutChanged?.Invoke();
+    }
+
     /// <summary>Carrega plugins e layout, cria as instâncias. Ainda não desenha: isso vem com <see cref="ActivateAsync"/>.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -923,7 +1005,7 @@ public event Action? LayoutChanged;
             placement.Size = widget.Manifest.SupportedSizes[0];
 
         var logger = _loggerFactory.CreateLogger($"Widget.{widget.Manifest.Name}");
-        var storage = new InstanceStorage(Path.Combine(_options.DataDirectory, "instances"), placement.InstanceId);
+        var storage = new InstanceStorage(InstancesDirectory, placement.InstanceId);
         var context = new WidgetContext(placement.InstanceId, placement.Size,
             new WidgetHostInfo(widget.PluginDirectory, _loggerFactory, _time, _options.Theme),
             storage, new LoggingActions(logger), logger, this);

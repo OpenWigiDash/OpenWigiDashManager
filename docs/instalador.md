@@ -21,9 +21,13 @@ Por usuário, nada muda em relação ao dev: layout e ajustes em `%APPDATA%\Open
 usuário em `%LOCALAPPDATA%\OpenWigiDash\Widgets`. Um widget com o mesmo nome de pasta lá ganha do que
 veio com o instalador. Desinstalar não apaga nada disso.
 
-Toda vez que abre, o manager guarda uma cópia do `layout.json` em `%APPDATA%\OpenWigiDash\backups`
-(`layout-AAAAMMDD-HHMMSS.json`, as 10 mais novas; se nada mudou desde a última, não copia de novo). Para
-voltar a uma delas, feche o manager pela bandeja e copie o arquivo por cima do `layout.json`.
+Toda vez que abre, e antes de cada restauração, o manager guarda uma cópia do `layout.json` em
+`%APPDATA%\OpenWigiDash\backups` (`layout-AAAAMMDD-HHMMSS.json`, as 10 mais novas; se nada mudou desde a
+última, não copia de novo). Em **Ajustes > Layout** dá para voltar a qualquer uma delas, exportar uma cópia
+para outro lugar (um `.zip` com o layout e as configurações e arquivos de cada widget) e restaurar de um
+arquivo escolhido no disco (o `.zip` exportado ou um `layout.json` solto). Layout da grade 5x4 é convertido
+para a 10x8 ao restaurar. As cópias automáticas têm só o layout: um widget tirado depois da cópia volta com
+as configurações padrão.
 
 Aberto de dentro de um app da Microsoft Store (o Claude Desktop, por exemplo), o manager roda no pacote
 daquele app, e o Windows desvia o que ele grava em `%APPDATA%` e `%LOCALAPPDATA%` para

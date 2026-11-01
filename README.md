@@ -36,7 +36,7 @@ Detalhes em [docs/multiusuario.md](docs/multiusuario.md#sem-o-aparelho-wigidash-
 As telas:
 - **Widgets e páginas** (a tela inicial): estado do aparelho, grade 10x8 com cada widget desenhando ao vivo e a moldura de cada página (espaço, borda, cantos e cores), e embaixo as páginas em miniatura. Dá para adicionar, mover, redimensionar e tirar widgets, e criar e renomear páginas. Com um widget selecionado, as configurações do plugin (em Razor) ficam no painel ao lado, e o que mudar já aparece no tile. "Destacar prévia" abre a tela do aparelho numa janela própria, onde o mouse vira toque.
 - **Loja de plugins:** busca, instala, atualiza e remove plugins do nuget.org ([Plugins](#plugins)).
-- **Ajustes:** aparelho ativo (USB ou virtual), brilho, iniciar com o Windows, tema claro ou escuro e a checagem diária de atualização dos plugins.
+- **Ajustes:** aparelho ativo (USB ou virtual), brilho, iniciar com o Windows, tema claro ou escuro, a checagem diária de atualização dos plugins e as cópias do layout: exportar para um arquivo, restaurar de um arquivo escolhido no disco ou de uma das cópias automáticas.
 
 Fechar a janela só esconde; o painel continua rodando pelo tray.
 

@@ -105,21 +105,46 @@ public sealed class LayoutStore(string path)
 
     public string Path { get; } = path;
 
-    public DashboardLayout Load()
+    public DashboardLayout Load() => File.Exists(Path) ? Parse(File.ReadAllText(Path)) : new DashboardLayout();
+
+    /// <summary>
+    /// Lê um layout em JSON (o <c>layout.json</c>, uma cópia ou um arquivo exportado). Da grade 5x4 passa pela mesma
+    /// conversão do <see cref="Load"/>; de versão mais nova, ou que não é layout, dá <see cref="InvalidDataException"/>.
+    /// </summary>
+    public static DashboardLayout Parse(string text)
     {
-        if (!File.Exists(Path))
-            return new DashboardLayout();
-        var text = File.ReadAllText(Path);
-        var grid = JsonNode.Parse(text)?["grid"]?.GetValue<int>() ?? 1;
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(text);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("O arquivo não é um layout do OpenWigiDash.", ex);
+        }
+        if (root is not JsonObject obj || obj["pages"] is not JsonArray)
+            throw new InvalidDataException("O arquivo não é um layout do OpenWigiDash.");
+        var grid = obj["grid"]?.GetValue<int>() ?? 1;
         if (grid > DashboardLayout.CurrentGrid)
             throw new InvalidDataException($"O layout é de uma versão mais nova do OpenWigiDash (grade {grid}).");
         if (grid < DashboardLayout.CurrentGrid)
             text = MigrateFromGrid1(text);
-        var layout = JsonSerializer.Deserialize<DashboardLayout>(text, Json) ?? new DashboardLayout();
+        DashboardLayout layout;
+        try
+        {
+            layout = JsonSerializer.Deserialize<DashboardLayout>(text, Json) ?? new DashboardLayout();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"O layout está com defeito: {ex.Message}", ex);
+        }
         if (layout.Pages.Count == 0)
             layout.Pages.Add(new LayoutPage { Name = "Página 1" });
         return layout;
     }
+
+    /// <summary>O layout em JSON, como vai para o <c>layout.json</c>.</summary>
+    public static string Serialize(DashboardLayout layout) => JsonSerializer.Serialize(layout, Json);
 
     /// <summary>Layout gravado antes da grade 10x8? Quem abre grava de volta depois de converter.</summary>
     public bool NeedsMigration() =>
@@ -156,7 +181,7 @@ public sealed class LayoutStore(string path)
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
         var temp = Path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(layout, Json));
+        File.WriteAllText(temp, Serialize(layout));
         File.Move(temp, Path, overwrite: true);
     }
 
@@ -165,7 +190,7 @@ public sealed class LayoutStore(string path)
 
     /// <summary>
     /// Copia o layout atual para <see cref="BackupDirectory"/> como <c>layout-AAAAMMDD-HHMMSS.json</c> e guarda só as
-    /// <paramref name="keep"/> mais novas. Para voltar a uma, feche o manager e copie por cima do <c>layout.json</c>.
+    /// <paramref name="keep"/> mais novas. Para voltar a uma: Ajustes > Layout, ou <see cref="DashboardHost.RestoreLayoutAsync"/>.
     /// Sem layout, ou igual à última cópia, não faz nada. Devolve o caminho da cópia nova, ou null.
     /// </summary>
     public string? Backup(DateTimeOffset now, int keep = 10)

@@ -2,6 +2,9 @@
 @inject ManagerSettings Settings
 @inject AgentClient Agent
 @inject AppUpdates Updates
+@inject DashboardHost Host
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 <MudStack Spacing="4" Style="max-width: 720px">
@@ -38,6 +41,46 @@
         <MudSwitch T="bool" Value="Settings.CheckPluginUpdates" ValueChanged="v => Settings.CheckPluginUpdates = v" Color="Color.Primary">
             Procurar atualizações dos plugins uma vez por dia
         </MudSwitch>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.overline" Color="Color.Secondary">Layout</MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Guarde uma cópia das páginas e dos widgets, com as configurações de cada um, ou volte a uma cópia guardada.
+        </MudText>
+        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ExportLayout" Disabled="_busy"
+                       StartIcon="@Icons.Material.Filled.SaveAlt">Exportar cópia...</MudButton>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="RestoreFromFile" Disabled="_busy"
+                       StartIcon="@Icons.Material.Filled.Restore">Restaurar de arquivo...</MudButton>
+        </MudStack>
+
+        <MudText Typo="Typo.body2" Class="mt-4 mb-1">Cópias automáticas</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+            O manager guarda uma cópia do layout ao abrir e antes de cada restauração (as 10 mais novas). Elas têm só as
+            páginas e as posições: widgets tirados depois da cópia voltam com as configurações padrão.
+        </MudText>
+        @if (_backups.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Ainda não há cópias.</MudText>
+        }
+        else
+        {
+            <MudList T="string" Dense="true" Class="py-0">
+                @foreach (var backup in _backups)
+                {
+                    <MudListItem T="string">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">@BackupLabel(backup)</MudText>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="_busy"
+                                       OnClick="() => RestoreBackup(backup)">Restaurar</MudButton>
+                        </MudStack>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="OpenBackupFolder" Class="mt-1"
+                   StartIcon="@Icons.Material.Filled.FolderOpen">Abrir a pasta das cópias</MudButton>
     </MudPaper>
 
     <MudPaper Class="pa-4" Outlined="true">
@@ -107,10 +150,101 @@
     private bool _checking;
     private string? _checkError;
 
+    private const string LayoutFilter = "Cópia do layout (*.zip;*.json)|*.zip;*.json|Todos os arquivos (*.*)|*.*";
+    private IReadOnlyList<string> _backups = [];
+    private bool _busy;
+
+    private void LoadBackups()
+    {
+        try
+        {
+            _backups = Host.LayoutBackups();
+        }
+        catch (System.IO.IOException)
+        {
+            _backups = [];
+        }
+    }
+
+    // layout-20261101-180257.json -> "01/11/2026 18:02:57"
+    private static string BackupLabel(string path)
+    {
+        var name = System.IO.Path.GetFileNameWithoutExtension(path);
+        return DateTime.TryParseExact(name.Replace("layout-", ""), "yyyyMMdd-HHmmss", null,
+            System.Globalization.DateTimeStyles.None, out var when)
+            ? when.ToString("dd/MM/yyyy HH:mm:ss")
+            : name;
+    }
+
+    private async Task ExportLayout()
+    {
+        var path = FilePicker.Save("Exportar cópia do layout", "Cópia do layout (*.zip)|*.zip",
+            LayoutArchive.SuggestedFileName(DateTimeOffset.Now));
+        if (path is null)
+            return;
+        _busy = true;
+        try
+        {
+            await Host.ExportLayoutAsync(path);
+            Snackbar.Add($"Cópia do layout gravada em {path}.", Severity.Success);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Snackbar.Add($"Não deu para gravar a cópia: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task RestoreFromFile()
+    {
+        var path = FilePicker.Open("Restaurar layout", LayoutFilter);
+        return path is null ? Task.CompletedTask : RestoreAsync(path, System.IO.Path.GetFileName(path));
+    }
+
+    private Task RestoreBackup(string path) => RestoreAsync(path, $"a cópia de {BackupLabel(path)}");
+
+    private async Task RestoreAsync(string path, string what)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Restaurar o layout?",
+            $"As páginas e os widgets de agora serão trocados pelos de {what}. Antes, o layout atual vira uma cópia " +
+            "automática, então dá para voltar a ele.", yesText: "Restaurar", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
+        _busy = true;
+        try
+        {
+            await Host.RestoreLayoutAsync(path);
+            Snackbar.Add("Layout restaurado.", Severity.Success);
+        }
+        catch (System.IO.InvalidDataException ex)
+        {
+            Snackbar.Add($"Não deu para restaurar: {ex.Message}", Severity.Error);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Snackbar.Add($"Não deu para ler o arquivo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+            LoadBackups();
+        }
+    }
+
+    private void OpenBackupFolder()
+    {
+        System.IO.Directory.CreateDirectory(Host.LayoutBackupDirectory);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Host.LayoutBackupDirectory) { UseShellExecute = true })?.Dispose();
+    }
+
     protected override void OnInitialized()
     {
         Agent.Changed += OnAgentChanged;
         Updates.Changed += OnAgentChanged;
+        LoadBackups();
     }
 
     public void Dispose()
