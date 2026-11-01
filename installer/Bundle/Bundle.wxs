@@ -25,7 +25,11 @@
       <Payload Name="openwigidash.ico" SourceFile="$(BrandingDir)openwigidash.ico" />
     </BootstrapperApplication>
 
-    <Variable Name="LaunchTarget" Value="[ProgramFiles64Folder]OpenWigiDash\Manager\OpenWigiDashManager.exe" />
+    <!-- "Abrir" no fim do setup: abre o manager pelo explorer.exe, como um clique no menu Iniciar. Aberto
+         direto pelo processo do setup, o manager não via a pasta de widgets do usuário
+         (%LOCALAPPDATA%\OpenWigiDash\Widgets) e carregava só os que vêm com o instalador. -->
+    <Variable Name="LaunchTarget" Value="[WindowsFolder]explorer.exe" />
+    <Variable Name="LaunchArguments" Value="&quot;[ProgramFiles64Folder]OpenWigiDash\Manager\OpenWigiDashManager.exe&quot;" />
 
     <!-- WebView2 Evergreen: a versão instalada fica em "pv" (por máquina ou por usuário). -->
     <util:RegistrySearch Id="WebView2Machine" Root="HKLM"
