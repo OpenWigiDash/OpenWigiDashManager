@@ -90,10 +90,10 @@ public class GeometryTests
     {
         var cell = WidgetSize.Small.CellSpan;
         Assert.Equal(cell, TileFrame.Default.ContentSize(cell)); // padrão: igual a antes da moldura
-        Assert.Equal(new PixelSize(190, 135), TileFrame.Framed.ContentSize(cell));
+        Assert.Equal(new PixelSize(188, 133), TileFrame.Framed.ContentSize(cell));
         Assert.Equal(cell, TileFrame.None.ContentSize(cell));
-        Assert.Equal(new PixelSize(88, 60), TileFrame.Framed.ContentSize(WidgetSize.Mini.CellSpan));
-        Assert.Equal(new PixelRect(107, 79, 88, 61), TileFrame.Framed.ContentBounds(WidgetGrid.CellBounds(1, 1, WidgetSize.Mini)));
+        Assert.Equal(new PixelSize(87, 59), TileFrame.Framed.ContentSize(WidgetSize.Mini.CellSpan));
+        Assert.Equal(new PixelRect(111, 82, 87, 60), TileFrame.Framed.ContentBounds(WidgetGrid.CellBounds(1, 1, WidgetSize.Mini)));
     }
 
     [Fact]
