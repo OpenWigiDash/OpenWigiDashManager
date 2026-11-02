@@ -37,7 +37,7 @@ public partial class MainWindow : Window
         _splashFallback = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
         _splashFallback.Tick += (_, _) => HideSplash();
         _splashFallback.Start();
-        DarkTitleBar.Attach(this);
+        DwmWindow.UseAppTitleBar(this);
         IsVisibleChanged += (_, e) =>
         {
             if (e.NewValue is true)
@@ -97,28 +97,45 @@ public partial class MainWindow : Window
 
     private DispatcherTimer? _coverTimer;
 
-    // Volta do tray: a capa (posta no OnClosing) segura a tela na cor do tema até o WebView2 retomar a
-    // pintura, e some com um fade curto. Na primeira abertura quem cobre é a tela de abertura.
+    // Volta do tray ou de minimizado. Escondida, a janela para de desenhar, e o Windows mostrava o primeiro
+    // quadro dela (branco) antes de o WPF pintar de novo. Na volta do tray ela vem "encoberta" no DWM
+    // (posto no OnClosing): o WPF desenha a capa lisa na cor do tema sem nada aparecer, e só então a janela
+    // é mostrada. A capa segura enquanto o WebView2 retoma a pintura e some com um fade curto. Na primeira
+    // abertura quem cobre é a tela de abertura.
     private void OnShownAgain()
     {
         if (Cover.Visibility != Visibility.Visible)
             return;
         _coverTimer?.Stop();
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
-        _coverTimer = timer;
-        timer.Tick += (_, _) =>
+        var reveal = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(_cloaked ? 120 : 0) };
+        _coverTimer = reveal;
+        reveal.Tick += (_, _) =>
         {
-            timer.Stop();
-            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(150));
-            fade.Completed += (_, _) =>
+            reveal.Stop();
+            if (_cloaked)
             {
-                if (IsVisible)
-                    Cover.Visibility = Visibility.Collapsed;
+                _cloaked = false;
+                DwmWindow.SetCloaked(this, false);
+            }
+            var lift = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+            _coverTimer = lift;
+            lift.Tick += (_, _) =>
+            {
+                lift.Stop();
+                var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(150));
+                fade.Completed += (_, _) =>
+                {
+                    if (IsVisible)
+                        Cover.Visibility = Visibility.Collapsed;
+                };
+                Cover.BeginAnimation(OpacityProperty, fade);
             };
-            Cover.BeginAnimation(OpacityProperty, fade);
+            lift.Start();
         };
-        timer.Start();
+        reveal.Start();
     }
+
+    private bool _cloaked;
 
     private void ShowCover()
     {
@@ -209,6 +226,8 @@ public partial class MainWindow : Window
             return;
         e.Cancel = true;
         ShowCover();
+        _cloaked = true;
+        DwmWindow.SetCloaked(this, true);
         Hide();
     }
 }
