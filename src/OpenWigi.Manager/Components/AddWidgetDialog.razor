@@ -1,5 +1,6 @@
 @* Assistente de "Adicionar widget": 1) escolher o widget; 2) tamanho e lugar na página. *@
 @inject ManagerSettings Settings
+@inject PluginStore Store
 @implements IDisposable
 
 <MudDialog>
@@ -38,7 +39,7 @@
                     @if (group.Name is { } groupName)
                     {
                         <div class="owd-widget-group">
-                            <MudIcon Icon="@Icons.Material.Filled.Extension" Size="Size.Small" />
+                            <PluginIcon Url="@_pluginIcons.GetValueOrDefault(groupName)" Size="28" />
                             <span class="owd-ellipsis">@groupName</span>
                             <span class="owd-muted">· @group.Widgets.Count widget(s)</span>
                         </div>
@@ -190,6 +191,30 @@
     }
 
     protected override void OnInitialized() => Settings.Changed += Refresh;
+
+    // Ícone de cada plugin, o mesmo da Loja, para o título do grupo no agrupamento por plugin.
+    private readonly Dictionary<string, string> _pluginIcons = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        foreach (var plugin in Widgets.Select(PluginOf).Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+        {
+            if (_pluginIcons.ContainsKey(plugin))
+                continue;
+            try
+            {
+                if (await Store.IconAsync(plugin, null) is { } icon)
+                {
+                    _pluginIcons[plugin] = icon;
+                    StateHasChanged();
+                }
+            }
+            catch (Exception)
+            {
+                // Fica o ícone genérico.
+            }
+        }
+    }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
 
