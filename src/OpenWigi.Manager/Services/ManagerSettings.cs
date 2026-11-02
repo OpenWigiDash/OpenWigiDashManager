@@ -18,7 +18,8 @@ public sealed class ManagerSettings
 
     private sealed record Stored(bool DarkMode = true, int? Brightness = null, bool ShowWidgetNames = true, bool StartWithWindows = true,
         WindowPlacement? Window = null, bool CheckPluginUpdates = true, DateTimeOffset? LastPluginUpdateCheck = null,
-        bool CheckAppUpdates = true, bool BetaAppUpdates = false, DateTimeOffset? LastAppUpdateCheck = null, string? NotifiedAppUpdate = null);
+        bool CheckAppUpdates = true, bool BetaAppUpdates = false, DateTimeOffset? LastAppUpdateCheck = null, string? NotifiedAppUpdate = null,
+        WidgetGrouping AddWidgetGrouping = WidgetGrouping.None);
 
     /// <summary>Onde a janela estava ao fechar: posição e tamanho fora do maximizado, e se estava maximizada.</summary>
     public sealed record WindowPlacement(double Left, double Top, double Width, double Height, bool Maximized);
@@ -127,6 +128,20 @@ public sealed class ManagerSettings
                 return;
             _stored = _stored with { NotifiedAppUpdate = value };
             Save();
+        }
+    }
+
+    /// <summary>Como o "Adicionar widget" agrupa os widgets; fica o último escolhido.</summary>
+    public WidgetGrouping AddWidgetGrouping
+    {
+        get => _stored.AddWidgetGrouping;
+        set
+        {
+            if (_stored.AddWidgetGrouping == value)
+                return;
+            _stored = _stored with { AddWidgetGrouping = value };
+            Save();
+            Changed?.Invoke();
         }
     }
 
@@ -258,4 +273,17 @@ public sealed class ManagerSettings
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         File.WriteAllText(_path, JsonSerializer.Serialize(_stored, Json));
     }
+}
+
+/// <summary>Agrupamento da lista do "Adicionar widget".</summary>
+public enum WidgetGrouping
+{
+    /// <summary>Uma lista só.</summary>
+    None,
+
+    /// <summary>Um grupo por plugin de origem.</summary>
+    Plugin,
+
+    /// <summary>Por categoria do widget. Ainda não existe no SDK: fica para quando os plugins declararem.</summary>
+    Category,
 }

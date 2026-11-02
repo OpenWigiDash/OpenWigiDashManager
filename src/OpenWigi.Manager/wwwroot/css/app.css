@@ -617,3 +617,19 @@ html, body {
     border-radius: 6px;
     border: 1px solid var(--mud-palette-lines-default);
 }
+
+/* "Adicionar widget": a caixa de agrupamento e o título de cada grupo. */
+.owd-grouping {
+    flex: 0 0 220px;
+}
+
+.owd-widget-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+    min-width: 0;
+}

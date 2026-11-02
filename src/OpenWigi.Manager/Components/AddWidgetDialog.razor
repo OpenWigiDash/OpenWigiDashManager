@@ -1,4 +1,6 @@
 @* Assistente de "Adicionar widget": 1) escolher o widget; 2) tamanho e lugar na página. *@
+@inject ManagerSettings Settings
+@implements IDisposable
 
 <MudDialog>
     <TitleContent>
@@ -15,42 +17,67 @@
             }
             else
             {
-                @if (Widgets.Count > 6)
-                {
-                    <MudTextField T="string" @bind-Value="_search" Placeholder="Procurar" Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" Class="mb-3" />
-                }
-                <MudGrid Spacing="2">
-                    @foreach (var widget in Filtered)
+                <div class="d-flex flex-wrap align-center gap-3 mb-3">
+                    @if (Widgets.Count > 6)
                     {
-                        var w = widget;
-                        <MudItem xs="12" sm="6">
-                            <MudCard Outlined="true" Class="owd-pick" @onclick="() => Pick(w)">
-                                <MudCardContent Class="d-flex gap-3">
-                                    <div class="owd-pick-icon">
-                                        @if (_icons.GetValueOrDefault(w.Manifest.Id) is { } icon)
-                                        {
-                                            <img src="@icon" alt="" />
-                                        }
-                                        else
-                                        {
-                                            <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Color="Color.Secondary" />
-                                        }
-                                    </div>
-                                    <div>
-                                    <MudText Typo="Typo.subtitle1">@w.Manifest.Name</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(w.Manifest.Description ?? "Sem descrição")</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @(w.Manifest.Author is { } author ? $"{author} · " : "")v@(w.Manifest.Version) ·
-                                        @w.Manifest.SupportedSizes.Count tamanho(s)
-                                    </MudText>
-                                    </div>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
+                        <MudTextField T="string" @bind-Value="_search" Placeholder="Procurar" Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Class="flex-grow-1 mt-0" />
                     }
-                </MudGrid>
+                    @* Como a lista aparece; a escolha fica lembrada para a próxima vez. *@
+                    <MudSelect T="WidgetGrouping" Value="Settings.AddWidgetGrouping" ValueChanged="v => Settings.AddWidgetGrouping = v"
+                               Label="Agrupar por" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                               Class="owd-grouping mt-0">
+                        <MudSelectItem T="WidgetGrouping" Value="WidgetGrouping.None">Nenhum agrupamento</MudSelectItem>
+                        <MudSelectItem T="WidgetGrouping" Value="WidgetGrouping.Plugin">Plugin de origem</MudSelectItem>
+                        <MudSelectItem T="WidgetGrouping" Value="WidgetGrouping.Category" Disabled="true">Categoria (em breve)</MudSelectItem>
+                    </MudSelect>
+                </div>
+                @foreach (var group in Groups)
+                {
+                    @if (group.Name is { } groupName)
+                    {
+                        <div class="owd-widget-group">
+                            <MudIcon Icon="@Icons.Material.Filled.Extension" Size="Size.Small" />
+                            <span class="owd-ellipsis">@groupName</span>
+                            <span class="owd-muted">· @group.Widgets.Count widget(s)</span>
+                        </div>
+                    }
+                    <MudGrid Spacing="2" Class="mb-2">
+                        @foreach (var widget in group.Widgets)
+                        {
+                            var w = widget;
+                            <MudItem xs="12" sm="6">
+                                <MudCard Outlined="true" Class="owd-pick" @onclick="() => Pick(w)">
+                                    <MudCardContent Class="d-flex gap-3">
+                                        <div class="owd-pick-icon">
+                                            @if (_icons.GetValueOrDefault(w.Manifest.Id) is { } icon)
+                                            {
+                                                <img src="@icon" alt="" />
+                                            }
+                                            else
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Color="Color.Secondary" />
+                                            }
+                                        </div>
+                                        <div>
+                                        <MudText Typo="Typo.subtitle1">@w.Manifest.Name</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@(w.Manifest.Description ?? "Sem descrição")</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @(w.Manifest.Author is { } author ? $"{author} · " : "")v@(w.Manifest.Version) ·
+                                            @w.Manifest.SupportedSizes.Count tamanho(s)
+                                        </MudText>
+                                        </div>
+                                    </MudCardContent>
+                                </MudCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                @if (!Groups.Any())
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhum widget com "@_search".</MudText>
+                }
             }
         }
         else
@@ -162,6 +189,12 @@
             }
     }
 
+    protected override void OnInitialized() => Settings.Changed += Refresh;
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Settings.Changed -= Refresh;
+
     /// <summary>O que o assistente devolve ao fechar com "Adicionar".</summary>
     public sealed record Choice(Guid WidgetId, WidgetSize Size, int Column, int Row);
 
@@ -169,6 +202,31 @@
     private WidgetSize _size = WidgetSize.Small;
     private (int Column, int Row)? _at;
     private string _search = string.Empty;
+
+    // Plugin de origem: a pasta dele, que é o id do pacote quando veio da Loja (ex.: OpenWigiDash.Discord).
+    private static string PluginOf(OpenWigi.Host.Plugins.LoadedWidget widget) =>
+        System.IO.Path.GetFileName(widget.PluginDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+
+    // Grupos da lista, já filtrada pela busca. Sem agrupamento (ou categoria, que ainda não existe), um grupo sem nome.
+    private IReadOnlyList<(string? Name, IReadOnlyList<OpenWigi.Host.Plugins.LoadedWidget> Widgets)> Groups
+    {
+        get
+        {
+            var widgets = Filtered.ToList();
+            var groups = new List<(string? Name, IReadOnlyList<OpenWigi.Host.Plugins.LoadedWidget> Widgets)>();
+            if (Settings.AddWidgetGrouping == WidgetGrouping.Plugin)
+            {
+                foreach (var group in widgets.GroupBy(PluginOf, StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase))
+                    groups.Add((group.Key, group.ToList()));
+            }
+            else if (widgets.Count > 0)
+            {
+                groups.Add((null, widgets));
+            }
+            return groups;
+        }
+    }
 
     private IEnumerable<OpenWigi.Host.Plugins.LoadedWidget> Filtered => string.IsNullOrWhiteSpace(_search)
         ? Widgets
