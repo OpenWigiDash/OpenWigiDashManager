@@ -25,6 +25,15 @@
                            FontWeight="SemiBold" Foreground="#E8E9ED" />
                 <ProgressBar x:Name="SplashProgress" IsIndeterminate="True" Width="168" Height="3"
                              Margin="0,20,0,0" BorderThickness="0" Foreground="#E5243B" Background="#24262E" />
+                <!-- Só aparece se o WebView2 não terminar de abrir (ver OnSplashTimeout). -->
+                <StackPanel x:Name="SplashStuck" Visibility="Collapsed" Margin="0,24,0,0" HorizontalAlignment="Center">
+                    <TextBlock x:Name="SplashStuckText" HorizontalAlignment="Center" TextAlignment="Center"
+                               MaxWidth="420" TextWrapping="Wrap" FontFamily="Segoe UI" FontSize="14"
+                               Foreground="#E8E9ED"
+                               Text="A janela está demorando para abrir. O painel no aparelho continua funcionando." />
+                    <Button x:Name="SplashRetry" Content="Tentar de novo" HorizontalAlignment="Center"
+                            Margin="0,14,0,0" Padding="16,6" Click="OnRetryClick" />
+                </StackPanel>
             </StackPanel>
         </Grid>
 
