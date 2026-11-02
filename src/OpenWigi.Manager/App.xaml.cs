@@ -11,6 +11,7 @@ using MudBlazor.Services;
 using OpenWigi.Host;
 using OpenWigi.Manager.Services;
 using OpenWigi.Manager.Tray;
+using OpenWigi.Sdk;
 
 namespace OpenWigi.Manager;
 
@@ -170,6 +171,8 @@ public partial class App : System.Windows.Application
         services.AddBlazorWebViewDeveloperTools();
 #endif
         services.AddMudServices();
+        // Janela de ícones para as telas de configurações dos plugins (@inject IWidgetIconPicker). Scoped, como o IDialogService.
+        services.AddScoped<IWidgetIconPicker, IconPicker>();
         services.AddSingleton<ManagerSettings>();
         services.AddSingleton<AgentClient>();
         services.AddSingleton<AppUpdates>();

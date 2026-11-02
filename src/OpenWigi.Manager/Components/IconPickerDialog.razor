@@ -1,0 +1,111 @@
+@* Biblioteca de ícones (WidgetIcons do SDK) para a tela de configurações de qualquer widget, como a do Stream Deck:
+   uma aba por categoria e busca em todas. Aberta pelo IconPicker (IWidgetIconPicker) via IDialogService, que desenha
+   na raiz da página: dentro do painel de configurações, a janela ficava atrás dos cantos dos widgets do canvas.
+   Devolve um WidgetIconChoice. *@
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_search" Placeholder="Procurar ícone" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Clearable="true" Class="mb-2" AutoFocus="true" />
+
+        @if (string.IsNullOrWhiteSpace(_search))
+        {
+            <MudTabs @bind-ActivePanelIndex="_tab" Elevation="0" Rounded="true" ApplyEffectsToContainer="true"
+                     TabPanelsClass="pt-3" MinimumTabWidth="60px">
+                <MudTabPanel Text="Todos">
+                    @Grid(_icons, showAutomatic: true)
+                </MudTabPanel>
+                @foreach (var category in _categories)
+                {
+                    <MudTabPanel Text="@category.Name">
+                        @Grid(_icons.Where(i => string.Equals(i.Category, category.Key, StringComparison.OrdinalIgnoreCase)), showAutomatic: false)
+                    </MudTabPanel>
+                }
+            </MudTabs>
+        }
+        else if (WidgetIcons.Search(_search, _icons).ToList() is { Count: > 0 } found)
+        {
+            <div class="pt-3">@Grid(found, showAutomatic: false)</div>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">Nenhum ícone com "@_search".</MudText>
+        }
+
+        @if (Options.Hint is { } hint)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3 d-block">@hint</MudText>
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public WidgetIconPickerOptions Options { get; set; } = default!;
+
+    private IReadOnlyList<WidgetIconCategory> _categories = [];
+    private IReadOnlyList<WidgetIcon> _icons = [];
+    private string? _search;
+    private int _tab;
+
+    protected override void OnParametersSet()
+    {
+        _categories = Categories(Options);
+        // Na ordem das abas; dentro de cada uma, os da biblioteca e depois os do plugin.
+        _icons = _categories
+            .SelectMany(c => WidgetIcons.InCategory(c.Key).Concat(Options.Extra.Where(e => SameKey(e.Category, c.Key))))
+            .ToList();
+        // Abre na aba do ícone atual, para ele aparecer marcado sem procurar.
+        if (_icons.FirstOrDefault(i => SameKey(i.Key, Options.Current)) is { } current)
+            _tab = 1 + _categories.ToList().FindIndex(c => SameKey(c.Key, current.Category));
+    }
+
+    /// <summary>Abas: as pedidas (ou todas da biblioteca), mais as categorias novas que o plugin trouxe em Extra.</summary>
+    internal static IReadOnlyList<WidgetIconCategory> Categories(WidgetIconPickerOptions options)
+    {
+        var keys = options.Categories ?? WidgetIcons.Categories.Select(c => c.Key).ToList();
+        var extraKeys = options.Categories is null
+            ? options.Extra.Select(e => e.Category).Where(k => WidgetIcons.FindCategory(k) is null)
+            : [];
+        return keys.Concat(extraKeys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(k => WidgetIcons.FindCategory(k) ?? new WidgetIconCategory(k, k))
+            .Where(c => WidgetIcons.InCategory(c.Key).Any() || options.Extra.Any(e => SameKey(e.Category, c.Key)))
+            .ToList();
+    }
+
+    private RenderFragment Grid(IEnumerable<WidgetIcon> icons, bool showAutomatic) => __builder =>
+    {
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;max-height:52vh;overflow-y:auto;padding:2px">
+            @if (showAutomatic && Options.Automatic is { } automatic)
+            {
+                <button type="button" style="@TileStyle(Options.Current is null)" title="O widget escolhe sozinho"
+                        @onclick="() => Close(WidgetIconChoice.Automatic)">
+                    <WidgetIconView Icon="@automatic" Size="32" Background="#000" />
+                    <span style="font-size:12px">Automático</span>
+                </button>
+            }
+            @foreach (var icon in icons)
+            {
+                var key = icon.Key;
+                <button type="button" style="@TileStyle(SameKey(Options.Current, key))" title="@icon.Name"
+                        @onclick="() => Close(new WidgetIconChoice(key))">
+                    <WidgetIconView Icon="@icon" Size="32" Background="#000" />
+                    <span style="font-size:12px;line-height:1.2;text-align:center">@icon.Name</span>
+                </button>
+            }
+        </div>
+    };
+
+    // Fundo preto e ícone branco, como fica no visor.
+    private static string TileStyle(bool selected) =>
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 4px;border-radius:8px;"
+        + "cursor:pointer;background:#000;color:#fff;font:inherit;"
+        + (selected ? "border:3px solid var(--mud-palette-primary)" : "border:1px solid var(--mud-palette-lines-default)");
+
+    private static bool SameKey(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    private void Close(WidgetIconChoice choice) => Dialog.Close(DialogResult.Ok(choice));
+}
