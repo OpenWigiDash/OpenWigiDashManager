@@ -169,7 +169,7 @@
                         @* Cabeçalho: o ícone e o nome do tipo do widget (o que o plugin diz que ele é) e o nome desta instância. *@
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Widget selecionado</MudText>
                         <div class="owd-side-head mb-1">
-                            <div class="owd-side-icon" title="@TypeNameOf(selected, selectedProblem)">
+                            <div class="owd-side-icon owd-type-icon" title="@TypeNameOf(selected, selectedProblem)">
                                 @if (selectedProblem is not null)
                                 {
                                     <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />

@@ -586,3 +586,19 @@ html, body {
     height: 100%;
     object-fit: contain;
 }
+
+/* Ícone do tipo do widget: é a prévia do plugin, com texto dentro; grande o bastante para ler, na proporção dela. */
+.owd-side-icon.owd-type-icon {
+    width: auto;
+    min-width: 72px;
+    max-width: 45%;
+    height: 96px;
+    border-radius: 8px;
+    border: 1px solid var(--mud-palette-lines-default);
+}
+
+.owd-side-icon.owd-type-icon img {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+}
