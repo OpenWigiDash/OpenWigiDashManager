@@ -492,6 +492,97 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Duplicar_copia_as_configuracoes_clonaveis_e_os_arquivos()
+    {
+        var host = await StartAsync();
+        var source = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var storage = new OpenWigi.Host.Instances.InstanceStorage(Path.Combine(Data, "instances"), source.InstanceId);
+        await storage.SetAsync("cor", "azul");
+        await storage.SetAsync("token", "segredo", cloneable: false);
+        var image = Path.Combine(_root, "fundo.png");
+        File.WriteAllText(image, "png");
+        await storage.ImportAsync("fundo", image);
+
+        var page = await host.AddPageAsync("Outra");
+        Assert.Null(await host.DuplicateWidgetAsync(source.InstanceId, page, (WidgetGrid.Columns, 0))); // fora da grade
+        var copy = await host.DuplicateWidgetAsync(source.InstanceId, page, (2, 2));
+
+        Assert.NotNull(copy);
+        Assert.NotEqual(source.InstanceId, copy.Value);
+        var placed = host.Layout.Pages[page].Widgets.Single(w => w.InstanceId == copy.Value);
+        Assert.Equal((Counter, source.Size, 2, 2), (placed.WidgetId, placed.Size, placed.Column, placed.Row));
+        Assert.Equal("Contador (exemplo) 2", host.DisplayNameOf(copy.Value));
+        Assert.NotNull(host.GetSettings(copy.Value)); // a instância subiu
+
+        var cloned = new OpenWigi.Host.Instances.InstanceStorage(Path.Combine(Data, "instances"), copy.Value);
+        Assert.Equal("azul", await cloned.GetAsync("cor"));
+        Assert.Null(await cloned.GetAsync("token"));
+        var file = await cloned.GetPathAsync("fundo");
+        Assert.NotNull(file);
+        Assert.StartsWith(Path.Combine(Data, "instances", copy.Value.ToString("D")), file);
+        Assert.Equal("png", File.ReadAllText(file));
+
+        // Tirar a cópia não mexe na original.
+        await host.RemoveWidgetAsync(copy.Value);
+        Assert.Equal("segredo", await new OpenWigi.Host.Instances.InstanceStorage(Path.Combine(Data, "instances"), source.InstanceId).GetAsync("token"));
+    }
+
+    [Fact]
+    public async Task Copia_de_copia_continua_a_numeracao_e_nome_dado_vira_a_base()
+    {
+        var host = await StartAsync();
+        var source = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var page = await host.AddPageAsync("Outra");
+        var second = await host.DuplicateWidgetAsync(source.InstanceId, page, (0, 0));
+        var third = await host.DuplicateWidgetAsync(second!.Value, page, (2, 0));
+        Assert.Equal("Contador (exemplo) 3", host.DisplayNameOf(third!.Value));
+
+        await host.RenameWidgetAsync(third.Value, "Café");
+        var fourth = await host.DuplicateWidgetAsync(third.Value, page, (4, 0));
+        Assert.Equal("Café 2", host.DisplayNameOf(fourth!.Value));
+    }
+
+    [Fact]
+    public async Task Mover_para_outra_pagina_leva_a_mesma_instancia_e_recusa_se_nao_couber()
+    {
+        var host = await StartAsync();
+        await host.ActivateAsync(true);
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var id = counter.InstanceId;
+        var page = await host.AddPageAsync("Outra");
+
+        // Página cheia de contadores: não sobra lugar.
+        var full = await host.AddPageAsync("Cheia");
+        while (await host.AddWidgetAsync(Counter, full) is not null)
+        {
+        }
+        Assert.Null(host.Layout.Pages[full].FindPlace(counter.Size));
+        Assert.False(await host.MoveWidgetToPageAsync(id, full, (0, 0)));
+        Assert.Contains(host.Layout.Pages[0].Widgets, w => w.InstanceId == id);
+
+        Assert.True(await host.MoveWidgetToPageAsync(id, page, (3, 4)));
+        Assert.DoesNotContain(host.Layout.Pages[0].Widgets, w => w.InstanceId == id);
+        var moved = Assert.Single(host.Layout.Pages[page].Widgets);
+        Assert.Equal((id, 3, 4), (moved.InstanceId, moved.Column, moved.Row));
+        Assert.True(host.GetSettings(id)!.Value.Context.IsAsleep); // a página dele não está no aparelho
+        Assert.Contains(new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[page].Widgets, w => w.InstanceId == id);
+
+        // De volta para a página que está no aparelho: acorda.
+        var free = host.Layout.Pages[0].FindPlace(moved.Size)!.Value;
+        Assert.True(await host.MoveWidgetToPageAsync(id, 0, free));
+        Assert.False(host.GetSettings(id)!.Value.Context.IsAsleep);
+    }
+
+    [Fact]
+    public void FindPlace_prefere_a_posicao_pedida_e_cai_na_primeira_livre()
+    {
+        var page = new LayoutPage { Widgets = [new WidgetPlacement { Column = 0, Row = 0, Size = WidgetSize.Large }] };
+        Assert.Equal((4, 2), page.FindPlace(WidgetSize.Small, (4, 2)));
+        Assert.Equal(page.FindFreeCell(WidgetSize.Small), page.FindPlace(WidgetSize.Small, (0, 0)));
+        Assert.Equal((0, 0), page.FindPlace(WidgetSize.Large, (0, 0), except: page.Widgets[0].InstanceId));
+    }
+
+    [Fact]
     public async Task Ao_abrir_de_novo_volta_na_pagina_em_que_estava()
     {
         var host = await StartAsync();

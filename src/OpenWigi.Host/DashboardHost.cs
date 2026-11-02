@@ -580,6 +580,121 @@ public event Action? LayoutChanged;
     }
 
     /// <summary>
+    /// Põe uma cópia do widget em <paramref name="page"/>, em <paramref name="at"/>: mesmo tipo e tamanho, nome novo
+    /// ("Relógio 2") e as configurações clonáveis e arquivos da original. Devolve o id da cópia, ou null se o plugin
+    /// não está instalado ou se ela não cabe ali.
+    /// </summary>
+    public async Task<Guid?> DuplicateWidgetAsync(Guid instanceId, int page, (int Column, int Row) at, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            if (page < 0 || page >= _layout.Pages.Count ||
+                _layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId) is not { } source ||
+                _catalog.Find(source.WidgetId) is not { } widget)
+                return null;
+            var target = _layout.Pages[page];
+            if (!target.CanPlace(at.Column, at.Row, source.Size))
+                return null;
+
+            var placement = new WidgetPlacement
+            {
+                WidgetId = source.WidgetId,
+                Name = SuggestName(CopyBaseName(source, widget.Manifest.Name)),
+                Column = at.Column,
+                Row = at.Row,
+                Size = source.Size,
+            };
+            // As configurações vão antes de criar a instância: o plugin já abre com elas.
+            await new InstanceStorage(InstancesDirectory, instanceId)
+                .CloneToAsync(new InstanceStorage(InstancesDirectory, placement.InstanceId), cancellationToken);
+            target.Widgets.Add(placement);
+            await CreateRuntimeAsync(placement, cancellationToken);
+            if (_runtimes.TryGetValue(placement.InstanceId, out var runtime))
+            {
+                var visible = _active && page == CurrentPage && _fullscreen is null;
+                runtime.Context.IsAsleep = !visible;
+                runtime.LastFrame = await runtime.RenderAsync(RenderReason.Initial, cancellationToken);
+                if (visible)
+                    await runtime.CallAsync("OnWakeAsync", (i, ct) => i.OnWakeAsync(ct), cancellationToken);
+                else
+                    await runtime.CallAsync("OnSleepAsync", (i, ct) => i.OnSleepAsync(ct), cancellationToken);
+            }
+            await CommitLayoutAsync(page, cancellationToken);
+            return placement.InstanceId;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    // Base do nome da cópia: o nome que a pessoa deu, ou o do widget se era só o sugerido ("Relógio 2" vira "Relógio 3").
+    private static string CopyBaseName(WidgetPlacement source, string widgetName)
+    {
+        if (source.Name is not { Length: > 0 } name)
+            return widgetName;
+        var suffix = name.StartsWith(widgetName, StringComparison.OrdinalIgnoreCase) ? name[widgetName.Length..] : null;
+        return suffix is not null && (suffix.Length == 0 || (suffix[0] == ' ' && int.TryParse(suffix.AsSpan(1), out _)))
+            ? widgetName
+            : name;
+    }
+
+    /// <summary>
+    /// Leva o widget (a mesma instância, com as configurações) para <paramref name="page"/>, em <paramref name="at"/>.
+    /// Na mesma página é um mover comum. False se ele não cabe ali.
+    /// </summary>
+    public async Task<bool> MoveWidgetToPageAsync(Guid instanceId, int page, (int Column, int Row) at, CancellationToken cancellationToken = default)
+    {
+        await _state.WaitAsync(cancellationToken);
+        try
+        {
+            var from = _layout.Pages.FindIndex(p => p.Widgets.Any(w => w.InstanceId == instanceId));
+            if (from < 0 || page < 0 || page >= _layout.Pages.Count)
+                return false;
+            var placement = _layout.Pages[from].Widgets.First(w => w.InstanceId == instanceId);
+            var target = _layout.Pages[page];
+            if (!target.CanPlace(at.Column, at.Row, placement.Size, except: instanceId))
+                return false;
+
+            _layout.Pages[from].Widgets.Remove(placement);
+            placement.Column = at.Column;
+            placement.Row = at.Row;
+            target.Widgets.Add(placement);
+
+            if (_runtimes.TryGetValue(instanceId, out var runtime))
+            {
+                if (ReferenceEquals(_pressTarget, runtime))
+                    _pressTarget = null;
+                if (ReferenceEquals(_fullscreen, runtime) && page != from)
+                {
+                    // Indo para outra página, sai da tela cheia: senão ela cobriria a página que ficou no aparelho.
+                    _fullscreen = null;
+                    runtime.Context.IsFullscreen = false;
+                    await runtime.CallAsync("OnFullscreenChangedAsync", (i, ct) => i.OnFullscreenChangedAsync(false, ct), cancellationToken);
+                    runtime.LastFrame = await runtime.RenderAsync(RenderReason.FullscreenChanged, cancellationToken) ?? runtime.LastFrame;
+                }
+                await SyncGeometryAsync(runtime, cancellationToken);
+                var visible = _active && page == CurrentPage && _fullscreen is null;
+                if (visible && runtime.Context.IsAsleep)
+                {
+                    runtime.Context.IsAsleep = false;
+                    await runtime.CallAsync("OnWakeAsync", (i, ct) => i.OnWakeAsync(ct), cancellationToken);
+                    runtime.LastFrame = await runtime.RenderAsync(RenderReason.Resumed, cancellationToken) ?? runtime.LastFrame;
+                }
+                else if (!visible && !runtime.Context.IsAsleep)
+                    await SleepAsync(runtime, cancellationToken);
+            }
+            await CommitLayoutAsync(from == CurrentPage ? from : page, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _state.Release();
+        }
+    }
+
+    /// <summary>
     /// Muda o tamanho de um widget no lugar onde ele está. A instância é recriada no tamanho novo
     /// (o contrato fixa o tamanho por instância), mas mantém o id, as configurações e os arquivos.
     /// False se o widget não suporta o tamanho ou se ele não cabe ali.

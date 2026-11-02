@@ -31,6 +31,33 @@
                 const r = el.getBoundingClientRect();
                 return [r.left, r.top, r.width, r.height];
             },
+            // Retângulos de vários elementos (as miniaturas das páginas), na ordem do documento.
+            rects: selector => [...document.querySelectorAll(selector)].map(el => {
+                const r = el.getBoundingClientRect();
+                return [r.left, r.top, r.width, r.height];
+            }),
+            // Arrastar um widget para fora do Canvas (até uma miniatura): o Canvas segura o ponteiro até soltar,
+            // senão o arraste acabaria ao sair dele.
+            capture: (el, pointerId) => {
+                try { el.setPointerCapture(pointerId); } catch { /* o ponteiro já foi solto */ }
+            },
+            // Ctrl+C, Ctrl+X, Ctrl+V e Ctrl+D no editor de widgets. Como o Delete: não vale digitando nem com diálogo aberto.
+            onEditKeys: target => {
+                const keys = { c: 'copy', x: 'cut', v: 'paste', d: 'duplicate' };
+                const handler = e => {
+                    const action = e.key === 'Escape' ? 'escape' : (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey ? keys[e.key.toLowerCase()] : null;
+                    if (!action || e.repeat) return;
+                    const el = document.activeElement;
+                    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+                    if (document.querySelector('.mud-dialog')) return;
+                    // Texto selecionado na janela: o Ctrl+C é do texto.
+                    if (action === 'copy' && String(window.getSelection() ?? '').length > 0) return;
+                    if (action !== 'escape') e.preventDefault();
+                    target.invokeMethodAsync('EditKey', action);
+                };
+                document.addEventListener('keydown', handler);
+                return { dispose: () => document.removeEventListener('keydown', handler) };
+            },
             // Delete no editor de widgets. Não vale enquanto se digita (campo de nome) ou com um diálogo aberto.
             onDeleteKey: target => {
                 const handler = e => {

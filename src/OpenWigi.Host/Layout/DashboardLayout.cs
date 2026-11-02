@@ -39,6 +39,29 @@ public sealed class LayoutPage
                     return (column, row);
         return null;
     }
+
+    /// <summary>
+    /// O tamanho cabe em (<paramref name="column"/>, <paramref name="row"/>) sem sair da grade nem cobrir outro widget?
+    /// <paramref name="except"/> não conta (o próprio widget que está sendo movido).
+    /// </summary>
+    public bool CanPlace(int column, int row, WidgetSize size, Guid? except = null) =>
+        column >= 0 && row >= 0 && column + size.Columns <= WidgetGrid.Columns && row + size.Rows <= WidgetGrid.Rows &&
+        !Widgets.Any(w => w.InstanceId != except && w.Overlaps(column, row, size));
+
+    /// <summary>
+    /// Onde pôr um widget deste tamanho: em <paramref name="preferred"/> se couber ali, senão na primeira posição livre.
+    /// null = não cabe nesta página.
+    /// </summary>
+    public (int Column, int Row)? FindPlace(WidgetSize size, (int Column, int Row)? preferred = null, Guid? except = null)
+    {
+        if (preferred is { } p && CanPlace(p.Column, p.Row, size, except))
+            return p;
+        for (var row = 0; row + size.Rows <= WidgetGrid.Rows; row++)
+            for (var column = 0; column + size.Columns <= WidgetGrid.Columns; column++)
+                if (CanPlace(column, row, size, except))
+                    return (column, row);
+        return null;
+    }
 }
 
 public sealed class WidgetPlacement

@@ -124,6 +124,22 @@ internal sealed class InstanceStorage : IWidgetSettings, IWidgetFiles
         }
     }
 
+    /// <summary>
+    /// Copia para <paramref name="target"/> (a instância nova de um widget duplicado) as configurações marcadas como
+    /// clonáveis e os arquivos. O que o plugin gravou com <c>cloneable: false</c> (token, id de sessão) fica só aqui.
+    /// </summary>
+    public async Task CloneToAsync(InstanceStorage target, CancellationToken cancellationToken = default)
+    {
+        foreach (var (key, entry) in await LoadAsync(cancellationToken))
+            if (entry.Cloneable)
+                await target.SetAsync(key, entry.Value, cloneable: true, cancellationToken);
+
+        var files = await ReadAsync<Dictionary<string, string>>(_filesPath, cancellationToken) ?? [];
+        foreach (var (fileId, path) in files)
+            if (File.Exists(path))
+                await target.ImportAsync(fileId, path, cancellationToken);
+    }
+
     /// <summary>Apaga tudo da instância (o widget foi tirado do layout).</summary>
     public void DeleteAll()
     {
