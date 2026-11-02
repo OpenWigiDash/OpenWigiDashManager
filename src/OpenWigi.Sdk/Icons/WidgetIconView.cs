@@ -45,22 +45,29 @@ public sealed class WidgetIconView : ComponentBase
             return;
         }
 
+        // Caixa quadrada de Size x Size, com os glifos nas mesmas posições do tile (WidgetIconLayout): num ícone
+        // combinado, o principal um pouco menor e para cima e para a esquerda, o destaque no círculo do canto de baixo.
+        var place = WidgetIconLayout.Place(icon, new IconRect(0, 0, Size, Size), Size);
         builder.OpenElement(10, "span");
         builder.AddAttribute(11, "class", Class);
         builder.AddAttribute(12, "title", icon.Name);
         builder.AddAttribute(13, "style",
-            $"position:relative;display:inline-block;font-family:{WidgetIcons.FontFamily};font-size:{Px(Size)};"
-            + $"line-height:1.2;width:{Px(Size * 1.15)};text-align:center;font-style:normal");
-        builder.AddContent(14, icon.Glyph);
-        if (icon.Accent is { } accent)
-        {
-            builder.OpenElement(15, "span");
-            builder.AddAttribute(16, "style",
-                $"position:absolute;right:{Px(-Size * 0.12)};bottom:{Px(-Size * 0.02)};font-size:{Px(Size * WidgetIconLayout.AccentScale)};"
-                + $"line-height:1;padding:1px;border-radius:50%;background:{Background}");
-            builder.AddContent(17, accent);
-            builder.CloseElement();
-        }
+            $"position:relative;display:inline-block;flex:0 0 auto;width:{Px(Size)};height:{Px(Size)};"
+            + $"font-family:{WidgetIcons.FontFamily};font-style:normal;line-height:1");
+        Glyph(builder, 20, icon.Glyph, place.Main, place.MainSize, null);
+        if (icon.Accent is { } accent && place.AccentCircle is { } circle)
+            Glyph(builder, 30, accent, circle, place.AccentSize, Background);
+        builder.CloseElement();
+    }
+
+    private static void Glyph(RenderTreeBuilder builder, int seq, string glyph, IconRect box, float size, string? background)
+    {
+        builder.OpenElement(seq, "span");
+        builder.AddAttribute(seq + 1, "style",
+            $"position:absolute;left:{Px(box.X)};top:{Px(box.Y)};width:{Px(box.Width)};height:{Px(box.Height)};"
+            + $"display:flex;align-items:center;justify-content:center;font-size:{Px(size)}"
+            + (background is null ? "" : $";border-radius:50%;background:{background}"));
+        builder.AddContent(seq + 2, glyph);
         builder.CloseElement();
     }
 

@@ -134,8 +134,10 @@ public partial class WidgetIconsTests
         var html = await RenderAsync(new Dictionary<string, object?> { ["IconKey"] = "webcam-mic", ["Size"] = 30 });
         Assert.Contains("", html);
         Assert.Contains("", html);
-        Assert.Contains("font-size:30px", html);
-        Assert.Contains("font-size:15px", html);
+        // As mesmas posições do tile (WidgetIconLayout): principal a 86%, deslocado para cima e para a esquerda,
+        // e o microfone com metade do tamanho num círculo no canto de baixo, à direita.
+        Assert.Contains("left:-2.4px;top:-1.8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:25.8px", html);
+        Assert.Contains("left:14.7px;top:13.5px;width:18.6px;height:18.6px;display:flex;align-items:center;justify-content:center;font-size:15px;border-radius:50%", html);
         Assert.Contains("Segoe Fluent Icons", html);
     }
 
