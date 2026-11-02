@@ -171,7 +171,7 @@ public sealed class AgentClient : IAsyncDisposable
                 case DeviceStatus status:
                     Device = status;
                     if (!status.Connected)
-                        Set(AgentStatus.NoDevice, NoDeviceReason);
+                        Set(AgentStatus.NoDevice, status.Reconnecting ? ReconnectingReason : NoDeviceReason);
                     else
                         Changed?.Invoke();
                     break;
@@ -202,6 +202,8 @@ public sealed class AgentClient : IAsyncDisposable
             }
         }
     }
+
+    private const string ReconnectingReason = "A conexão USB com o WigiDash caiu; o serviço está tentando de novo.";
 
     private const string NoDeviceReason = "WigiDash desconectado. Sem o aparelho? Escolha o WigiDash virtual em Ajustes.";
 

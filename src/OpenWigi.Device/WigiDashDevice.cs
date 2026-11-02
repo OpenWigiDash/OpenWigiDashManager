@@ -38,7 +38,17 @@ public sealed class WigiDashDevice : IDisposable
     {
         devicePath ??= WinUsbDeviceFinder.FindDevicePaths().FirstOrDefault()
             ?? throw new IOException("Nenhum WigiDash conectado.");
-        return new WigiDashDevice(WinUsbTransport.Open(devicePath), gestures);
+        var transport = WinUsbTransport.Open(devicePath);
+        try
+        {
+            return new WigiDashDevice(transport, gestures);
+        }
+        catch
+        {
+            // Sem isso o handle do WinUSB ficava aberto quando a primeira leitura (GetInfo) falhava.
+            transport.Dispose();
+            throw;
+        }
     }
 
     public DeviceInfo Info { get; }

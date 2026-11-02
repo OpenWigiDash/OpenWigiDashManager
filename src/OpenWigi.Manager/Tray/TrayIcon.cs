@@ -92,7 +92,7 @@ public sealed class TrayIcon : IDisposable
     {
         var status = _agent.Status;
         // Texto da dica: até 127 caracteres no Windows.
-        var text = $"OpenWigiDash {AppVersion.Display} — {Describe(status)}";
+        var text = $"OpenWigiDash {AppVersion.Display} — {(_agent.Status != AgentStatus.NoService && _agent.Device.Reconnecting ? "reconectando ao aparelho" : Describe(status))}";
         _icon.Text = text.Length > 127 ? text[..127] : text;
 
         var name = ResourceName(status, TaskbarIsLight());

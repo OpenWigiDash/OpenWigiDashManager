@@ -1,12 +1,20 @@
 @implements IDisposable
 @inject AgentClient Agent
 
-<MudTooltip Text="@Agent.Reason">
+<MudTooltip Text="@Tooltip">
     <MudChip T="string" Size="Size.Small" Color="@ChipColor" Variant="Variant.Outlined" Icon="@ChipIcon">@Label</MudChip>
 </MudTooltip>
 
 @code {
-    private string Label => Agent.Status switch
+    // O serviço está tentando de novo com o aparelho no cabo: um aviso só, em vez de piscar entre
+    // "Mostrando o seu painel" e "Aparelho desconectado" a cada tentativa.
+    private bool Reconnecting => Agent.Status != AgentStatus.NoService && Agent.Device.Reconnecting;
+
+    private string Tooltip => Reconnecting
+        ? "A conexão USB com o WigiDash está caindo. O serviço está tentando de novo e, se precisar, reseta o USB sozinho."
+        : Agent.Reason;
+
+    private string Label => Reconnecting ? "Reconectando ao aparelho…" : Agent.Status switch
     {
         AgentStatus.Owner => "Mostrando o seu painel",
         AgentStatus.Waiting => "Tela em outra sessão",
@@ -14,14 +22,14 @@
         _ => "Serviço não encontrado",
     };
 
-    private Color ChipColor => Agent.Status switch
+    private Color ChipColor => Reconnecting ? Color.Info : Agent.Status switch
     {
         AgentStatus.Owner => Color.Success,
         AgentStatus.Waiting => Color.Secondary,
         _ => Color.Warning,
     };
 
-    private string ChipIcon => Agent.Status switch
+    private string ChipIcon => Reconnecting ? Icons.Material.Filled.Sync : Agent.Status switch
     {
         AgentStatus.Owner => Icons.Material.Filled.CheckCircle,
         AgentStatus.Waiting => Icons.Material.Filled.PauseCircle,
