@@ -25,7 +25,7 @@ Tudo fica no perfil do usuário do Windows, então cada pessoa da casa tem o pr�
 
 ## Tela
 
-- **Grade:** 10x8 meias células com 4 px de espaço (colunas de 98 px, linhas de 70 e 71 px alternadas). O `layout.json` da grade 5x4 é convertido na primeira abertura (posição e tamanho dobram, nada muda de lugar) e ganha `"grid": 2`.
+- **Grade:** 10x8 meias células com 4 px de espaço entre elas e a mesma folga até a borda da tela (5 px nas laterais, 4 px em cima e embaixo; colunas de 97 px, linhas de 69 e 70 px alternadas). Toque na folga da borda vai para o widget da borda. O `layout.json` da grade 5x4 é convertido na primeira abertura (posição e tamanho dobram, nada muda de lugar) e ganha `"grid": 2`.
 - **Moldura:** cada página tem a sua (`LayoutPage.Frame`): respiro, borda, cantos e cores. O compositor pinta fundo, borda e canto arredondado (com suavização) ao montar a página, e corta de novo o canto do conteúdo depois de cada quadro do widget. Tela cheia fica sem moldura. Trocar a moldura chama `OnSizeChangedAsync` nos widgets cuja área mudou e redesenha a página.
 - **Primeira execução:** sem layout, o host põe um de cada widget instalado na primeira posição livre.
 

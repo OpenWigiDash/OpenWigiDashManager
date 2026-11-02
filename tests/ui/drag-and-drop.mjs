@@ -11,8 +11,9 @@ const before = await counter.getAttribute('style');
 console.log('antes:', before);
 
 // Vai para o canto inferior direito, ou para o inferior esquerdo se já estiver lá.
-// Grade 10x8 de meias células; o contador (2x2) no canto começa na coluna 9, linha 7.
-const atCorner = before.includes('grid-column: 9') && before.includes('grid-row: 7');
+// Grade 10x8 de meias células; o contador (2x2) no canto começa na coluna 9, linha 7, que no CSS são as
+// linhas 10 e 8 (a primeira trilha da grade CSS é a folga da borda).
+const atCorner = before.includes('grid-column: 10') && before.includes('grid-row: 8');
 const grid = await page.locator('.owd-grid').boundingBox();
 const cellW = grid.width / 10, cellH = grid.height / 8;
 const target = { x: grid.x + cellW * (atCorner ? 0.5 : 8.5), y: grid.y + cellH * 6.5 };

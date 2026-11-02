@@ -72,13 +72,13 @@
                 {
                     var column = i % WidgetGrid.Columns;
                     var row = i / WidgetGrid.Columns;
-                    <div class="owd-cell-empty owd-cell-pick" style="grid-column: @(column + 1); grid-row: @(row + 1)"
+                    <div class="owd-cell-empty owd-cell-pick" style="grid-column: @(column + 2); grid-row: @(row + 2)"
                          @onclick="() => _at = (column, row)"></div>
                 }
                 @foreach (var placement in Page.Widgets)
                 {
                     <div class="owd-widget owd-occupied" title="@(NameOf(placement.InstanceId) ?? "Widget")"
-                         style="grid-column: @(placement.Column + 1) / span @placement.Size.Columns; grid-row: @(placement.Row + 1) / span @placement.Size.Rows">
+                         style="grid-column: @(placement.Column + 2) / span @placement.Size.Columns; grid-row: @(placement.Row + 2) / span @placement.Size.Rows">
                         @* Os widgets que já estão na página aparecem como no Canvas, ao vivo. *@
                         @if (Dashboard is not null)
                         {
@@ -95,7 +95,7 @@
                     var c = Math.Min(at.Column, WidgetGrid.Columns - 1);
                     var r = Math.Min(at.Row, WidgetGrid.Rows - 1);
                     <div class="owd-drop owd-drop-preview @(Fits ? "ok" : "bad")"
-                         style="grid-column: @(c + 1) / span @Math.Min(_size.Columns, WidgetGrid.Columns - c); grid-row: @(r + 1) / span @Math.Min(_size.Rows, WidgetGrid.Rows - r)">
+                         style="grid-column: @(c + 2) / span @Math.Min(_size.Columns, WidgetGrid.Columns - c); grid-row: @(r + 2) / span @Math.Min(_size.Rows, WidgetGrid.Rows - r)">
                         @* Como o widget novo vai ficar: a prévia do plugin nesse tamanho, quando ele tem. *@
                         @if (_preview is not null && Fits)
                         {

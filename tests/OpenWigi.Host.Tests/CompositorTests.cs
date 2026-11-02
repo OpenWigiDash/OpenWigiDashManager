@@ -45,7 +45,7 @@ public class CompositorTests
 
         var write = Assert.Single(sink.Writes);
         Assert.Equal(bounds.Y * Compositor.RowBytes, write.Offset);
-        Assert.Equal(145 * Compositor.RowBytes, write.Length);
+        Assert.Equal(143 * Compositor.RowBytes, write.Length);
     }
 
     [Fact]
@@ -58,10 +58,10 @@ public class CompositorTests
 
         compositor.Draw(top, WidgetFrame.Solid(new PixelSize(top.Width, top.Height), 255, 0, 0));
         compositor.Draw(bottom, WidgetFrame.Solid(new PixelSize(bottom.Width, bottom.Height), 255, 0, 0));
-        Assert.Equal([(0, 70), (521, 592)], compositor.DirtyBands);
+        Assert.Equal([(4, 73), (518, 588)], compositor.DirtyBands);
         await compositor.FlushAsync(CancellationToken.None);
 
-        Assert.Equal([(0, 70 * Compositor.RowBytes), (521 * Compositor.RowBytes, 71 * Compositor.RowBytes)],
+        Assert.Equal([(4 * Compositor.RowBytes, 69 * Compositor.RowBytes), (518 * Compositor.RowBytes, 70 * Compositor.RowBytes)],
             sink.Writes.Select(w => (w.Offset, w.Length)));
     }
 
@@ -69,15 +69,15 @@ public class CompositorTests
     public void Faixas_perto_ou_sobrepostas_viram_uma_so()
     {
         var compositor = new Compositor(new RecordingSink());
-        var row0 = WidgetGrid.CellBounds(0, 0, WidgetSize.Mini); // 0..70
-        var row1 = WidgetGrid.CellBounds(0, 1, WidgetSize.Mini); // 74..145, 4 linhas depois
-        var row4 = WidgetGrid.CellBounds(0, 4, WidgetSize.Mini); // 298..368
+        var row0 = WidgetGrid.CellBounds(0, 0, WidgetSize.Mini); // 4..73
+        var row1 = WidgetGrid.CellBounds(0, 1, WidgetSize.Mini); // 77..147, 4 linhas depois
+        var row4 = WidgetGrid.CellBounds(0, 4, WidgetSize.Mini); // 298..367
 
         compositor.Draw(row4, WidgetFrame.Solid(new PixelSize(row4.Width, row4.Height), 1, 1, 1));
         compositor.Draw(row0, WidgetFrame.Solid(new PixelSize(row0.Width, row0.Height), 1, 1, 1));
         compositor.Draw(row1, WidgetFrame.Solid(new PixelSize(row1.Width, row1.Height), 1, 1, 1));
 
-        Assert.Equal([(0, 145), (298, 368)], compositor.DirtyBands);
+        Assert.Equal([(4, 147), (298, 367)], compositor.DirtyBands);
     }
 
     [Fact]
@@ -117,8 +117,9 @@ public class CompositorTests
 
         var white = WidgetFrame.Solid(WidgetSize.Small.CellSpan, 255, 255, 255);
         await compositor.ShowPageAsync(TileFrame.None.Background, [(shape, white)], Transition.None, CancellationToken.None);
-        Assert.Equal(0xFFFF, Pixel(sink.LastFullPage!, 0, 0));
-        Assert.Equal(0xFFFF, Pixel(sink.LastFullPage!, 199, 144));
+        Assert.Equal(0xFFFF, Pixel(sink.LastFullPage!, shape.Cell.X, shape.Cell.Y));
+        Assert.Equal(0xFFFF, Pixel(sink.LastFullPage!, shape.Cell.Right - 1, shape.Cell.Bottom - 1));
+        Assert.Equal(0, Pixel(sink.LastFullPage!, 0, 0)); // folga da borda: fundo da página
     }
 
     [Fact]
@@ -166,7 +167,7 @@ public class CompositorTests
 
             var widgets = layout.Pages[0].Widgets;
             Assert.Equal((2, 4, WidgetSize.Wide), (widgets[0].Column, widgets[0].Row, widgets[0].Size));
-            Assert.Equal(new PixelRect(204, 298, 404, 145), widgets[0].Bounds); // o mesmo lugar da grade 5x4
+            Assert.Equal(new PixelRect(207, 298, 400, 143), widgets[0].Bounds); // o mesmo lugar da grade 5x4
             Assert.Equal((8, 6, WidgetSize.Small), (widgets[1].Column, widgets[1].Row, widgets[1].Size));
             Assert.Equal(TileFrame.Default, layout.Pages[0].Frame);
 

@@ -3,53 +3,59 @@ namespace OpenWigi.Sdk.Tests;
 public class GeometryTests
 {
     [Theory]
-    [InlineData(1, 1, 98, 70)]
-    [InlineData(2, 2, 200, 145)]
-    [InlineData(4, 2, 404, 145)]
-    [InlineData(4, 4, 404, 294)]
-    [InlineData(3, 2, 302, 145)]
-    [InlineData(10, 8, 1016, 592)]
+    [InlineData(1, 1, 97, 69)]
+    [InlineData(2, 2, 198, 143)]
+    [InlineData(4, 2, 400, 143)]
+    [InlineData(4, 4, 400, 290)]
+    [InlineData(3, 2, 299, 143)]
+    [InlineData(10, 8, 1006, 584)]
     public void Celulas_somam_meias_celulas_e_espacamento(int columns, int rows, int width, int height)
     {
         Assert.Equal(new PixelSize(width, height), new WidgetSize(columns, rows).CellSpan);
     }
 
     [Fact]
-    public void Tamanhos_da_grade_5x4_tem_os_mesmos_pixels()
+    public void Tamanhos_com_nome()
     {
-        Assert.Equal(new PixelSize(200, 145), WidgetSize.Small.CellSpan);
-        Assert.Equal(new PixelSize(404, 145), WidgetSize.Wide.CellSpan);
-        Assert.Equal(new PixelSize(404, 294), WidgetSize.Large.CellSpan);
-        Assert.Equal(new PixelSize(98, 70), WidgetSize.Mini.CellSpan);
+        Assert.Equal(new PixelSize(198, 143), WidgetSize.Small.CellSpan);
+        Assert.Equal(new PixelSize(400, 143), WidgetSize.Wide.CellSpan);
+        Assert.Equal(new PixelSize(400, 290), WidgetSize.Large.CellSpan);
+        Assert.Equal(new PixelSize(97, 69), WidgetSize.Mini.CellSpan);
     }
 
     [Fact]
-    public void Grade_cheia_fecha_a_tela_do_WigiDash()
+    public void Grade_cheia_deixa_nas_bordas_a_mesma_folga_que_entre_as_celulas()
     {
         Assert.Equal(new PixelSize(1016, 592), WidgetGrid.Screen);
-        Assert.Equal(WidgetGrid.Screen, WidgetSize.FullScreen.CellSpan);
-        Assert.Equal(new PixelRect(0, 0, 1016, 592), WidgetGrid.CellBounds(0, 0, WidgetSize.FullScreen));
+        var full = WidgetGrid.CellBounds(0, 0, WidgetSize.FullScreen);
+        Assert.Equal(WidgetGrid.Area, full);
+        Assert.Equal(new PixelRect(5, 4, 1006, 584), full);
+        // 5 px nas laterais e 4 px em cima e embaixo: o espaço entre duas células é 4.
+        Assert.Equal(WidgetGrid.Screen.Width - full.Right, full.X);
+        Assert.Equal(WidgetGrid.Screen.Height - full.Bottom, full.Y);
+        Assert.Equal(WidgetGrid.Gap, WidgetGrid.CellBounds(1, 0, WidgetSize.Mini).X - WidgetGrid.CellBounds(0, 0, WidgetSize.Mini).Right);
+        Assert.Equal(WidgetGrid.Gap, WidgetGrid.CellBounds(0, 1, WidgetSize.Mini).Y - WidgetGrid.CellBounds(0, 0, WidgetSize.Mini).Bottom);
+        Assert.Equal(WidgetGrid.Gap, full.Y);
     }
 
     [Fact]
-    public void Linhas_alternam_70_e_71_e_cada_par_fecha_uma_celula_antiga()
+    public void Linhas_alternam_69_e_70()
     {
-        Assert.Equal(new PixelRect(0, 0, 98, 70), WidgetGrid.CellBounds(0, 0, WidgetSize.Mini));
-        Assert.Equal(new PixelRect(102, 74, 98, 71), WidgetGrid.CellBounds(1, 1, WidgetSize.Mini));
-        Assert.Equal(new PixelRect(918, 521, 98, 71), WidgetGrid.CellBounds(9, 7, WidgetSize.Mini));
-        // Posições pares são as células da grade 5x4.
+        Assert.Equal(new PixelRect(5, 4, 97, 69), WidgetGrid.CellBounds(0, 0, WidgetSize.Mini));
+        Assert.Equal(new PixelRect(106, 77, 97, 70), WidgetGrid.CellBounds(1, 1, WidgetSize.Mini));
+        Assert.Equal(new PixelRect(914, 518, 97, 70), WidgetGrid.CellBounds(9, 7, WidgetSize.Mini));
         for (var c = 0; c < 5; c++)
             for (var r = 0; r < 4; r++)
-                Assert.Equal(new PixelRect(c * 204, r * 149, 200, 145), WidgetGrid.CellBounds(c * 2, r * 2, WidgetSize.Small));
+                Assert.Equal(new PixelRect(5 + c * 202, 4 + r * 147, 198, 143), WidgetGrid.CellBounds(c * 2, r * 2, WidgetSize.Small));
     }
 
     [Fact]
     public void Numero_par_de_linhas_tem_a_mesma_altura_em_qualquer_linha()
     {
         for (var row = 0; row + 2 <= WidgetGrid.Rows; row++)
-            Assert.Equal(145, WidgetGrid.CellBounds(0, row, WidgetSize.Small).Height);
-        Assert.Equal(70, WidgetGrid.CellBounds(0, 2, new WidgetSize(1, 3)).Height - 149);
-        Assert.Equal(71, WidgetGrid.CellBounds(0, 3, new WidgetSize(1, 3)).Height - 149);
+            Assert.Equal(143, WidgetGrid.CellBounds(0, row, WidgetSize.Small).Height);
+        Assert.Equal(69, WidgetGrid.CellBounds(0, 2, new WidgetSize(1, 3)).Height - 147);
+        Assert.Equal(70, WidgetGrid.CellBounds(0, 3, new WidgetSize(1, 3)).Height - 147);
     }
 
     [Fact]

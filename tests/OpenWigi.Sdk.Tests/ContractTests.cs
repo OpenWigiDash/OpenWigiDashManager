@@ -130,8 +130,8 @@ public class ContractTests
         IWidgetInstance instance = await new CounterWidget().CreateInstanceAsync(context, default);
 
         var first = await instance.RenderAsync(RenderReason.Initial, default);
-        // A moldura padrão não tira nada: o 4x2 desenha nos 404x145 inteiros.
-        Assert.Equal(new PixelSize(404, 145), first.Size);
+        // A moldura padrão não tira nada: o 4x2 desenha nos 400x143 inteiros.
+        Assert.Equal(new PixelSize(400, 143), first.Size);
 
         await instance.OnTouchAsync(new TouchEvent(TouchKind.Tap, 10, 10, TimeSpan.FromMilliseconds(80)), default);
         Assert.Single(context.Presented);

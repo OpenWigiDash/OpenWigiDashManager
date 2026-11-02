@@ -16,26 +16,27 @@ compatibilidade binária: plugin antigo precisa ser portado.
 
 ## Grade
 
-**10 colunas por 8 linhas de meias células**, com **4 px** entre elas, fechando os 1016x592 da tela.
-As colunas têm 98 px. As linhas alternam 70 px (pares) e 71 px (ímpares), então duas linhas somam
-sempre 145 px: os tamanhos da grade 5x4 antiga continuam com os mesmos pixels.
+**10 colunas por 8 linhas de meias células**, com **4 px** entre elas e a mesma folga entre a grade e a
+borda da tela (5 px nas laterais, 4 px no topo e no rodapé), dentro dos 1016x592 da tela
+(`WidgetGrid.Area` é a parte coberta pelas células). As colunas têm 97 px. As linhas alternam 69 px
+(pares) e 70 px (ímpares), então duas linhas somam sempre 143 px em qualquer posição.
 
 | `WidgetSize` | Meias células | Células em pixels |
 |---|---|---|
-| `Mini` | 1x1 | 98x70 (ou 98x71 numa linha ímpar) |
-| `Small` | 2x2 | 200x145 |
-| `Wide` | 4x2 | 404x145 |
-| `Large` | 4x4 | 404x294 |
-| `FullScreen` | 10x8 | 1016x592 |
+| `Mini` | 1x1 | 97x69 (ou 97x70 numa linha ímpar) |
+| `Small` | 2x2 | 198x143 |
+| `Wide` | 4x2 | 400x143 |
+| `Large` | 4x4 | 400x290 |
+| `FullScreen` | 10x8 | 1006x584 (a tela inteira é o modo tela cheia, não um tamanho da grade) |
 
-**O 1x1 é para botão com ícone.** Com 98x70 (88x60 com a moldura completa) não cabe texto legível.
+**O 1x1 é para botão com ícone.** Com 97x69 (87x59 com a moldura completa) não cabe texto legível.
 Ofereça `Mini` só nos widgets que são um toque num ícone (mutar, microfone, atalho); widgets com texto,
 lista ou número começam em `Small`.
 
-Qualquer tamanho de 1x1 a 10x8 vale (ex.: `new WidgetSize(3, 2)` = 302x145). `WidgetSize.CellSpan` dá
+Qualquer tamanho de 1x1 a 10x8 vale (ex.: `new WidgetSize(3, 2)` = 299x143). `WidgetSize.CellSpan` dá
 os pixels das células começando numa linha par; `WidgetGrid.CellBounds(coluna, linha, tamanho)` dá o
 retângulo exato. Os valores de `WidgetGrid` são `static readonly`, não `const`, para não ficarem
-copiados dentro do plugin.
+copiados dentro do plugin. Não conte com esses números no plugin: desenhe sempre em `context.PixelSize`.
 
 ## Moldura e área de conteúdo
 
@@ -59,7 +60,7 @@ margem para a moldura. O host corta o canto do conteúdo, então deixe uns pixel
 se tiver texto ali. `WidgetTheme.CornerRadius` é só para painéis dentro do widget.
 
 **Teste todos os tamanhos:** a folga (`TileFrame.Inset`) vai de 0 a 7 px (`TileFrame.InsetOptions`),
-então um `Small` pode receber de 186x131 a 200x145. Use `TileFrame.ContentSize(celula)` para gerar os
+então um `Small` pode receber de 184x129 a 198x143. Use `TileFrame.ContentSize(celula)` para gerar os
 tamanhos nos testes. Em tela cheia não há moldura e `PixelSize` é a tela inteira.
 
 **Quando o tamanho muda:** a pessoa troca a moldura da página, ou move um widget de número ímpar de

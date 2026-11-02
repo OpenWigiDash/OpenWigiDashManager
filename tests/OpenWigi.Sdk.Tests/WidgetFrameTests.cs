@@ -7,17 +7,17 @@ public class WidgetFrameTests
     [Fact]
     public void Quadro_sem_regiao_suja_muda_inteiro()
     {
-        var frame = new WidgetFrame(Small, FramePixelFormat.Rgb565, new byte[200 * 145 * 2]);
-        Assert.Equal(400, frame.Stride);
+        var frame = new WidgetFrame(Small, FramePixelFormat.Rgb565, new byte[Small.Width * Small.Height * 2]);
+        Assert.Equal(Small.Width * 2, frame.Stride);
         Assert.Null(frame.Dirty);
-        Assert.Equal(new PixelRect(0, 0, 200, 145), frame.ChangedRegion);
+        Assert.Equal(PixelRect.FromSize(Small), frame.ChangedRegion);
     }
 
     [Fact]
     public void Regiao_suja_vira_a_area_alterada()
     {
         var dirty = new PixelRect(10, 20, 30, 40);
-        var frame = new WidgetFrame(Small, FramePixelFormat.Bgra32, new byte[200 * 145 * 4], dirty: dirty);
+        var frame = new WidgetFrame(Small, FramePixelFormat.Bgra32, new byte[Small.Width * Small.Height * 4], dirty: dirty);
         Assert.Equal(dirty, frame.ChangedRegion);
     }
 
@@ -25,18 +25,19 @@ public class WidgetFrameTests
     public void Buffer_curto_e_rejeitado()
     {
         Assert.Throws<ArgumentException>(() =>
-            new WidgetFrame(Small, FramePixelFormat.Bgra32, new byte[200 * 145 * 4 - 1]));
+            new WidgetFrame(Small, FramePixelFormat.Bgra32, new byte[Small.Width * Small.Height * 4 - 1]));
     }
 
     [Fact]
     public void Stride_maior_aceita_a_ultima_linha_sem_preenchimento()
     {
-        const int stride = 832;
-        var buffer = new byte[stride * 144 + 800];
+        var row = Small.Width * 4;
+        var stride = row + 32;
+        var buffer = new byte[stride * (Small.Height - 1) + row];
         var frame = new WidgetFrame(Small, FramePixelFormat.Bgra32, buffer, stride);
         Assert.Equal(stride, frame.Stride);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new WidgetFrame(Small, FramePixelFormat.Bgra32, buffer, stride: 799));
+            new WidgetFrame(Small, FramePixelFormat.Bgra32, buffer, stride: row - 1));
     }
 
     [Theory]
@@ -46,7 +47,7 @@ public class WidgetFrameTests
     public void Regiao_suja_fora_do_quadro_ou_vazia_e_rejeitada(int x, int y, int width, int height)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new WidgetFrame(Small, FramePixelFormat.Bgra32, new byte[200 * 145 * 4],
+            new WidgetFrame(Small, FramePixelFormat.Bgra32, new byte[Small.Width * Small.Height * 4],
                 dirty: new PixelRect(x, y, width, height)));
     }
 

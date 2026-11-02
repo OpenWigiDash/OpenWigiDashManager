@@ -34,14 +34,15 @@ public readonly record struct PixelRect(int X, int Y, int Width, int Height)
 }
 
 /// <summary>
-/// A grade da tela: 10 colunas por 8 linhas de meias células, com 4 px entre elas, fechando os 1016x592
-/// do WigiDash. As colunas têm 98 px. As linhas alternam 70 px (pares) e 71 px (ímpares), então um widget
-/// com número par de linhas tem sempre a mesma altura em qualquer posição, e 2x2 meias células dão os
-/// mesmos 200x145 da grade 5x4 antiga.
+/// A grade da tela: 10 colunas por 8 linhas de meias células dentro dos 1016x592 do WigiDash, com 4 px
+/// entre elas e a mesma folga entre a grade e a borda da tela (5 px nas laterais, 4 px no topo e no
+/// rodapé). As colunas têm 97 px. As linhas alternam 69 px (pares) e 70 px (ímpares), então um widget
+/// com número par de linhas tem sempre a mesma altura em qualquer posição (2x2 meias células dão 198x143).
 /// </summary>
 /// <remarks>
 /// Os valores são <c>static readonly</c> de propósito: <c>const</c> seria copiado para dentro do plugin
-/// na compilação e ficaria velho se a grade mudar.
+/// na compilação e ficaria velho se a grade mudar. Plugin não deve contar com esses números: o tamanho
+/// para desenhar é sempre o <see cref="IWidgetContext.PixelSize"/>.
 /// </remarks>
 public static class WidgetGrid
 {
@@ -51,21 +52,30 @@ public static class WidgetGrid
     /// <summary>Espaço fixo entre duas células vizinhas.</summary>
     public static readonly int Gap = 4;
 
-    public static readonly int ColumnWidth = 98;
+    /// <summary>Folga entre a grade e as bordas esquerda e direita da tela.</summary>
+    public static readonly int MarginX = 5;
 
-    /// <summary>Altura de um par de linhas mais o espaço depois dele (70 + 4 + 71 + 4).</summary>
-    private const int RowPairPitch = 149;
+    /// <summary>Folga entre a grade e as bordas de cima e de baixo da tela.</summary>
+    public static readonly int MarginY = 4;
+
+    public static readonly int ColumnWidth = 97;
+
+    /// <summary>Altura de um par de linhas mais o espaço depois dele (69 + 4 + 70 + 4).</summary>
+    private const int RowPairPitch = 147;
 
     public static PixelSize Screen { get; } = new(1016, 592);
 
+    /// <summary>Parte da tela coberta pelas células: a tela menos a folga das bordas.</summary>
+    public static PixelRect Area { get; } = new(5, 4, 1006, 584);
+
     /// <summary>X do começo da coluna, contando de 0.</summary>
-    public static int ColumnX(int column) => column * (ColumnWidth + Gap);
+    public static int ColumnX(int column) => MarginX + column * (ColumnWidth + Gap);
 
     /// <summary>Y do começo da linha, contando de 0.</summary>
-    public static int RowY(int row) => row / 2 * RowPairPitch + row % 2 * 74;
+    public static int RowY(int row) => MarginY + row / 2 * RowPairPitch + row % 2 * 73;
 
-    /// <summary>Altura da linha: 70 nas pares, 71 nas ímpares.</summary>
-    public static int RowHeight(int row) => row % 2 == 0 ? 70 : 71;
+    /// <summary>Altura da linha: 69 nas pares, 70 nas ímpares.</summary>
+    public static int RowHeight(int row) => row % 2 == 0 ? 69 : 70;
 
     /// <summary>Retângulo na tela ocupado por um widget de <paramref name="size"/> com canto em (coluna, linha).</summary>
     public static PixelRect CellBounds(int column, int row, WidgetSize size)
@@ -113,9 +123,9 @@ public readonly record struct WidgetSize
         }
     }
 
-    /// <summary>Botão pequeno: uma meia célula (98x70).</summary>
+    /// <summary>Botão pequeno: uma meia célula (97x69).</summary>
     public static WidgetSize Mini { get; } = new(1, 1);
-    /// <summary>O tile 1x1 da grade antiga (200x145).</summary>
+    /// <summary>O tile 1x1 da grade antiga 5x4 (198x143).</summary>
     public static WidgetSize Small { get; } = new(2, 2);
     public static WidgetSize Wide { get; } = new(4, 2);
     public static WidgetSize Large { get; } = new(4, 4);
@@ -140,7 +150,7 @@ public readonly record struct WidgetSize
 /// </summary>
 public sealed record TileFrame
 {
-    /// <summary>Respiro em volta de cada tile, além dos 4 px fixos da grade.</summary>
+    /// <summary>Respiro em volta de cada tile, além dos 4 px fixos da grade e da folga das bordas.</summary>
     public static IReadOnlyList<int> SpacingOptions { get; } = [0, 1, 2, 3];
 
     /// <summary>Larguras de borda possíveis.</summary>

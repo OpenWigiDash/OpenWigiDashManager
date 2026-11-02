@@ -23,14 +23,16 @@ html, body {
     right: 0.75rem;
 }
 
-/* Grade do editor: 10x8 meias células, mesma proporção do aparelho. O fundo é o da página.
-   Como no aparelho, os tiles da borda vão até a beira da tela: sem padding em volta da grade, e o espaço
-   entre as células é só o da WidgetGrid (4 px de 1016 na horizontal, 4 px de 592 na vertical).
+/* Grade do editor: 10x8 meias células, mesma proporção e mesmos espaços do aparelho (WidgetGrid). O fundo
+   é o da página. A primeira e a última trilha de cada lado são a folga entre a grade e a borda da tela:
+   com o espaço de 4 px depois delas, dão 5 px nas laterais e 4 px no topo e no rodapé. Por isso as
+   células começam na linha 2 da grade CSS (coluna + 2, linha + 2 nos .razor). Colunas: 1 + 10 x 97 + 1
+   mais 11 espaços de 4 = 1016. Linhas: 8 x 69,5 em média mais 9 espaços de 4 = 592.
    --owd-px é um pixel do aparelho na escala da grade, para desenhar a moldura dos tiles. */
 .owd-grid {
     display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(8, 1fr);
+    grid-template-columns: 1fr repeat(10, 97fr) 1fr;
+    grid-template-rows: 0 repeat(8, 1fr) 0;
     gap: calc(400% / 592) calc(400% / 1016);
     aspect-ratio: 1016 / 592;
     background: var(--owd-page-bg, #0e0f13);
@@ -373,11 +375,12 @@ html, body {
     box-shadow: 0 0 0 1px #e5243b;
 }
 
-/* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. */
+/* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. Trilhas vazias nas pontas, como na .owd-grid: a folga
+   da borda é o próprio espaço de 1 px. */
 .owd-thumb-grid {
     display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(8, 1fr);
+    grid-template-columns: 0 repeat(10, 1fr) 0;
+    grid-template-rows: 0 repeat(8, 1fr) 0;
     gap: 1px;
     width: 100%;
     height: 94px;
