@@ -1,6 +1,8 @@
 @* Prévia ao vivo de uma instância no tile do editor: o mesmo quadro que vai (ou iria) para o aparelho. *@
 @using System.Threading
+@using Microsoft.Extensions.Logging
 @implements IDisposable
+@inject ILogger<WidgetLiveFrame> Logger
 
 @if (_src is not null)
 {
@@ -14,10 +16,16 @@
     /// <summary>Junta os quadros: no máximo isto de imagens por segundo. É para ver, não para espelhar vídeo.</summary>
     [Parameter] public int MaxPerSecond { get; set; } = 5;
 
+    /// <summary>Tentativas seguidas de montar a imagem antes de esperar o próximo quadro do widget.</summary>
+    private const int MaxAttempts = 5;
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(500);
+
     private TimeSpan Interval => TimeSpan.FromSeconds(1.0 / Math.Max(1, MaxPerSecond));
 
     private string? _src;
-    private int _pending;
+    private long _version;
+    private int _running;
     private bool _disposed;
 
     protected override void OnInitialized()
@@ -28,30 +36,60 @@
 
     private void OnFrame(Guid instanceId)
     {
-        if (instanceId != InstanceId || Interlocked.Exchange(ref _pending, 1) == 1)
+        if (instanceId != InstanceId)
             return;
+        Interlocked.Increment(ref _version);
+        if (Interlocked.Exchange(ref _running, 1) == 0)
+            _ = Task.Run(ShowLatestAsync);
+    }
 
-        // O PNG sai fora da thread da UI; só a troca da imagem passa por ela.
-        _ = Task.Run(async () =>
+    // Um laço só por tile: pega o quadro mais novo, monta o PNG fora da thread da UI e troca a imagem.
+    // Antes, uma falha aqui (GDI+, por exemplo) sumia dentro do Task.Run e o tile ficava cinza até o widget
+    // desenhar de novo, o que num botão parado (Push to Talk, modo de voz) pode nunca acontecer.
+    private async Task ShowLatestAsync()
+    {
+        var failures = 0;
+        while (!_disposed)
         {
+            if (_src is not null || failures > 0)
+                await Task.Delay(failures > 0 ? RetryDelay : Interval);
+            var version = Interlocked.Read(ref _version);
             try
             {
-                if (_src is not null)
-                    await Task.Delay(Interval);
-                Interlocked.Exchange(ref _pending, 0);
-                if (_disposed || Dashboard.FrameOf(InstanceId) is not { } frame)
-                    return;
-                var src = PreviewImage.ToDataUrl(frame);
-                await InvokeAsync(() =>
+                // Sem quadro ainda (o widget não desenhou): nada a mostrar; o primeiro quadro avisa de novo.
+                if (Dashboard.FrameOf(InstanceId) is { } frame)
                 {
-                    _src = src;
-                    StateHasChanged();
-                });
+                    var src = PreviewImage.ToDataUrl(frame);
+                    await InvokeAsync(() =>
+                    {
+                        _src = src;
+                        StateHasChanged();
+                    });
+                }
+                failures = 0;
             }
             catch (ObjectDisposedException)
             {
+                return;
             }
-        });
+            catch (Exception ex)
+            {
+                failures++;
+                Logger.LogWarning(ex, "Prévia do widget {Instance}: falha ao montar o quadro (tentativa {Attempt} de {Max})",
+                    InstanceId, failures, MaxAttempts);
+                if (failures < MaxAttempts)
+                    continue;
+                failures = 0; // desiste deste quadro; o próximo do widget tenta de novo
+            }
+
+            // Sem quadro novo durante o trabalho: para. Se um chegou entre a checagem e a saída, segue.
+            if (Interlocked.Read(ref _version) != version)
+                continue;
+            Volatile.Write(ref _running, 0);
+            if (Interlocked.Read(ref _version) == version || Interlocked.Exchange(ref _running, 1) == 1)
+                return;
+        }
+        Volatile.Write(ref _running, 0);
     }
 
     public void Dispose()
