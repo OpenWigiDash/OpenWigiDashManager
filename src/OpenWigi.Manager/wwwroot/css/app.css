@@ -322,7 +322,7 @@ html, body {
     color: var(--mud-palette-text-secondary);
 }
 
-/* Switch "Mostrar nomes" desligado: o tile fica só com a prévia (o selecionado mantém o nome). */
+/* Switch "Mostrar nomes" desligado: o tile fica só com a prévia, inclusive o selecionado (num 1x1 o nome cobriria o widget). */
 .owd-widget-label.hidden {
     display: none;
 }

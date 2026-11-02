@@ -122,7 +122,7 @@
                             }
                             else
                             {
-                                <div class="owd-widget-label @(Settings.ShowWidgetNames || p.InstanceId == _selected ? "" : "hidden")">
+                                <div class="owd-widget-label @(Settings.ShowWidgetNames ? "" : "hidden")">
                                     <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
                                     <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
                                 </div>
