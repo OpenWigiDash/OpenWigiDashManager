@@ -36,14 +36,20 @@
                 </div>
                 @foreach (var group in Groups)
                 {
+                    var expanded = group.Name is null || IsExpanded(group.Name);
                     @if (group.Name is { } groupName)
                     {
-                        <div class="owd-widget-group">
+                        @* Clicar no título recolhe ou expande o grupo. Com busca, todos ficam abertos para mostrar o que achou. *@
+                        <button type="button" class="owd-widget-group" aria-expanded="@(expanded ? "true" : "false")"
+                                @onclick="() => ToggleGroup(groupName)">
+                            <MudIcon Icon="@(expanded ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
                             <PluginIcon Url="@_pluginIcons.GetValueOrDefault(groupName)" Size="28" />
                             <span class="owd-ellipsis">@groupName</span>
                             <span class="owd-muted">· @group.Widgets.Count widget(s)</span>
-                        </div>
+                        </button>
                     }
+                    @if (expanded)
+                    {
                     <MudGrid Spacing="2" Class="mb-2">
                         @foreach (var widget in group.Widgets)
                         {
@@ -74,6 +80,7 @@
                             </MudItem>
                         }
                     </MudGrid>
+                    }
                 }
                 @if (!Groups.Any())
                 {
@@ -191,6 +198,19 @@
     }
 
     protected override void OnInitialized() => Settings.Changed += Refresh;
+
+    // Grupos recolhidos: valem enquanto o manager estiver aberto, entre uma abertura e outra do assistente.
+    private static readonly HashSet<string> Collapsed = new(StringComparer.OrdinalIgnoreCase);
+
+    private bool IsExpanded(string group) => !string.IsNullOrWhiteSpace(_search) || !Collapsed.Contains(group);
+
+    private void ToggleGroup(string group)
+    {
+        if (!string.IsNullOrWhiteSpace(_search))
+            return;
+        if (!Collapsed.Remove(group))
+            Collapsed.Add(group);
+    }
 
     // Ícone de cada plugin, o mesmo da Loja, para o título do grupo no agrupamento por plugin.
     private readonly Dictionary<string, string> _pluginIcons = new(StringComparer.OrdinalIgnoreCase);
