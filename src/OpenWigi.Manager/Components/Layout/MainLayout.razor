@@ -104,6 +104,12 @@
         }
     }
 
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+            Settings.NotifyUiReady();
+    }
+
     private void Refresh() => InvokeAsync(StateHasChanged);
 
     private void Navigate(string route) => InvokeAsync(() => Navigation.NavigateTo(route));
