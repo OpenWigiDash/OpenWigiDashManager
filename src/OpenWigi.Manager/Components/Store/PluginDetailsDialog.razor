@@ -1,5 +1,6 @@
 @* Detalhes de um plugin da Loja. Devolve a ação escolhida (install, update, remove); quem abriu executa. *@
 @inject PluginStore Store
+@inject AgentClient Agent
 
 <MudDialog>
     <TitleContent>
@@ -93,6 +94,17 @@
                                 @foreach (var widget in widgets)
                                 {
                                     <tr>
+                                        @* Ícone do tipo: a prévia do plugin, a mesma do "Adicionar widget" e do painel do widget. *@
+                                        <td class="owd-store-widget-icon">
+                                            @if (_icons.GetValueOrDefault(widget.Manifest.Id) is { } icon)
+                                            {
+                                                <img src="@icon" alt="" />
+                                            }
+                                            else
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Widgets" Color="Color.Secondary" />
+                                            }
+                                        </td>
                                         <td>@widget.Manifest.Name</td>
                                         <td><MudText Typo="Typo.caption" Color="Color.Secondary">@string.Join(", ", widget.Manifest.SupportedSizes)</MudText></td>
                                     </tr>
@@ -128,4 +140,28 @@
     [Parameter] public string? Icon { get; set; }
 
     private void Close(string action) => Dialog.Close(DialogResult.Ok(action));
+
+    private readonly Dictionary<Guid, string> _icons = [];
+
+    // A lista aparece logo; cada ícone entra quando o plugin entrega a prévia.
+    protected override async Task OnInitializedAsync()
+    {
+        if (Item.Installed is not { } plugin)
+            return;
+        foreach (var widget in Store.WidgetsOf(plugin))
+        {
+            try
+            {
+                if (await Agent.Dashboard.GetCatalogIconAsync(widget.Manifest.Id) is { } frame)
+                {
+                    _icons[widget.Manifest.Id] = await Task.Run(() => PreviewImage.ToDataUrl(frame));
+                    StateHasChanged();
+                }
+            }
+            catch (Exception)
+            {
+                // Fica o ícone genérico.
+            }
+        }
+    }
 }

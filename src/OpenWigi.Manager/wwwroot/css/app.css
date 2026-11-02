@@ -542,3 +542,121 @@ html, body {
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
+/* Aviso de widget quebrado nas miniaturas das páginas: só o alerta, no meio do tile. */
+.owd-widget-problem.mini {
+    justify-content: center;
+    padding: 0;
+    border-radius: 3px;
+}
+
+.owd-widget-problem.mini .mud-icon-root {
+    font-size: 12px;
+}
+
+/* No assistente de adicionar, o aviso fica legível por cima do tile apagado da página. */
+.owd-occupied .owd-widget-problem {
+    font-size: 11px;
+    padding: 4px;
+}
+
+/* Cabeçalho do painel lateral: ícone do que está selecionado (a página ou o tipo do widget) e o nome. */
+.owd-side-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.owd-side-icon {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--mud-palette-background-gray);
+    color: var(--mud-palette-text-secondary);
+}
+
+.owd-side-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Ícone do tipo do widget: é a prévia do plugin, com texto dentro; grande o bastante para ler, na proporção dela. */
+.owd-side-icon.owd-type-icon {
+    width: auto;
+    min-width: 72px;
+    max-width: 45%;
+    height: 96px;
+    border-radius: 8px;
+    border: 1px solid var(--mud-palette-lines-default);
+}
+
+.owd-side-icon.owd-type-icon img {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+}
+
+/* Ícone do tipo de cada widget nos detalhes do plugin (Loja). */
+.owd-store-widget-icon {
+    width: 1%;
+    padding-right: 12px !important;
+}
+
+.owd-store-widget-icon img {
+    display: block;
+    height: 64px;
+    width: auto;
+    max-width: 120px;
+    border-radius: 6px;
+    border: 1px solid var(--mud-palette-lines-default);
+}
+
+/* "Adicionar widget": a caixa de agrupamento e o título de cada grupo. */
+.owd-grouping {
+    flex: 0 0 220px;
+}
+
+.owd-widget-group {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    padding: 4px 6px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+    min-width: 0;
+}
+
+.owd-widget-group .owd-store-icon {
+    flex: 0 0 auto;
+    border-radius: 6px;
+}
+
+.owd-widget-group:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+/* O título do grupo fica à esquerda: o resto da linha é espaço vazio clicável. */
+.owd-widget-group > :last-child {
+    margin-right: auto;
+}
+
+.owd-widget-group .owd-ellipsis {
+    flex: 0 1 auto;
+}
