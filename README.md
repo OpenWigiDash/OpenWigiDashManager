@@ -56,6 +56,7 @@ Publishing quando o repositório do plugin recebe uma tag de versão. Os plugins
 | --- | --- |
 | [Discord](https://github.com/OpenWigiDash/WigiDash-DiscordWidGet): 15 widgets para mute, deafen, canais, volume, soundboard e mais | `OpenWigiDash.Discord` |
 | [Stream Deck Mirror](https://github.com/OpenWigiDash/WigiDash-StreamDeckMirror-WidGet): espelha um Virtual Device do Stream Deck | `OpenWigiDash.StreamDeckMirror` |
+| [System](https://github.com/OpenWigiDash/OpenWigiDash-System-Plugin): abrir aplicativos e trocar a placa de som do Windows | `OpenWigiDash.System` |
 
 No manager, a tela **Loja de plugins** busca no nuget.org, mostra o ícone de cada pacote e instala,
 atualiza ou remove com um clique. Pacotes da Org [OpenWigiDash](https://www.nuget.org/profiles/OpenWigiDash) no nuget.org aparecem como

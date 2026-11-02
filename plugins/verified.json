@@ -13,6 +13,12 @@
       "owner": "OpenWigiDash",
       "repository": "https://github.com/OpenWigiDash/WigiDash-StreamDeckMirror-WidGet",
       "blockedVersions": []
+    },
+    {
+      "id": "OpenWigiDash.System",
+      "owner": "OpenWigiDash",
+      "repository": "https://github.com/OpenWigiDash/OpenWigiDash-System-Plugin",
+      "blockedVersions": []
     }
   ]
 }
