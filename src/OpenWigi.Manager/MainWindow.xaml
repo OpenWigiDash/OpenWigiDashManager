@@ -27,5 +27,10 @@
                              Margin="0,20,0,0" BorderThickness="0" Foreground="#E5243B" Background="#24262E" />
             </StackPanel>
         </Grid>
+
+        <!-- Capa lisa na volta do tray: escondida, a janela para de desenhar o WebView2, e ao reaparecer
+             os primeiros quadros dele vinham brancos. Ela entra antes do Hide() e sai quando ele já
+             voltou a pintar (ver OnClosing e OnShownAgain). -->
+        <Border x:Name="Cover" Background="#121318" Visibility="Collapsed" IsHitTestVisible="False" />
     </Grid>
 </Window>

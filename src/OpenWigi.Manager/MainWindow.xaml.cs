@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly IServiceProvider _services;
     private readonly ManagerSettings _settings;
     private readonly DispatcherTimer _splashFallback;
+    private Microsoft.Web.WebView2.Wpf.WebView2CompositionControl? _webView;
 
     public MainWindow(IServiceProvider services)
     {
@@ -39,6 +40,24 @@ public partial class MainWindow : Window
         _splashFallback.Tick += (_, _) => HideSplash();
         _splashFallback.Start();
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is true)
+                OnShownAgain();
+        };
+        // Minimizada o WebView2 também para de pintar; na volta, o mesmo cuidado da volta do tray.
+        StateChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Minimized)
+                ShowCover();
+            else
+                OnShownAgain();
+        };
+        WebView.BlazorWebViewInitialized += (_, e) =>
+        {
+            _webView = e.WebView;
+            ApplyWebViewBackground();
+        };
         Closed += (_, _) =>
         {
             _splashFallback.Stop();
@@ -64,7 +83,52 @@ public partial class MainWindow : Window
         SplashTitle.Foreground = Brush(colors.Text);
         SplashProgress.Foreground = Brush(colors.Accent);
         SplashProgress.Background = Brush(colors.Track);
+        Cover.Background = Brush(colors.Background);
         ApplyTitleBarTheme();
+        ApplyWebViewBackground();
+    }
+
+    // O que o WebView2 pinta enquanto não tem quadro da página (ao criar e ao voltar a ficar visível).
+    private void ApplyWebViewBackground()
+    {
+        if (_webView is null)
+            return;
+        var hex = (_settings.DarkMode ? Palette.Dark : Palette.Light).Background;
+        var color = (Color)ColorConverter.ConvertFromString(hex);
+        _webView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, color.R, color.G, color.B);
+    }
+
+    private DispatcherTimer? _coverTimer;
+
+    // Volta do tray: a capa (posta no OnClosing) segura a tela na cor do tema até o WebView2 retomar a
+    // pintura, e some com um fade curto. Na primeira abertura quem cobre é a tela de abertura.
+    private void OnShownAgain()
+    {
+        if (Cover.Visibility != Visibility.Visible)
+            return;
+        _coverTimer?.Stop();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+        _coverTimer = timer;
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(150));
+            fade.Completed += (_, _) =>
+            {
+                if (IsVisible)
+                    Cover.Visibility = Visibility.Collapsed;
+            };
+            Cover.BeginAnimation(OpacityProperty, fade);
+        };
+        timer.Start();
+    }
+
+    private void ShowCover()
+    {
+        _coverTimer?.Stop();
+        Cover.BeginAnimation(OpacityProperty, null);
+        Cover.Opacity = 1;
+        Cover.Visibility = Visibility.Visible;
     }
 
     private static SolidColorBrush Brush(string hex)
@@ -162,6 +226,7 @@ public partial class MainWindow : Window
         if (_exiting)
             return;
         e.Cancel = true;
+        ShowCover();
         Hide();
     }
 }
