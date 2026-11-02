@@ -20,7 +20,7 @@ public sealed class PluginInstallerTests : IDisposable
     {
         _feed.Publish("Autor.OpenWigiDash.Teste", "1.0.0-preview.1");
         _feed.Publish("Autor.OpenWigiDash.Teste", "1.0.0-preview.2");
-        _feed.Publish("Autor.OpenWigiDash.Teste", "2.0.0-preview.1", sdk: "3.1.0"); // pede um host mais novo
+        _feed.Publish("Autor.OpenWigiDash.Teste", "2.0.0-preview.1", sdk: "3.99.0"); // pede um host mais novo
 
         var result = await Installer().InstallAsync("Autor.OpenWigiDash.Teste");
 

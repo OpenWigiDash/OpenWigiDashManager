@@ -1,4 +1,4 @@
-# OpenWigi.Sdk — contrato dos widgets (v3.0)
+# OpenWigi.Sdk — contrato dos widgets (v3.1)
 
 Pacote `OpenWigiDash.Sdk` no nuget.org (assembly `OpenWigi.Sdk`, `net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
 compatibilidade binária: plugin antigo precisa ser portado.
@@ -127,6 +127,58 @@ escuro junto com ele. Para seguir o tema, monte a tela com componentes Mud e, em
 variáveis `--mud-palette-*` (ex.: `var(--mud-palette-text-secondary)`) no lugar de cores fixas.
 `WidgetTheme` (em `IWidgetContext.Theme`) é outra coisa: as cores para desenhar no visor do aparelho.
 
+## Biblioteca de ícones
+
+O SDK traz uma biblioteca de ícones para todos os widgets usarem, separada em categorias (Áudio, Câmera e
+imagem, Dispositivos, Mídia, Sistema, Comunicação, Lugares e transporte, Símbolos e setas). Ela cresce a cada
+versão do SDK; as chaves que já saíram nunca mudam, então guarde a chave nas configurações.
+
+- `WidgetIcons.All`, `Categories`, `Find(chave)`, `InCategory(categoria)` e `Search(texto)` (sem diferenciar
+  acentos nem maiúsculas).
+- `WidgetIcon`: `Key`, `Name`, `Category`, `Glyph` (caractere da fonte de ícones do Windows), `Accent` (segundo
+  glifo opcional, pequeno no canto, para ícones combinados como `webcam-mic`), `Tags` (sinônimos para a busca) e
+  `PathData` (vetor SVG 24x24, que vale no lugar do glifo quando existe; reservado para ícones que a fonte não tem).
+- `WidgetIcons.FontFamily` é a fonte para CSS; `FontFamilyNames` dá as fontes em ordem para desenhar no tile
+  (Segoe Fluent Icons no Windows 11, Segoe MDL2 Assets no Windows 10, com os mesmos códigos).
+
+**Deixar a pessoa escolher.** O manager oferece a janela de escolha, com uma aba por categoria e busca.
+Na tela de configurações:
+
+```razor
+@inject IWidgetIconPicker IconPicker
+
+<MudButton OnClick="Pick"><WidgetIconView IconKey="@_icon" Size="28" /> Trocar ícone</MudButton>
+
+@code {
+    private string? _icon;
+
+    private async Task Pick()
+    {
+        var choice = await IconPicker.PickAsync(new WidgetIconPickerOptions
+        {
+            Title = "Ícone do botão",
+            Current = _icon,
+            Categories = ["audio", "devices"], // opcional: só estas abas
+        });
+        if (choice is null)
+            return; // fechou sem escolher
+        _icon = choice.Key; // null = "Automático", se você passou Options.Automatic
+        await Context.Settings.SetAsync("icon", _icon ?? "");
+    }
+}
+```
+
+A janela abre na raiz do manager, por cima do canvas. Não monte um overlay próprio dentro do painel de
+configurações: ele fica atrás dos cantos dos widgets. `Automatic` mostra a opção "Automático" com a prévia do
+ícone que o widget usaria sozinho, `Hint` põe um texto embaixo e `Extra` junta ícones do próprio plugin (o
+plugin é quem desenha esses no tile, porque `WidgetIcons.Find` não os conhece).
+
+**Desenhar no tile.** Meça o contorno do glifo e escale pelo maior lado, porque a caixa da fonte tem muita
+sobra em volta do desenho (com System.Drawing: `GraphicsPath.AddString`, `GetBounds` e uma `Matrix`). Para
+ícone combinado, `WidgetIconLayout.Place(icone, caixa, tamanho)` dá a caixa e o tamanho do principal e o
+círculo do destaque: pinte o círculo com a cor de fundo e desenhe o `Accent` centrado nele. Assim o tile
+fica igual à janela de escolha.
+
 ## Assemblies compartilhados
 
 O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Components*`,
@@ -135,13 +187,16 @@ O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Component
 cópia na pasta:
 
 ```xml
-<PackageReference Include="OpenWigiDash.Sdk" Version="3.0.0-preview.1" ExcludeAssets="runtime" />
+<PackageReference Include="OpenWigiDash.Sdk" Version="3.1.0-preview.1" ExcludeAssets="runtime" />
 <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
 ```
 
 ## Versão
 
-`OpenWigiSdk.Version` = 3.0. O host carrega widget com o mesmo major e minor menor ou igual ao dele.
+`OpenWigiSdk.Version` = 3.1. O host carrega widget com o mesmo major e minor menor ou igual ao dele.
+
+**3.1:** biblioteca de ícones (`WidgetIcons`, `IWidgetIconPicker`, `WidgetIconView`, `WidgetIconLayout`). Plugin
+feito para 3.0 continua carregando; plugin compilado contra 3.1 pede o manager com SDK 3.1.
 
 **De 2.0 para 3.0:** a grade passou a 10x8 meias células e `PixelSize` passou a ser a área de conteúdo.
 Para portar: troque `WidgetSize.PixelSize` por `context.PixelSize` (ou `CellSpan` só para posição),
@@ -214,7 +269,7 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
     <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="OpenWigiDash.Sdk" Version="3.0.0-preview.1" ExcludeAssets="runtime" />
+    <PackageReference Include="OpenWigiDash.Sdk" Version="3.1.0-preview.1" ExcludeAssets="runtime" />
     <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="icon.png" Pack="true" PackagePath="\" />
