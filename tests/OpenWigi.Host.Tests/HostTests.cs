@@ -682,6 +682,39 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Widget_de_plugin_removido_vai_para_o_aparelho_com_o_aviso()
+    {
+        var first = await StartAsync();
+        var placement = first.Layout.AllPlacements.First(p => p.WidgetId == Clock);
+        var name = first.NameOf(placement.InstanceId);
+        await first.DisposeAsync();
+
+        // Sem o plugin, o lugar do widget no aparelho (e na prévia) recebe o aviso desenhado, não um buraco.
+        var requests = new List<ProblemTileRequest>();
+        _host = new DashboardHost(new DashboardOptions
+        {
+            PluginsDirectory = Path.Combine(_root, "Vazia"),
+            DataDirectory = Data,
+            ProblemTile = request =>
+            {
+                lock (requests)
+                    requests.Add(request);
+                return WidgetFrame.Solid(request.Size, 242, 181, 68);
+            },
+        }, _sink, NullLoggerFactory.Instance);
+        await _host.StartAsync();
+        await _host.ActivateAsync(true);
+
+        var content = new TileShape(placement.Bounds, _host.Layout.Pages[0].Frame).Content;
+        ProblemTileRequest request;
+        lock (requests)
+            request = requests.Last(r => r.Widget == name);
+        Assert.Equal("Plugin removido", request.Title);
+        Assert.Equal("plugin OpenWigi.Samples.Clock", request.Plugin);
+        Assert.Equal(new PixelSize(content.Width, content.Height), request.Size);
+    }
+
+    [Fact]
     public async Task Plugin_que_nao_carrega_mais_mostra_o_motivo_no_widget()
     {
         var first = await StartAsync();

@@ -103,14 +103,8 @@
                             @if (Dashboard.ProblemOf(p.InstanceId) is { } problem)
                             {
                                 @* Sem isso o tile fica vazio, e não dá para saber que o plugin saiu ou não funciona nesta versão.
-                                   O nome do widget e o do plugin ficam sempre à vista (mesmo com "Mostrar nomes" desligado):
-                                   é o que diz o que reinstalar ou atualizar para o widget voltar. *@
-                                <div class="owd-widget-problem" title="@ProblemDetail(problem)">
-                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
-                                    <span class="owd-widget-problem-title">@ProblemTitle(problem)</span>
-                                    <span class="owd-widget-problem-name">@ProblemWidget(p, problem)</span>
-                                    <span class="owd-widget-problem-plugin">@ProblemPlugin(problem)</span>
-                                </div>
+                                   Fica à vista mesmo com "Mostrar nomes" desligado. *@
+                                <WidgetProblemBadge Problem="problem" Placement="p" />
                             }
                             else
                             {
@@ -170,14 +164,35 @@
                 @if (Selected is { } selected)
                 {
                     var settings = Dashboard.GetSettings(selected.InstanceId);
+                    var selectedProblem = Dashboard.ProblemOf(selected.InstanceId);
                     <MudPaper Class="pa-3 mb-4" Outlined="true">
-                        <MudText Typo="Typo.overline" Color="Color.Secondary">Selecionado</MudText>
-                        <MudText Typo="Typo.h6" Class="owd-ellipsis">@Dashboard.DisplayNameOf(selected.InstanceId)</MudText>
-                        @if (Dashboard.ProblemOf(selected.InstanceId) is { } selectedProblem)
+                        @* Cabeçalho: o ícone e o nome do tipo do widget (o que o plugin diz que ele é) e o nome desta instância. *@
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Widget selecionado</MudText>
+                        <div class="owd-side-head mb-1">
+                            <div class="owd-side-icon" title="@TypeNameOf(selected, selectedProblem)">
+                                @if (selectedProblem is not null)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+                                }
+                                else if (TypeIcon(selected.WidgetId) is { } typeIcon)
+                                {
+                                    <img src="@typeIcon" alt="" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Widgets" />
+                                }
+                            </div>
+                            <div class="owd-ellipsis">
+                                <MudText Typo="Typo.h6" Class="owd-ellipsis">@Dashboard.DisplayNameOf(selected.InstanceId)</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="owd-ellipsis">@TypeNameOf(selected, selectedProblem)</MudText>
+                            </div>
+                        </div>
+                        @if (selectedProblem is not null)
                         {
                             <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2">
-                                <MudText Typo="Typo.body2"><b>@ProblemTitle(selectedProblem)</b></MudText>
-                                <MudText Typo="Typo.caption" Class="d-block mb-2">@ProblemDetail(selectedProblem)</MudText>
+                                <MudText Typo="Typo.body2"><b>@WidgetProblemText.Title(selectedProblem)</b></MudText>
+                                <MudText Typo="Typo.caption" Class="d-block mb-2">@WidgetProblemText.Detail(selectedProblem)</MudText>
                                 @if (selectedProblem.Kind != WidgetProblemKind.InstanceFailed)
                                 {
                                     <MudText Typo="Typo.caption" Class="d-block mb-2">
@@ -244,22 +259,26 @@
                         </MudTabs>
                     </MudPaper>
                 }
-    
-                else
-                {
-                    <MudPaper Class="pa-4 mb-4" Outlined="true">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            Clique num widget da grade para configurar, mudar o tamanho ou tirar.
-                            Para pôr um novo, use "Adicionar widget".
-                        </MudText>
-                    </MudPaper>
-                }
-
-                @if (CurrentPage is { } framed)
+                else if (CurrentPage is { } framed)
                 {
                     var frame = framed.Frame;
-                    @* Moldura dos tiles desta página: valores fixos do SDK, para os plugins saberem todos os tamanhos possíveis. *@
+                    @* Só a página selecionada (nenhum widget): as propriedades dela. A moldura dos tiles usa valores fixos
+                       do SDK, para os plugins saberem todos os tamanhos possíveis. *@
                     <MudPaper Class="pa-3" Outlined="true">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Página selecionada</MudText>
+                        <div class="owd-side-head mb-2">
+                            @* A "telinha": o mesmo ícone de página do carrossel do rodapé. *@
+                            <div class="owd-side-icon"><MudIcon Icon="@Icons.Material.Filled.Monitor" /></div>
+                            <div class="owd-ellipsis">
+                                <MudText Typo="Typo.h6" Class="owd-ellipsis">@framed.Name</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="owd-ellipsis">
+                                    Página @(_page + 1) de @Dashboard.Layout.Pages.Count · @framed.Widgets.Count widget(s)
+                                </MudText>
+                            </div>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+                            Clique num widget da grade para configurar, mudar o tamanho ou tirar. Para pôr um novo, use "Adicionar widget".
+                        </MudText>
                         <MudStack Row="true" AlignItems="AlignItems.Center">
                             <MudText Typo="Typo.overline" Color="Color.Secondary" Class="flex-grow-1">Moldura da página</MudText>
                             <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(frame == TileFrame.Default)"
@@ -336,6 +355,10 @@
                                     <div @key="w.InstanceId" class="owd-thumb-widget"
                                          style="grid-column: @(w.Column + 2) / span @w.Size.Columns; grid-row: @(w.Row + 2) / span @w.Size.Rows; @TileStyle(w, thumb)">
                                         <div class="owd-tile"><WidgetLiveFrame Dashboard="Dashboard" InstanceId="w.InstanceId" MaxPerSecond="1" /></div>
+                                        @if (Dashboard.ProblemOf(w.InstanceId) is { } thumbProblem)
+                                        {
+                                            <WidgetProblemBadge Problem="thumbProblem" Placement="w" Mini="true" />
+                                        }
                                     </div>
                                 }
                             </div>
@@ -384,29 +407,41 @@
 </MudStack>
 
 @code {
-    private static string ProblemTitle(WidgetProblem problem) => problem.Kind switch
+    // Nome do tipo do widget, o que o plugin declara no manifesto; quebrado, o lembrado de quando carregou.
+    private string TypeNameOf(WidgetPlacement placement, WidgetProblem? problem) =>
+        Dashboard.AvailableWidgets.FirstOrDefault(w => w.Manifest.Id == placement.WidgetId)?.Manifest.Name
+            ?? problem?.WidgetName ?? "Widget não instalado";
+
+    // Ícone do tipo (a prévia do catálogo, a mesma do "Adicionar widget"), pedido uma vez por tipo.
+    private readonly Dictionary<Guid, string?> _typeIcons = [];
+
+    private string? TypeIcon(Guid widgetId)
     {
-        WidgetProblemKind.NotInstalled => "Plugin removido",
-        WidgetProblemKind.PluginFailed when problem.Reason?.Contains("SDK", StringComparison.Ordinal) == true => "Não funciona nesta versão",
-        WidgetProblemKind.PluginFailed => "Plugin não carregou",
-        _ => "Widget com erro",
-    };
+        if (_typeIcons.TryGetValue(widgetId, out var icon))
+            return icon;
+        _typeIcons[widgetId] = null;
+        _ = LoadTypeIconAsync(widgetId);
+        return null;
+    }
 
-    private static string ProblemDetail(WidgetProblem problem) => problem.Kind switch
+    private async Task LoadTypeIconAsync(Guid widgetId)
     {
-        WidgetProblemKind.NotInstalled when problem.PluginFolder is { } folder =>
-            $"O plugin {folder} não está mais instalado. Reinstale pela Loja ou tire este widget da página; as configurações dele ficam guardadas até lá.",
-        WidgetProblemKind.NotInstalled => "O plugin deste widget não está instalado. Instale pela Loja ou tire este widget da página.",
-        WidgetProblemKind.PluginFailed => $"O plugin {problem.PluginFolder} está instalado, mas não carregou nesta versão do OpenWigiDash: {problem.Reason}",
-        _ => problem.Reason ?? "O widget deu erro ao abrir.",
-    };
-
-    // Nome que o widget tinha: o da instância, senão o do tipo (lembrado de quando ele carregou).
-    private static string ProblemWidget(WidgetPlacement placement, WidgetProblem problem) =>
-        placement.Name is { Length: > 0 } name ? name : problem.WidgetName ?? "Widget desconhecido";
-
-    private static string ProblemPlugin(WidgetProblem problem) =>
-        problem.PluginFolder is { } folder ? $"plugin {folder}" : "plugin desconhecido";
+        try
+        {
+            if (await Dashboard.GetCatalogIconAsync(widgetId) is not { } frame)
+                return;
+            var url = await Task.Run(() => PreviewImage.ToDataUrl(frame));
+            await InvokeAsync(() =>
+            {
+                _typeIcons[widgetId] = url;
+                StateHasChanged();
+            });
+        }
+        catch (Exception)
+        {
+            // Sem a prévia fica o ícone genérico.
+        }
+    }
 
     // A Loja já abre procurando o plugin, com o botão de instalar ou atualizar no card dele.
     private static string StoreLink(WidgetProblem problem) =>

@@ -83,6 +83,11 @@
                         @if (Dashboard is not null)
                         {
                             <WidgetLiveFrame Dashboard="Dashboard" InstanceId="placement.InstanceId" MaxPerSecond="2" />
+                            @* Widget quebrado: o mesmo aviso do Canvas, para ninguém achar que o lugar está livre. *@
+                            @if (Dashboard.ProblemOf(placement.InstanceId) is { } problem)
+                            {
+                                <WidgetProblemBadge Problem="problem" Placement="placement" />
+                            }
                         }
                         else
                         {

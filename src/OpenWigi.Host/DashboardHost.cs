@@ -24,6 +24,12 @@ public sealed record DashboardOptions
     public TimeSpan FlushInterval { get; init; } = TimeSpan.FromMilliseconds(33);
 
     public WidgetTheme Theme { get; init; } = new();
+
+    /// <summary>
+    /// Desenha o aviso de um widget que não está funcionando (plugin removido, que não carregou ou com erro),
+    /// para o aparelho e a prévia mostrarem o mesmo que o Canvas em vez de um buraco. null = fica o buraco.
+    /// </summary>
+    public Func<ProblemTileRequest, WidgetFrame?>? ProblemTile { get; init; }
 }
 
 /// <summary>
@@ -1016,9 +1022,40 @@ public event Action? LayoutChanged;
     {
         var widgets = _fullscreen is { } full
             ? [(ShapeOf(full), full.LastFrame)]
-            : RuntimesOn(CurrentPage).Select(r => (ShapeOf(r), r.LastFrame)).ToList();
+            : RuntimesOn(CurrentPage).Select(r => (ShapeOf(r), r.LastFrame)).Concat(ProblemTilesOn(CurrentPage)).ToList();
         var background = _fullscreen is null ? FrameOfPage(CurrentPage).Background : new WidgetColor(0, 0, 0);
         return _compositor.ShowPageAsync(background, widgets, transition, cancellationToken).AsTask();
+    }
+
+    // Widgets da página que não estão funcionando, com o aviso desenhado no lugar deles.
+    private IEnumerable<(TileShape Shape, WidgetFrame? Frame)> ProblemTilesOn(int page)
+    {
+        if (_options.ProblemTile is not { } draw || page >= _layout.Pages.Count)
+            yield break;
+        var frame = FrameOfPage(page);
+        foreach (var placement in _layout.Pages[page].Widgets)
+        {
+            if (!placement.FitsGrid || ProblemOf(placement.InstanceId) is not { } problem)
+                continue;
+            var shape = new TileShape(placement.Bounds, frame);
+            var content = shape.Content;
+            if (content.Width < 1 || content.Height < 1)
+                continue;
+            var size = new PixelSize(content.Width, content.Height);
+            WidgetFrame? tile;
+            try
+            {
+                tile = draw(new ProblemTileRequest(WidgetProblemText.Title(problem), WidgetProblemText.Widget(placement, problem),
+                    WidgetProblemText.Plugin(problem), size));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Aviso do widget {Instance} não pôde ser desenhado", placement.InstanceId);
+                continue;
+            }
+            if (tile is not null && tile.Size == size)
+                yield return (shape, tile);
+        }
     }
 
     private IEnumerable<WidgetRuntime> RuntimesOn(int page) =>

@@ -1,0 +1,22 @@
+@* Aviso de widget que não está funcionando, por cima do tile: o mesmo no Canvas, no assistente de adicionar
+   e nas miniaturas das páginas (o aparelho e a prévia recebem o desenho equivalente do ProblemTileRenderer).
+   O nome do widget e o do plugin ficam sempre à vista: é o que diz o que reinstalar ou atualizar. *@
+@using OpenWigi.Host.Plugins
+
+<div class="owd-widget-problem @(Mini ? "mini" : "")" title="@WidgetProblemText.Detail(Problem)">
+    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
+    @if (!Mini)
+    {
+        <span class="owd-widget-problem-title">@WidgetProblemText.Title(Problem)</span>
+        <span class="owd-widget-problem-name">@WidgetProblemText.Widget(Placement, Problem)</span>
+        <span class="owd-widget-problem-plugin">@WidgetProblemText.Plugin(Problem)</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public WidgetProblem Problem { get; set; } = default!;
+    [Parameter, EditorRequired] public WidgetPlacement Placement { get; set; } = default!;
+
+    /// <summary>Só o alerta, para tiles muito pequenos (as miniaturas do carrossel).</summary>
+    [Parameter] public bool Mini { get; set; }
+}

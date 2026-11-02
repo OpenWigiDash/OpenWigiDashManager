@@ -189,6 +189,8 @@ public partial class App : System.Windows.Application
                 PluginsDirectory = plugins,
                 BundledPluginsDirectory = index < 0 && Directory.Exists(bundled) ? bundled : null,
                 DataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenWigiDash"),
+                // Widget quebrado aparece no aparelho e na prévia com o mesmo aviso do Canvas.
+                ProblemTile = ProblemTileRenderer.Render,
             };
             return new DashboardHost(options, sp.GetRequiredService<AgentClient>().Sink, sp.GetRequiredService<ILoggerFactory>());
         });
