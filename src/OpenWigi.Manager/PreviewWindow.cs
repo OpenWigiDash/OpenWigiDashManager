@@ -36,6 +36,7 @@ public sealed class PreviewWindow : Window
         MinWidth = 320;
         MinHeight = 240;
         Background = new SolidColorBrush(Color.FromRgb(0x12, 0x13, 0x18));
+        DarkTitleBar.Attach(this);
 
         _image = new Image { Source = _bitmap, Stretch = Stretch.Uniform, Cursor = Cursors.Hand };
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);

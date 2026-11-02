@@ -1,8 +1,6 @@
 using System;
 using System.ComponentModel;
-using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -39,7 +37,7 @@ public partial class MainWindow : Window
         _splashFallback = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
         _splashFallback.Tick += (_, _) => HideSplash();
         _splashFallback.Start();
-        SourceInitialized += (_, _) => ApplyTitleBarTheme();
+        DarkTitleBar.Attach(this);
         IsVisibleChanged += (_, e) =>
         {
             if (e.NewValue is true)
@@ -84,7 +82,6 @@ public partial class MainWindow : Window
         SplashProgress.Foreground = Brush(colors.Accent);
         SplashProgress.Background = Brush(colors.Track);
         Cover.Background = Brush(colors.Background);
-        ApplyTitleBarTheme();
         ApplyWebViewBackground();
     }
 
@@ -166,21 +163,6 @@ public partial class MainWindow : Window
         };
         Splash.BeginAnimation(OpacityProperty, fade);
     }
-
-    // Barra de título escura no tema escuro (no Windows claro ela viria branca). Windows 10 20H1 ou mais novo.
-    private void ApplyTitleBarTheme()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
-        if (handle == IntPtr.Zero)
-            return;
-        var dark = _settings.DarkMode ? 1 : 0;
-        _ = DwmSetWindowAttribute(handle, DwmwaUseImmersiveDarkMode, ref dark, sizeof(int));
-    }
-
-    private const int DwmwaUseImmersiveDarkMode = 20;
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     // Abre onde e como foi fechada. Se o monitor de antes sumiu, fica no padrão (centralizada).
     private void RestorePlacement()
