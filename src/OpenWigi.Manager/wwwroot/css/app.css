@@ -191,8 +191,11 @@ html, body {
     z-index: 2;
 }
 
+/* isolation: os z-index de dentro (alças, rótulos, encaixe, selecionado) ficam presos ao canvas e não
+   passam por cima do painel do lado nem de um modal que um plugin abra nas configurações. */
 .owd-grid {
     position: relative;
+    isolation: isolate;
     user-select: none;
     touch-action: none;
 }
