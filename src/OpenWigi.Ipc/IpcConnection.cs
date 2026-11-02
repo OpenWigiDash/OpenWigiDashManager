@@ -13,7 +13,7 @@ namespace OpenWigi.Ipc;
 public sealed class IpcConnection(Stream stream) : IAsyncDisposable
 {
     public const string PipeName = "OpenWigiDash.v1";
-    public const ushort ProtocolVersion = 2;
+    public const ushort ProtocolVersion = 3;
     private const int MaxMessageBytes = 4 * 1024 * 1024;
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -204,10 +204,12 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         w.Write(status.Firmware);
         w.Write((byte)status.Kind);
         w.Write(status.UsbPresent);
+        w.Write(status.Reconnecting);
     }
 
     private static DeviceStatus ReadStatus(BinaryReader r) =>
-        new(r.ReadBoolean(), new Guid(r.ReadBytes(16)), r.ReadString(), (DeviceKind)r.ReadByte(), r.ReadBoolean());
+        new(r.ReadBoolean(), new Guid(r.ReadBytes(16)), r.ReadString(), (DeviceKind)r.ReadByte(), r.ReadBoolean(),
+            r.ReadBoolean());
 
     private async Task<bool> ReadExactlyOrEndAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

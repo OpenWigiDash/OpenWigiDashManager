@@ -80,5 +80,72 @@ internal static class NativeMethods
 
     [DllImport("winusb.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool WinUsb_AbortPipe(nint interfaceHandle, byte pipeId);
+
+    [DllImport("winusb.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool WinUsb_ResetPipe(nint interfaceHandle, byte pipeId);
+
+    [DllImport("winusb.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     public static extern unsafe bool WinUsb_SetPipePolicy(nint interfaceHandle, byte pipeId, uint policyType, uint valueLength, void* value);
+
+    // Reset do aparelho (UsbDeviceReset): árvore de dispositivos do cfgmgr32 e IOCTL do hub.
+
+    public const int CR_SUCCESS = 0;
+    public const uint CM_GET_DEVICE_INTERFACE_LIST_PRESENT = 0;
+    public const uint CM_DISABLE_UI_NOT_OK = 0x4;
+    public const uint IOCTL_USB_HUB_CYCLE_PORT = 0x220444; // CTL_CODE(FILE_DEVICE_USB, 273, METHOD_BUFFERED, FILE_ANY_ACCESS)
+    public const uint DEVPROP_TYPE_STRING = 0x12;
+    public const uint DEVPROP_TYPE_UINT32 = 0x7;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DEVPROPKEY
+    {
+        public Guid fmtid;
+        public uint pid;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct USB_CYCLE_PORT_PARAMS
+    {
+        public uint ConnectionIndex;
+        public uint StatusReturned;
+    }
+
+    public static readonly DEVPROPKEY DEVPKEY_Device_InstanceId = new() { fmtid = new("78c34fc8-104a-4aca-9ea4-524d52996e57"), pid = 256 };
+    public static readonly DEVPROPKEY DEVPKEY_Device_Address = new() { fmtid = new("a45c254e-df1c-4efd-8020-67d146a850e0"), pid = 30 };
+    public static readonly Guid GUID_DEVINTERFACE_USB_HUB = new("f18a0e88-c30c-11d0-8815-00a0c906bed8");
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    public static extern unsafe int CM_Get_Device_Interface_PropertyW(string deviceInterface, in DEVPROPKEY propertyKey,
+        out uint propertyType, byte* buffer, ref uint bufferSize, uint flags);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    public static extern int CM_Locate_DevNodeW(out uint devInst, string deviceId, uint flags);
+
+    [DllImport("cfgmgr32.dll")]
+    public static extern int CM_Get_Parent(out uint parent, uint devInst, uint flags);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    public static extern unsafe int CM_Get_DevNode_PropertyW(uint devInst, in DEVPROPKEY propertyKey, out uint propertyType,
+        byte* buffer, ref uint bufferSize, uint flags);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    public static extern int CM_Get_Device_Interface_List_SizeW(out uint length, in Guid interfaceClassGuid, string? deviceId, uint flags);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    public static extern unsafe int CM_Get_Device_Interface_ListW(in Guid interfaceClassGuid, string? deviceId, char* buffer,
+        uint length, uint flags);
+
+    [DllImport("cfgmgr32.dll")]
+    public static extern int CM_Disable_DevNode(uint devInst, uint flags);
+
+    [DllImport("cfgmgr32.dll")]
+    public static extern int CM_Enable_DevNode(uint devInst, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern unsafe bool DeviceIoControl(SafeFileHandle device, uint ioControlCode, void* inBuffer, uint inBufferSize,
+        void* outBuffer, uint outBufferSize, out uint bytesReturned, nint overlapped);
 }

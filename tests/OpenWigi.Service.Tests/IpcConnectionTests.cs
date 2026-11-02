@@ -23,6 +23,8 @@ public class IpcConnectionTests
         new EmulatedTouch(TouchContact.Down, 500, 300),
         new SelectDevice(DeviceKind.Virtual),
         new DeviceStatus(true, Guid.NewGuid(), "virtual", DeviceKind.Virtual, UsbPresent: true),
+        DeviceStatus.Disconnected with { Reconnecting = true },
+        new DeviceStatus(true, Guid.NewGuid(), "WigiDash-1.0", Reconnecting: true),
     ];
 
     [Theory]

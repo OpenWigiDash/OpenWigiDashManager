@@ -46,6 +46,9 @@ public sealed class WinUsbTransport : IUsbTransport
         var ms = (uint)(timeout ?? TimeSpan.FromSeconds(1)).TotalMilliseconds;
         transport.SetTimeout(ControlPipe, ms);
         transport.SetTimeout(DataOutPipe, ms);
+        // Uma sessão anterior que caiu no meio de uma escrita pode ter deixado o endpoint parado (STALL) ou
+        // com o data toggle trocado. O reset do pipe limpa os dois; se falhar, a primeira escrita mostra.
+        WinUsb_ResetPipe(handle, DataOutPipe);
         return transport;
     }
 
@@ -89,7 +92,11 @@ public sealed class WinUsbTransport : IUsbTransport
         fixed (byte* p = data)
         {
             if (!WinUsb_WritePipe(Handle, DataOutPipe, p, (uint)data.Length, out var written, 0))
-                throw Fail("bulk OUT");
+            {
+                var error = Fail("bulk OUT");
+                RecoverPipe(DataOutPipe);
+                throw error;
+            }
             return (int)written;
         }
     }
@@ -105,6 +112,15 @@ public sealed class WinUsbTransport : IUsbTransport
     }
 
     private nint Handle => _winUsb != 0 ? _winUsb : throw new ObjectDisposedException(nameof(WinUsbTransport));
+
+    // Depois de uma escrita que deu timeout, o pedido pode ter ficado pendurado no pipe e o endpoint em
+    // STALL. Cancela o que sobrou e manda CLEAR_FEATURE(ENDPOINT_HALT), para a próxima escrita não
+    // herdar o problema. Sem retorno: se não der, quem chamou já vai receber o erro original.
+    private void RecoverPipe(byte pipe)
+    {
+        WinUsb_AbortPipe(_winUsb, pipe);
+        WinUsb_ResetPipe(_winUsb, pipe);
+    }
 
     private unsafe void SetTimeout(byte pipe, uint milliseconds)
     {

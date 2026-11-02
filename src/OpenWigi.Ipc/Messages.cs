@@ -59,10 +59,12 @@ public sealed record Ownership(bool IsOwner, string Reason) : IpcMessage;
 
 /// <summary>
 /// Estado do aparelho ativo (<paramref name="Kind"/>). <paramref name="UsbPresent"/> diz se o WigiDash de verdade
-/// está ligado, mesmo com o virtual ativo, para a UI mostrar as duas opções.
+/// está ligado, mesmo com o virtual ativo, para a UI mostrar as duas opções. <paramref name="Reconnecting"/> diz que
+/// o aparelho está no cabo mas a conexão vem caindo e o serviço está tentando de novo (pode estar conectado ou não
+/// neste instante): a UI mostra "reconectando" em vez de alternar entre conectado e desconectado.
 /// </summary>
 public sealed record DeviceStatus(bool Connected, Guid DeviceId, string Firmware, DeviceKind Kind = DeviceKind.Usb,
-    bool UsbPresent = false) : IpcMessage
+    bool UsbPresent = false, bool Reconnecting = false) : IpcMessage
 {
     public static DeviceStatus Disconnected { get; } = new(false, Guid.Empty, string.Empty);
 }

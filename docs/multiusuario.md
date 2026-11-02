@@ -19,6 +19,22 @@ troca de console) e, por garantia, a cada segundo. Quem perde a tela recebe `Own
 quem ganha recebe `Ownership(true)` e manda o quadro inteiro de novo. A página 2 do hardware é
 reservada para a tela do serviço.
 
+## Quando a conexão USB cai
+
+Uma queda isolada (cabo, aparelho reiniciando) só reconecta. Se a conexão cai de novo antes de
+ficar 30 s de pé (`OpenWigi:StableAfter`), o serviço considera que o aparelho está travado:
+
+- a espera até a próxima tentativa dobra a cada queda (2, 4, 8, 16 s, até `ReconnectMaxInterval`, 30 s);
+- a cada 3 quedas seguidas (`ResetAfterFailures`, 0 desliga) ele reseta o USB do aparelho: desliga e
+  religa a porta do hub (`IOCTL_USB_HUB_CYCLE_PORT`) e, se o hub recusar, desativa e reativa o
+  dispositivo no Windows. Antes disso, toda escrita bulk que falha já cancela o que ficou no pipe e
+  limpa o STALL do endpoint (`WinUsb_AbortPipe` + `WinUsb_ResetPipe`), e cada abertura também limpa;
+- enquanto isso o `DeviceStatus` vai com `Reconnecting = true`, e o manager mostra "Reconectando ao
+  aparelho…" em vez de alternar entre conectado e "Aparelho desconectado".
+
+Tudo vai para o Log de Eventos (fonte `OpenWigiDash`). Se o aparelho sair da lista do Windows (cabo
+fora) fora dos 15 s depois de um reset, a recuperação acaba e o status volta a "desconectado".
+
 ## Canal
 
 Named pipe `\\.\pipe\OpenWigiDash.v1`, aberto para usuários autenticados da máquina e negado
