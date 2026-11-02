@@ -602,3 +602,18 @@ html, body {
     height: 100%;
     max-width: 100%;
 }
+
+/* Ícone do tipo de cada widget nos detalhes do plugin (Loja). */
+.owd-store-widget-icon {
+    width: 1%;
+    padding-right: 12px !important;
+}
+
+.owd-store-widget-icon img {
+    display: block;
+    height: 64px;
+    width: auto;
+    max-width: 120px;
+    border-radius: 6px;
+    border: 1px solid var(--mud-palette-lines-default);
+}
