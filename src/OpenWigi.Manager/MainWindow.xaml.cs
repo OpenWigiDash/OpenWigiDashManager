@@ -38,6 +38,11 @@ public partial class MainWindow : Window
         _splashFallback.Tick += (_, _) => HideSplash();
         _splashFallback.Start();
         DwmWindow.UseAppTitleBar(this);
+        SourceInitialized += (_, _) =>
+        {
+            if (_cloaked)
+                DwmWindow.SetCloaked(this, true);
+        };
         IsVisibleChanged += (_, e) =>
         {
             if (e.NewValue is true)
@@ -82,6 +87,8 @@ public partial class MainWindow : Window
         SplashProgress.Foreground = Brush(colors.Accent);
         SplashProgress.Background = Brush(colors.Track);
         Cover.Background = Brush(colors.Background);
+        CoverProgress.Foreground = Brush(colors.Accent);
+        CoverProgress.Background = Brush(colors.Track);
         ApplyWebViewBackground();
     }
 
@@ -97,14 +104,14 @@ public partial class MainWindow : Window
 
     private DispatcherTimer? _coverTimer;
 
-    // Volta do tray ou de minimizado. Escondida, a janela para de desenhar, e o Windows mostrava o primeiro
-    // quadro dela (branco) antes de o WPF pintar de novo. Na volta do tray ela vem "encoberta" no DWM
-    // (posto no OnClosing): o WPF desenha a capa lisa na cor do tema sem nada aparecer, e só então a janela
-    // é mostrada. A capa segura enquanto o WebView2 retoma a pintura e some com um fade curto. Na primeira
-    // abertura quem cobre é a tela de abertura.
+    // Toda vez que a janela aparece, o Windows mostrava o primeiro quadro dela (branco) antes de o WPF
+    // pintar: na abertura a frio e na volta do tray. Por isso ela aparece "encoberta" no DWM (o cloak é
+    // posto ao criar o HWND e no OnClosing): o WPF desenha a tela de abertura ou a capa sem nada aparecer,
+    // e só então a janela é revelada. Na volta do tray e de minimizado, a capa ainda segura enquanto o
+    // WebView2 retoma a pintura e some com um fade curto; na abertura quem cobre é a tela de abertura.
     private void OnShownAgain()
     {
-        if (Cover.Visibility != Visibility.Visible)
+        if (!_cloaked && Cover.Visibility != Visibility.Visible)
             return;
         _coverTimer?.Stop();
         var reveal = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(_cloaked ? 120 : 0) };
@@ -117,7 +124,10 @@ public partial class MainWindow : Window
                 _cloaked = false;
                 DwmWindow.SetCloaked(this, false);
             }
-            var lift = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+            if (Cover.Visibility != Visibility.Visible)
+                return;
+            CoverProgress.IsIndeterminate = true;
+            var lift = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             _coverTimer = lift;
             lift.Tick += (_, _) =>
             {
@@ -125,8 +135,10 @@ public partial class MainWindow : Window
                 var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(150));
                 fade.Completed += (_, _) =>
                 {
-                    if (IsVisible)
-                        Cover.Visibility = Visibility.Collapsed;
+                    if (!IsVisible)
+                        return;
+                    Cover.Visibility = Visibility.Collapsed;
+                    CoverProgress.IsIndeterminate = false; // para a animação da barra
                 };
                 Cover.BeginAnimation(OpacityProperty, fade);
             };
@@ -135,7 +147,8 @@ public partial class MainWindow : Window
         reveal.Start();
     }
 
-    private bool _cloaked;
+    // Começa true: a primeira exibição também vem encoberta (o cloak de fato entra no SourceInitialized).
+    private bool _cloaked = true;
 
     private void ShowCover()
     {

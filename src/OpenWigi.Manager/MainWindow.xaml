@@ -28,9 +28,16 @@
             </StackPanel>
         </Grid>
 
-        <!-- Capa lisa na volta do tray: escondida, a janela para de desenhar o WebView2, e ao reaparecer
-             os primeiros quadros dele vinham brancos. Ela entra antes do Hide() e sai quando ele já
-             voltou a pintar (ver OnClosing e OnShownAgain). -->
-        <Border x:Name="Cover" Background="#121318" Visibility="Collapsed" IsHitTestVisible="False" />
+        <!-- Capa da volta do tray (e de minimizado): escondida, a janela para de desenhar o WebView2. Ela
+             entra antes do Hide() e sai quando ele já voltou a pintar (ver OnClosing e OnShownAgain). É uma
+             versão menor da tela de abertura: logo e a barra de progresso, nas cores do tema. -->
+        <Grid x:Name="Cover" Background="#121318" Visibility="Collapsed" IsHitTestVisible="False">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Image Source="pack://application:,,,/Assets/openwigidash-512.png" Width="96" Height="96"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <ProgressBar x:Name="CoverProgress" IsIndeterminate="True" Width="120" Height="3"
+                             Margin="0,16,0,0" BorderThickness="0" Foreground="#E5243B" Background="#24262E" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
