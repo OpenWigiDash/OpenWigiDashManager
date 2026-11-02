@@ -374,6 +374,29 @@ public sealed class HostTests : IAsyncLifetime
         Assert.Null(host.FrameOf(Guid.NewGuid()));
     }
 
+    [Fact]
+    public async Task Relogio_1x1_desenha_no_tamanho_e_na_cor_de_fundo_escolhida()
+    {
+        var host = await StartAsync();
+        var page = await host.AddPageAsync("Relógio");
+        var id = (await host.AddWidgetAsync(Clock, page, WidgetSize.Mini))!.Value;
+
+        var frame = host.FrameOf(id);
+        Assert.NotNull(frame);
+        Assert.Equal(TileFrame.Default.ContentSize(WidgetSize.Mini.CellSpan), frame.Size);
+
+        // A cor vem da tela de configurações; o plugin está em outro contexto de carga, então vai por reflexão.
+        var instance = host.GetSettings(id)!.Value.Instance;
+        var set = instance.GetType().GetMethod("SetBackgroundAsync")!;
+        await (Task)set.Invoke(instance, [new WidgetColor(255, 0, 0)])!;
+
+        // Canto de cima à esquerda é fundo; Bgra32 guarda azul, verde, vermelho.
+        static byte[] Corner(WidgetFrame? f) => f is null ? [] : f.Pixels.Span[..3].ToArray();
+        for (var i = 0; i < 50 && !Corner(host.FrameOf(id)).SequenceEqual(new byte[] { 0, 0, 255 }); i++)
+            await Task.Delay(20);
+        Assert.Equal(new byte[] { 0, 0, 255 }, Corner(host.FrameOf(id)));
+    }
+
 [Fact]
     public async Task Paginas_nunca_tem_nome_repetido()
     {
@@ -577,7 +600,8 @@ public sealed class HostTests : IAsyncLifetime
 
         var clock = await host.GetCatalogIconAsync(Clock);
         Assert.NotNull(clock);
-        Assert.Equal(DashboardHost.PreviewPixelSize(WidgetSize.Small), clock.Size);
+        // O menor tamanho do relógio é o 1x1.
+        Assert.Equal(DashboardHost.PreviewPixelSize(WidgetSize.Mini), clock.Size);
         Assert.Same(clock, await host.GetCatalogIconAsync(Clock));
 
         // O contador não implementa GetPreviewAsync: a UI mostra o ícone genérico.
@@ -595,7 +619,8 @@ public sealed class HostTests : IAsyncLifetime
         var settings = host.GetSettings(counter);
         Assert.NotNull(settings);
         Assert.Equal("CounterSettings", settings.Value.Component.Name);
-        Assert.Null(host.GetSettings(clock));
+        Assert.Equal("ClockSettings", host.GetSettings(clock)?.Component.Name);
+        Assert.Null(host.GetSettings(Guid.NewGuid()));
     }
 
     [Fact]

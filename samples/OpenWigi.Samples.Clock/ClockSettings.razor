@@ -1,0 +1,58 @@
+@using MudBlazor
+@using MudBlazor.Utilities
+@using OpenWigi.Sdk
+@inherits WidgetSettingsComponent<ClockInstance>
+@inject IDialogService Dialogs
+
+@* Tela de configurações do relógio: cor de fundo e cor da fonte, valem para todos os tamanhos.
+   Sem cor escolhida, segue o tema do manager. *@
+<MudStack Spacing="3">
+    <MudText Typo="Typo.overline" Color="Color.Secondary">Cores</MudText>
+    @ColorRow("Cor de fundo", Instance.Background, Instance.CustomBackground is not null, PickBackground, () => Instance.SetBackgroundAsync(null))
+    @ColorRow("Cor da fonte", Instance.Foreground, Instance.CustomForeground is not null, PickForeground, () => Instance.SetForegroundAsync(null))
+    <MudText Typo="Typo.caption" Color="Color.Secondary">No tamanho 1x1 o relógio mostra só a hora.</MudText>
+</MudStack>
+
+@code {
+    private RenderFragment ColorRow(string label, WidgetColor color, bool custom, Func<Task> pick, Func<Task> reset) => __builder =>
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <div style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--mud-palette-lines-default); background: @color"
+                 title="@color"></div>
+            <MudStack Spacing="0" Style="min-width: 110px">
+                <MudText Typo="Typo.body2">@label</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@(custom ? color.ToString() : "Do tema")</MudText>
+            </MudStack>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="pick">Escolher</MudButton>
+            @if (custom)
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="async () => { await reset(); StateHasChanged(); }">Usar a do tema</MudButton>
+            }
+        </MudStack>
+    };
+
+    private async Task PickBackground()
+    {
+        if (await AskAsync("Cor de fundo", Instance.Background) is { } color)
+            await Instance.SetBackgroundAsync(color);
+    }
+
+    private async Task PickForeground()
+    {
+        if (await AskAsync("Cor da fonte", Instance.Foreground) is { } color)
+            await Instance.SetForegroundAsync(color);
+    }
+
+    private async Task<WidgetColor?> AskAsync(string title, WidgetColor current)
+    {
+        var parameters = new DialogParameters<ClockColorDialog>
+        {
+            { d => d.Initial, new MudColor(current.R, current.G, current.B, (byte)255) },
+        };
+        var dialog = await Dialogs.ShowAsync<ClockColorDialog>(title, parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, CloseOnEscapeKey = true });
+        if (await dialog.Result is { Canceled: false, Data: MudColor chosen })
+            return new WidgetColor(chosen.R, chosen.G, chosen.B);
+        return null;
+    }
+}
