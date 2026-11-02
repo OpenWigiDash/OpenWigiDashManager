@@ -600,7 +600,8 @@ public sealed class HostTests : IAsyncLifetime
 
         var clock = await host.GetCatalogIconAsync(Clock);
         Assert.NotNull(clock);
-        Assert.Equal(DashboardHost.PreviewPixelSize(WidgetSize.Small), clock.Size);
+        // O menor tamanho do relógio é o 1x1.
+        Assert.Equal(DashboardHost.PreviewPixelSize(WidgetSize.Mini), clock.Size);
         Assert.Same(clock, await host.GetCatalogIconAsync(Clock));
 
         // O contador não implementa GetPreviewAsync: a UI mostra o ícone genérico.
