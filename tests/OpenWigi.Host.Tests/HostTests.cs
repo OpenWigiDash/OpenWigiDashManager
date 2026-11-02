@@ -204,6 +204,21 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Toque_na_folga_da_borda_da_tela_vai_para_o_widget_da_borda()
+    {
+        var host = await StartAsync();
+        await host.ActivateAsync(true);
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).Bounds;
+        Assert.Equal(WidgetGrid.Area.Y, counter.Y); // na primeira linha, colado na folga de cima
+
+        // Na beira da tela, 4 px acima da célula: fora da folga do toque, mas é a borda.
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.Tap, counter.X + 10, 0, TimeSpan.Zero));
+
+        var settings = Directory.GetFiles(Path.Combine(Data, "instances"), "settings.json", SearchOption.AllDirectories);
+        Assert.Contains(settings, f => File.ReadAllText(f).Contains("\"value\": \"1\""));
+    }
+
+    [Fact]
     public async Task Toque_duplo_so_vale_se_os_dois_toques_foram_no_mesmo_widget()
     {
         var host = await StartAsync();
@@ -234,11 +249,11 @@ public sealed class HostTests : IAsyncLifetime
         var host = await StartAsync();
         var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
         var context = host.GetSettings(counter.InstanceId)!.Value.Context;
-        Assert.Equal(new PixelSize(200, 145), context.PixelSize); // padrão: sem folga, como antes
+        Assert.Equal(new PixelSize(198, 143), context.PixelSize); // padrão: sem folga, a célula inteira
 
         await host.SetPageFrameAsync(0, TileFrame.Framed);
 
-        Assert.Equal(new PixelSize(190, 135), context.PixelSize);
+        Assert.Equal(new PixelSize(188, 133), context.PixelSize);
         Assert.Equal(TileFrame.Framed, context.Frame);
         Assert.Equal(TileFrame.Framed, new LayoutStore(Path.Combine(Data, "layout.json")).Load().Pages[0].Frame);
     }

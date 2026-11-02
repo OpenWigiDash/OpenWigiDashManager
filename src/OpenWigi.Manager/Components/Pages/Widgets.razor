@@ -89,13 +89,13 @@
                      @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
                     @foreach (var cell in FreeCells())
                     {
-                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 1); grid-row: @(cell.Row + 1)"></div>
+                        <div class="owd-cell-empty" style="grid-column: @(cell.Column + 2); grid-row: @(cell.Row + 2)"></div>
                     }
                     @foreach (var placement in CurrentPage?.Widgets ?? [])
                     {
                         var p = placement;
                         <div @key="p.InstanceId" class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
-                             style="grid-column: @(p.Column + 1) / span @p.Size.Columns; grid-row: @(p.Row + 1) / span @p.Size.Rows; @TileStyle(p, CurrentPage)"
+                             style="grid-column: @(p.Column + 2) / span @p.Size.Columns; grid-row: @(p.Row + 2) / span @p.Size.Rows; @TileStyle(p, CurrentPage)"
                              @onpointerdown="e => Press(p, e)"
                              @onclick="() => _selected = p.InstanceId">
                             @* O tile mostra o que o widget desenha, com a moldura da página, como vai aparecer no aparelho. *@
@@ -132,7 +132,7 @@
                     @if (_resizing is { } resized && _resizeTo is { } newSize)
                     {
                         <div class="owd-drop @(ResizeAllowed(resized, newSize) ? "ok" : "bad")"
-                             style="grid-column: @(resized.Column + 1) / span @newSize.Columns; grid-row: @(resized.Row + 1) / span @newSize.Rows">
+                             style="grid-column: @(resized.Column + 2) / span @newSize.Columns; grid-row: @(resized.Row + 2) / span @newSize.Rows">
                             <span class="owd-drop-label">@newSize</span>
                         </div>
                     }
@@ -143,7 +143,7 @@
                         {
                             @* Em cima de outro do mesmo tamanho: os dois trocam de lugar. *@
                             <div class="owd-drop ok"
-                                 style="grid-column: @(other.Column + 1) / span @dragged.Size.Columns; grid-row: @(other.Row + 1) / span @dragged.Size.Rows">
+                                 style="grid-column: @(other.Column + 2) / span @dragged.Size.Columns; grid-row: @(other.Row + 2) / span @dragged.Size.Rows">
                                 <span class="owd-drop-label">Trocar</span>
                             </div>
                         }
@@ -152,7 +152,7 @@
                             var c = Math.Clamp(target.Column, 0, WidgetGrid.Columns - dragged.Size.Columns);
                             var r = Math.Clamp(target.Row, 0, WidgetGrid.Rows - dragged.Size.Rows);
                             <div class="owd-drop @(Fits(dragged, target) ? "ok" : "bad")"
-                                 style="grid-column: @(c + 1) / span @dragged.Size.Columns; grid-row: @(r + 1) / span @dragged.Size.Rows"></div>
+                                 style="grid-column: @(c + 2) / span @dragged.Size.Columns; grid-row: @(r + 2) / span @dragged.Size.Rows"></div>
                         }
                     }
                 </div>
@@ -334,7 +334,7 @@
                                 @foreach (var w in thumb.Widgets)
                                 {
                                     <div @key="w.InstanceId" class="owd-thumb-widget"
-                                         style="grid-column: @(w.Column + 1) / span @w.Size.Columns; grid-row: @(w.Row + 1) / span @w.Size.Rows; @TileStyle(w, thumb)">
+                                         style="grid-column: @(w.Column + 2) / span @w.Size.Columns; grid-row: @(w.Row + 2) / span @w.Size.Rows; @TileStyle(w, thumb)">
                                         <div class="owd-tile"><WidgetLiveFrame Dashboard="Dashboard" InstanceId="w.InstanceId" MaxPerSecond="1" /></div>
                                     </div>
                                 }
@@ -693,8 +693,17 @@
     private (int Column, int Row) CellAt(double clientX, double clientY)
     {
         var (x, y, width, height) = (_gridRect[0], _gridRect[1], Math.Max(1, _gridRect[2]), Math.Max(1, _gridRect[3]));
-        return (Math.Clamp((int)((clientX - x) / (width / WidgetGrid.Columns)), 0, WidgetGrid.Columns - 1),
-            Math.Clamp((int)((clientY - y) / (height / WidgetGrid.Rows)), 0, WidgetGrid.Rows - 1));
+        // Em pixels do aparelho; a célula é a última que começa antes do ponteiro (folga e espaço contam
+        // para a célula vizinha).
+        var deviceX = (clientX - x) * WidgetGrid.Screen.Width / width;
+        var deviceY = (clientY - y) * WidgetGrid.Screen.Height / height;
+        var column = 0;
+        while (column + 1 < WidgetGrid.Columns && WidgetGrid.ColumnX(column + 1) <= deviceX)
+            column++;
+        var row = 0;
+        while (row + 1 < WidgetGrid.Rows && WidgetGrid.RowY(row + 1) <= deviceY)
+            row++;
+        return (column, row);
     }
 
     private void EndDrag()

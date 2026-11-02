@@ -933,7 +933,7 @@ public event Action? LayoutChanged;
         var bestDistance = int.MaxValue;
         foreach (var placement in _layout.Pages[CurrentPage].Widgets)
         {
-            var cell = placement.Bounds;
+            var cell = Reach(placement.Bounds);
             var dx = Math.Max(0, Math.Max(cell.X - x, x - (cell.Right - 1)));
             var dy = Math.Max(0, Math.Max(cell.Y - y, y - (cell.Bottom - 1)));
             if (dx > TouchSlop || dy > TouchSlop)
@@ -943,6 +943,18 @@ public event Action? LayoutChanged;
                 (best, bestDistance) = (placement, distance);
         }
         return best is not null && _runtimes.TryGetValue(best.InstanceId, out var runtime) ? runtime : null;
+    }
+
+    // Célula de um widget para o toque: na borda da grade ela vai até a beira da tela, para a folga
+    // das bordas não virar um lugar morto.
+    private static PixelRect Reach(PixelRect cell)
+    {
+        var area = WidgetGrid.Area;
+        var left = cell.X <= area.X ? 0 : cell.X;
+        var top = cell.Y <= area.Y ? 0 : cell.Y;
+        var right = cell.Right >= area.Right ? WidgetGrid.Screen.Width : cell.Right;
+        var bottom = cell.Bottom >= area.Bottom ? WidgetGrid.Screen.Height : cell.Bottom;
+        return new PixelRect(left, top, right - left, bottom - top);
     }
 
     // Acerta moldura e área de conteúdo do contexto depois de mudar a moldura da página ou a posição.

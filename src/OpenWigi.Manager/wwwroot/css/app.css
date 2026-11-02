@@ -23,17 +23,20 @@ html, body {
     right: 0.75rem;
 }
 
-/* Grade do editor: 10x8 meias células, mesma proporção do aparelho. O fundo é o da página.
+/* Grade do editor: 10x8 meias células, mesma proporção e mesmos espaços do aparelho (WidgetGrid). O fundo
+   é o da página. A primeira e a última trilha de cada lado são a folga entre a grade e a borda da tela:
+   com o espaço de 4 px depois delas, dão 5 px nas laterais e 4 px no topo e no rodapé. Por isso as
+   células começam na linha 2 da grade CSS (coluna + 2, linha + 2 nos .razor). Colunas: 1 + 10 x 97 + 1
+   mais 11 espaços de 4 = 1016. Linhas: 8 x 69,5 em média mais 9 espaços de 4 = 592.
    --owd-px é um pixel do aparelho na escala da grade, para desenhar a moldura dos tiles. */
 .owd-grid {
     display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    gap: 0.4%;
+    grid-template-columns: 1fr repeat(10, 97fr) 1fr;
+    grid-template-rows: 0 repeat(8, 1fr) 0;
+    gap: calc(400% / 592) calc(400% / 1016);
     aspect-ratio: 1016 / 592;
     background: var(--owd-page-bg, #0e0f13);
-    border-radius: 10px;
-    padding: 6px;
+    padding: 0;
     container-type: inline-size;
     --owd-px: calc(100cqw / 1016);
 }
@@ -46,7 +49,7 @@ html, body {
 .owd-widget {
     border-radius: 6px;
     background: transparent;
-    border: 1px solid transparent;
+    border: 0;
     padding: 6px 8px;
     overflow: hidden;
     cursor: pointer;
@@ -188,8 +191,11 @@ html, body {
     z-index: 2;
 }
 
+/* isolation: os z-index de dentro (alças, rótulos, encaixe, selecionado) ficam presos ao canvas e não
+   passam por cima do painel do lado nem de um modal que um plugin abra nas configurações. */
 .owd-grid {
     position: relative;
+    isolation: isolate;
     user-select: none;
     touch-action: none;
 }
@@ -306,9 +312,10 @@ html, body {
     to { opacity: 1; }
 }
 
+/* Por fora do tile, para não empurrar a prévia para dentro (o tile ocupa a célula inteira). */
 .owd-widget.selected {
-    border-color: #e5243b;
-    box-shadow: 0 0 0 1px #e5243b;
+    z-index: 1;
+    box-shadow: 0 0 0 2px #e5243b;
 }
 
 .owd-muted {
@@ -371,11 +378,12 @@ html, body {
     box-shadow: 0 0 0 1px #e5243b;
 }
 
-/* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. */
+/* Miniatura: altura fixa, 162 x 94 ~ 1016 x 592. Trilhas vazias nas pontas, como na .owd-grid: a folga
+   da borda é o próprio espaço de 1 px. */
 .owd-thumb-grid {
     display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(8, 1fr);
+    grid-template-columns: 0 repeat(10, 1fr) 0;
+    grid-template-rows: 0 repeat(8, 1fr) 0;
     gap: 1px;
     width: 100%;
     height: 94px;
