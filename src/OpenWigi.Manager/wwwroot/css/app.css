@@ -322,7 +322,7 @@ html, body {
     color: var(--mud-palette-text-secondary);
 }
 
-/* Switch "Mostrar nomes" desligado: o tile fica só com a prévia (o selecionado mantém o nome). */
+/* Switch "Mostrar nomes" desligado: o tile fica só com a prévia, inclusive o selecionado (num 1x1 o nome cobriria o widget). */
 .owd-widget-label.hidden {
     display: none;
 }
@@ -659,4 +659,86 @@ html, body {
 
 .owd-widget-group .owd-ellipsis {
     flex: 0 1 auto;
+}
+
+/* Widget recortado: fica tracejado até ser colado em outro lugar (Esc desiste). */
+.owd-widget.cut {
+    opacity: 0.5;
+    outline: 2px dashed var(--mud-palette-text-secondary);
+    outline-offset: -2px;
+}
+
+/* O que está copiado ou recortado, na barra do Canvas, com o botão de colar. */
+.owd-clipboard {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 2px 4px 2px 10px;
+    border-radius: 16px;
+    border: 1px dashed var(--mud-palette-lines-default);
+    font-size: 0.85rem;
+}
+
+/* O menu de contexto abre no cursor: o "botão" dele não ocupa lugar. */
+.owd-context-anchor {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+.owd-menu-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    min-width: 160px;
+}
+
+.owd-menu-row .owd-shortcut {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Arrastando um widget: as outras páginas viram alvo; a de baixo do ponteiro diz se ele cabe. */
+.owd-page-card {
+    position: relative;
+}
+
+.owd-page-card.drop-target {
+    border-style: dashed;
+    border-color: var(--mud-palette-text-secondary);
+}
+
+.owd-page-card.drop-ok {
+    border-color: #3dd68c;
+    box-shadow: 0 0 0 1px #3dd68c;
+    background: rgba(61, 214, 140, 0.12);
+}
+
+.owd-page-card.drop-bad {
+    border-color: #ff6b57;
+    box-shadow: 0 0 0 1px #ff6b57;
+    background: rgba(255, 107, 87, 0.12);
+}
+
+.owd-page-drop-label {
+    position: absolute;
+    z-index: 2;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    height: 94px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
 }

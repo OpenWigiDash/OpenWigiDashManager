@@ -107,9 +107,11 @@ O host nunca chama dois métodos da mesma instância ao mesmo tempo. Todos os ga
 ## Contexto do host (`IWidgetContext`)
 
 - `Settings`: chave/valor em texto, por instância, no perfil do usuário dono do layout; `cloneable:
-  false` para o que não deve ir junto ao duplicar. `GetJsonAsync`/`SetJsonAsync` para objetos.
+  false` para o que não deve ir junto ao duplicar (Duplicar, ou Copiar e Colar, no editor: a cópia é uma
+  instância nova, que já abre com as configurações clonáveis da original). `GetJsonAsync`/`SetJsonAsync`
+  para objetos. Mover o widget para outra página não é cópia: a instância e tudo dela vão junto.
 - `Files`: `ImportAsync` (copia arquivo escolhido), `CreateAsync` (reserva caminho), `GetPathAsync`,
-  `DeleteAsync`. Somem com a remoção do widget.
+  `DeleteAsync`. Somem com a remoção do widget. Ao duplicar, a cópia ganha os próprios arquivos (copiados).
 - `Actions`: gatilhos que o widget dispara (`RegisterTriggerAsync`/`FireTriggerAsync`), ações que ele
   executa (`RegisterActionAsync` → `OnActionAsync`), ações que a pessoa ligou à instância
   (`GetBoundActionsAsync(setId)`) e `InvokeAsync` para rodar qualquer ação da central.

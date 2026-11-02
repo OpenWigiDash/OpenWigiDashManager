@@ -76,6 +76,18 @@
                 @* Barra do Canvas: a página que está nele, nomes por cima da prévia e o "Adicionar widget". *@
                 <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2" Class="mb-2">
                     <MudText Typo="Typo.h6" Class="flex-grow-1 owd-ellipsis">@CurrentPage?.Name</MudText>
+                    @if (ClipPlacement is { } clipped && _clipboard is { } clip)
+                    {
+                        @* O que foi copiado ou recortado: troque de página e cole aqui (ou Ctrl+V). Apagado = não cabe nesta página. *@
+                        var pasteAt = PastePlace(clipped, clip, null);
+                        <div class="owd-clipboard" title="@(pasteAt is null ? $"Não cabe nesta página: falta um espaço livre de {clipped.Size}" : "Colar nesta página (Ctrl+V)")">
+                            <MudIcon Icon="@(clip.Mode == ClipMode.Cut ? Icons.Material.Filled.ContentCut : Icons.Material.Filled.ContentCopy)" Size="Size.Small" />
+                            <span class="owd-ellipsis">@(clip.Mode == ClipMode.Cut ? "Recortado" : "Copiado"): @Dashboard.DisplayNameOf(clipped.InstanceId) (@clipped.Size)</span>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ContentPaste"
+                                       Disabled="@(pasteAt is null)" OnClick="() => Paste(null)">@(pasteAt is null ? "Não cabe aqui" : "Colar")</MudButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="ClearClipboard" aria-label="Esquecer o que foi copiado" />
+                        </div>
+                    }
                     <MudSwitch T="bool" Value="Settings.ShowWidgetNames" ValueChanged="v => Settings.ShowWidgetNames = v"
                                Color="Color.Primary" Size="Size.Small">Mostrar nomes</MudSwitch>
                     <MudButton StartIcon="@Icons.Material.Filled.Widgets" Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddWidget">
@@ -86,7 +98,8 @@
                    de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
                 <div class="owd-grid owd-canvas @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
                      style="@PageStyle(CurrentPage)"
-                     @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel">
+                     @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel" @onpointercancel="Cancel"
+                     @oncontextmenu="OpenCanvasMenu" @oncontextmenu:preventDefault="true">
                     @foreach (var cell in FreeCells())
                     {
                         <div class="owd-cell-empty" style="grid-column: @(cell.Column + 2); grid-row: @(cell.Row + 2)"></div>
@@ -94,10 +107,11 @@
                     @foreach (var placement in CurrentPage?.Widgets ?? [])
                     {
                         var p = placement;
-                        <div @key="p.InstanceId" class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "")"
+                        <div @key="p.InstanceId" class="owd-widget @(p.InstanceId == _selected ? "selected" : "") @(p.InstanceId == _dragging?.InstanceId ? "ghost" : "") @(_clipboard is { Mode: ClipMode.Cut } cut && cut.InstanceId == p.InstanceId ? "cut" : "")"
                              style="grid-column: @(p.Column + 2) / span @p.Size.Columns; grid-row: @(p.Row + 2) / span @p.Size.Rows; @TileStyle(p, CurrentPage)"
                              @onpointerdown="e => Press(p, e)"
-                             @onclick="() => _selected = p.InstanceId">
+                             @onclick="() => _selected = p.InstanceId"
+                             @oncontextmenu="e => OpenWidgetMenu(p, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                             @* O tile mostra o que o widget desenha, com a moldura da página, como vai aparecer no aparelho. *@
                             <div class="owd-tile"><WidgetLiveFrame Dashboard="Dashboard" InstanceId="p.InstanceId" /></div>
                             @if (Dashboard.ProblemOf(p.InstanceId) is { } problem)
@@ -108,7 +122,7 @@
                             }
                             else
                             {
-                                <div class="owd-widget-label @(Settings.ShowWidgetNames || p.InstanceId == _selected ? "" : "hidden")">
+                                <div class="owd-widget-label @(Settings.ShowWidgetNames ? "" : "hidden")">
                                     <MudText Typo="Typo.subtitle2">@Dashboard.DisplayNameOf(p.InstanceId)</MudText>
                                     <MudText Typo="Typo.caption" Class="owd-widget-caption">@(p.Name is { Length: > 0 } && Dashboard.NameOf(p.InstanceId) is { } type && type != p.Name ? $"{type} · {p.Size}" : p.Size.ToString())</MudText>
                                 </div>
@@ -150,10 +164,59 @@
                         }
                     }
                 </div>
+                @* Menu de contexto (botão direito): no widget, as ações dele; no espaço vazio, colar ali. *@
+                <MudMenu @ref="_menu" PositionAtCursor="true" Dense="true" Class="owd-context-anchor">
+                    <ActivatorContent></ActivatorContent>
+                    <ChildContent>
+                        @if (_menuFor is { } target)
+                        {
+                            var installed = IsInstalled(target);
+                            <MudMenuItem Icon="@Icons.Material.Filled.AddToPhotos" Disabled="@(!installed)" OnClick="() => Duplicate(target)">
+                                <div class="owd-menu-row"><span>Duplicar</span><span class="owd-shortcut">Ctrl+D</span></div>
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.ContentCopy" Disabled="@(!installed)" OnClick="() => SetClipboard(target, ClipMode.Copy)">
+                                <div class="owd-menu-row"><span>Copiar</span><span class="owd-shortcut">Ctrl+C</span></div>
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.ContentCut" OnClick="() => SetClipboard(target, ClipMode.Cut)">
+                                <div class="owd-menu-row"><span>Recortar</span><span class="owd-shortcut">Ctrl+X</span></div>
+                            </MudMenuItem>
+                            <MudMenu Label="Mover para página" StartIcon="@Icons.Material.Filled.DriveFileMove" Disabled="@(Dashboard.Layout.Pages.Count < 2)" Dense="true">
+                                @for (var i = 0; i < Dashboard.Layout.Pages.Count; i++)
+                                {
+                                    var index = i;
+                                    if (index == _page)
+                                        continue;
+                                    var fits = PlaceOnPage(target, index) is not null;
+                                    <MudMenuItem Disabled="@(!fits)" OnClick="() => MoveToPage(target, index)">
+                                        <div class="owd-menu-row"><span class="owd-ellipsis">@Dashboard.Layout.Pages[index].Name</span>
+                                            @if (!fits)
+                                            {
+                                                <span class="owd-shortcut">não cabe</span>
+                                            }
+                                        </div>
+                                    </MudMenuItem>
+                                }
+                            </MudMenu>
+                            <MudDivider Class="my-1" />
+                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error" OnClick="() => Remove(target.InstanceId)">
+                                <div class="owd-menu-row"><span>Tirar</span><span class="owd-shortcut">Del</span></div>
+                            </MudMenuItem>
+                        }
+                        else
+                        {
+                            var pasteHere = ClipPlacement is { } source && _clipboard is { } clip && PastePlace(source, clip, _menuCell) is not null;
+                            <MudMenuItem Icon="@Icons.Material.Filled.ContentPaste" Disabled="@(!pasteHere)" OnClick="() => Paste(_menuCell)">
+                                <div class="owd-menu-row"><span>@(ClipPlacement is null ? "Colar (nada copiado)" : pasteHere ? "Colar aqui" : "Colar aqui (não cabe)")</span><span class="owd-shortcut">Ctrl+V</span></div>
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Widgets" OnClick="OpenAddWidget">Adicionar widget</MudMenuItem>
+                        }
+                    </ChildContent>
+                </MudMenu>
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
                     Arraste um widget para outra posição (em cima de outro do mesmo tamanho, os dois trocam de lugar),
                     ou puxe o canto inferior direito para mudar o tamanho:
                     a área verde mostra como ele fica (vermelha = não cabe ou o widget não tem esse tamanho).
+                    Arraste até uma página do rodapé para levá-lo para lá. Com o botão direito: duplicar, copiar, recortar e mover para outra página.
                 </MudText>
             </MudPaper>
         </MudItem>
@@ -348,7 +411,12 @@
                     {
                         var index = i;
                         var thumb = Dashboard.Layout.Pages[index];
-                        <div @key="thumb.Id" class="owd-page-card @(index == _page ? "selected" : "")">
+                        var drop = DropState(index);
+                        <div @key="thumb.Id" class="owd-page-card @(index == _page ? "selected" : "") @drop">
+                            @if (drop is "drop-ok" or "drop-bad")
+                            {
+                                <div class="owd-page-drop-label">@(drop == "drop-ok" ? "Soltar para mover" : "Não cabe")</div>
+                            }
                             <div class="owd-thumb-grid" style="@PageStyle(thumb)" role="button" tabindex="0" @onclick="() => SelectPage(index)" title="Mostrar @thumb.Name">
                                 @foreach (var w in thumb.Widgets)
                                 {
@@ -704,6 +772,27 @@
             var (pressColumn, pressRow) = CellAt(_pressAt.X, _pressAt.Y);
             _grab = (pressColumn - _pressed.Column, pressRow - _pressed.Row);
             _render = true;
+            // O Canvas segura o ponteiro para o arraste continuar fora dele, até uma miniatura do rodapé.
+            _ = JS.InvokeVoidAsync("owd.capture", _grid, e.PointerId).AsTask();
+            _ = LoadPageRectsAsync();
+        }
+
+        // Fora do Canvas: só vale soltar numa miniatura de outra página.
+        if (!InsideGrid(e.ClientX, e.ClientY))
+        {
+            var over = PageAt(e.ClientX, e.ClientY);
+            if (_hover is not null || _dropPage != over)
+            {
+                _hover = null;
+                _dropPage = over;
+                _render = true;
+            }
+            return;
+        }
+        if (_dropPage is not null)
+        {
+            _dropPage = null;
+            _render = true;
         }
 
         // A célula sob o mouse menos a célula do widget onde a pessoa pegou = canto do encaixe.
@@ -758,6 +847,50 @@
     {
         _dragging = null;
         _hover = null;
+        _dropPage = null;
+    }
+
+    // --- arrastar até uma página do rodapé
+
+    // Miniaturas das páginas na janela (lidas ao começar o arraste) e a página sob o ponteiro.
+    private double[][] _pageRects = [];
+    private int? _dropPage;
+
+    private async Task LoadPageRectsAsync()
+    {
+        try
+        {
+            _pageRects = await JS.InvokeAsync<double[][]>("owd.rects", ".owd-page-card:not(.owd-page-add)");
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            _pageRects = [];
+        }
+    }
+
+    private bool InsideGrid(double x, double y) =>
+        x >= _gridRect[0] && x < _gridRect[0] + _gridRect[2] && y >= _gridRect[1] && y < _gridRect[1] + _gridRect[3];
+
+    // Índice da página cuja miniatura está sob o ponteiro; a página aberta no Canvas não conta.
+    private int? PageAt(double x, double y)
+    {
+        for (var i = 0; i < _pageRects.Length && i < Dashboard.Layout.Pages.Count; i++)
+        {
+            var r = _pageRects[i];
+            if (i != _page && r.Length == 4 && x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3])
+                return i;
+        }
+        return null;
+    }
+
+    // Classe da miniatura durante o arraste: todas as outras páginas viram alvo; a de baixo do ponteiro diz se cabe.
+    private string DropState(int index)
+    {
+        if (_dragging is not { } dragged || index == _page)
+            return "";
+        if (_dropPage != index)
+            return "drop-target";
+        return PlaceOnPage(dragged, index) is null ? "drop-bad" : "drop-ok";
     }
 
     private bool Fits(WidgetPlacement placement, (int Column, int Row) at) =>
@@ -776,6 +909,12 @@
 
     private async Task Drop()
     {
+        if (_dragging is { } dragged && _dropPage is { } page)
+        {
+            EndDrag();
+            await MoveToPage(dragged, page);
+            return;
+        }
         if (_dragging is { } placement && _hover is { } at)
         {
             if (Fits(placement, at) && (at.Column, at.Row) != (placement.Column, placement.Row))
@@ -784,6 +923,171 @@
                 await Dashboard.SwapWidgetsAsync(placement.InstanceId, other.InstanceId);
         }
         EndDrag();
+    }
+
+    // --- menu de contexto, duplicar, copiar, recortar e colar
+
+    private enum ClipMode { Copy, Cut }
+
+    private sealed record Clip(Guid InstanceId, ClipMode Mode);
+
+    // A "área de transferência" do editor: vale entre as páginas, até esvaziar ou colar o recortado.
+    private Clip? _clipboard;
+    private MudMenu? _menu;
+    private WidgetPlacement? _menuFor;
+    private (int Column, int Row)? _menuCell;
+
+    // O widget copiado ou recortado, se ele ainda está no layout.
+    private WidgetPlacement? ClipPlacement =>
+        _clipboard is { } clip ? Dashboard.Layout.AllPlacements.FirstOrDefault(p => p.InstanceId == clip.InstanceId) : null;
+
+    // Duplicar e copiar recriam a instância: precisa do plugin instalado. Recortar só muda o lugar.
+    private bool IsInstalled(WidgetPlacement placement) =>
+        Dashboard.AvailableWidgets.Any(w => w.Manifest.Id == placement.WidgetId);
+
+    private async Task OpenWidgetMenu(WidgetPlacement placement, MouseEventArgs e)
+    {
+        if (_dragging is not null || _resizing is not null || _menu is null)
+            return;
+        _pressed = null;
+        _selected = placement.InstanceId;
+        _menuFor = placement;
+        _menuCell = null;
+        await ShowMenuAsync(e);
+    }
+
+    private async Task OpenCanvasMenu(MouseEventArgs e)
+    {
+        if (_dragging is not null || _resizing is not null || _menu is null)
+            return;
+        _gridRect = await JS.InvokeAsync<double[]>("owd.rect", _grid);
+        _menuFor = null;
+        _menuCell = CellAt(e.ClientX, e.ClientY);
+        await ShowMenuAsync(e);
+    }
+
+    // Redesenha antes de abrir, para o menu já aparecer com os itens do widget clicado.
+    private async Task ShowMenuAsync(MouseEventArgs e)
+    {
+        _render = true;
+        StateHasChanged();
+        await Task.Yield();
+        await _menu!.OpenMenuAsync(e);
+    }
+
+    // Lugar numa página: o mesmo da origem se estiver livre, senão o primeiro que couber.
+    private (int Column, int Row)? PlaceOnPage(WidgetPlacement placement, int page) =>
+        Dashboard.Layout.Pages.ElementAtOrDefault(page)?.FindPlace(placement.Size, (placement.Column, placement.Row), except: placement.InstanceId);
+
+    // Onde colar na página aberta. Com célula (botão direito no vazio), só ali; sem, o mesmo lugar da origem ou o primeiro livre.
+    private (int Column, int Row)? PastePlace(WidgetPlacement source, Clip clip, (int Column, int Row)? cell)
+    {
+        if (CurrentPage is not { } page)
+            return null;
+        Guid? except = clip.Mode == ClipMode.Cut ? source.InstanceId : null;
+        if (cell is not { } c)
+            return page.FindPlace(source.Size, (source.Column, source.Row), except);
+        var column = Math.Clamp(c.Column, 0, Math.Max(0, WidgetGrid.Columns - source.Size.Columns));
+        var row = Math.Clamp(c.Row, 0, Math.Max(0, WidgetGrid.Rows - source.Size.Rows));
+        return page.CanPlace(column, row, source.Size, except) ? (column, row) : null;
+    }
+
+    private void SetClipboard(WidgetPlacement placement, ClipMode mode) =>
+        _clipboard = new Clip(placement.InstanceId, mode);
+
+    private void ClearClipboard() => _clipboard = null;
+
+    // A cópia fica ao lado da original quando dá; senão no primeiro lugar livre da página.
+    private async Task Duplicate(WidgetPlacement placement)
+    {
+        if (CurrentPage is not { } page)
+            return;
+        if (page.FindPlace(placement.Size, (placement.Column + placement.Size.Columns, placement.Row)) is not { } at)
+        {
+            Snackbar.Add($"Não há espaço livre de {placement.Size} nesta página para a cópia.", Severity.Warning);
+            return;
+        }
+        if (await Dashboard.DuplicateWidgetAsync(placement.InstanceId, _page, at) is { } copy)
+            _selected = copy;
+        else
+            Snackbar.Add("Não deu para duplicar o widget.", Severity.Warning);
+    }
+
+    private async Task Paste((int Column, int Row)? cell)
+    {
+        if (ClipPlacement is not { } source || _clipboard is not { } clip)
+            return;
+        var name = Dashboard.DisplayNameOf(source.InstanceId);
+        if (PastePlace(source, clip, cell) is not { } at)
+        {
+            Snackbar.Add(cell is null
+                ? $"\"{name}\" não cabe nesta página: falta um espaço livre de {source.Size}."
+                : $"\"{name}\" ({source.Size}) não cabe nesse lugar.", Severity.Warning);
+            return;
+        }
+        if (clip.Mode == ClipMode.Cut)
+        {
+            if (await Dashboard.MoveWidgetToPageAsync(source.InstanceId, _page, at))
+            {
+                _clipboard = null;
+                _selected = source.InstanceId;
+            }
+            else
+                Snackbar.Add($"Não deu para mover \"{name}\" para cá.", Severity.Warning);
+        }
+        else if (await Dashboard.DuplicateWidgetAsync(source.InstanceId, _page, at) is { } copy)
+            _selected = copy;
+        else
+            Snackbar.Add($"Não deu para colar \"{name}\".", Severity.Warning);
+    }
+
+    private async Task MoveToPage(WidgetPlacement placement, int page)
+    {
+        var target = Dashboard.Layout.Pages.ElementAtOrDefault(page);
+        var name = Dashboard.DisplayNameOf(placement.InstanceId);
+        if (target is null || PlaceOnPage(placement, page) is not { } at)
+        {
+            Snackbar.Add($"\"{name}\" ({placement.Size}) não cabe em \"{target?.Name}\": falta espaço livre.", Severity.Warning);
+            return;
+        }
+        if (await Dashboard.MoveWidgetToPageAsync(placement.InstanceId, page, at))
+        {
+            if (_selected == placement.InstanceId)
+                _selected = null;
+            if (_clipboard?.InstanceId == placement.InstanceId && _clipboard.Mode == ClipMode.Cut)
+                _clipboard = null;
+            Snackbar.Add($"\"{name}\" foi para \"{target.Name}\".", Severity.Success);
+        }
+        else
+            Snackbar.Add($"Não deu para mover \"{name}\".", Severity.Warning);
+    }
+
+    [JSInvokable]
+    public async Task EditKey(string action)
+    {
+        if (_dragging is not null || _resizing is not null)
+            return;
+        switch (action)
+        {
+            case "copy" when Selected is { } s && IsInstalled(s):
+                SetClipboard(s, ClipMode.Copy);
+                break;
+            case "cut" when Selected is { } s:
+                SetClipboard(s, ClipMode.Cut);
+                break;
+            case "duplicate" when Selected is { } s && IsInstalled(s):
+                await Duplicate(s);
+                break;
+            case "paste":
+                await Paste(null);
+                break;
+            case "escape" when _clipboard is { Mode: ClipMode.Cut }:
+                ClearClipboard();
+                break;
+            default:
+                return;
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task AddPage() =>
@@ -863,6 +1167,7 @@
     private DotNetObjectReference<Widgets>? _self;
     private IJSObjectReference? _deleteKey;
     private IJSObjectReference? _fitCanvas;
+    private IJSObjectReference? _editKeys;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -871,6 +1176,7 @@
             _self = DotNetObjectReference.Create(this);
             _deleteKey = await JS.InvokeAsync<IJSObjectReference>("owd.onDeleteKey", _self);
             _fitCanvas = await JS.InvokeAsync<IJSObjectReference>("owd.fitCanvas", _grid);
+            _editKeys = await JS.InvokeAsync<IJSObjectReference>("owd.onEditKeys", _self);
         }
     }
 
@@ -894,6 +1200,11 @@
             {
                 await _deleteKey.InvokeVoidAsync("dispose");
                 await _deleteKey.DisposeAsync();
+            }
+            if (_editKeys is not null)
+            {
+                await _editKeys.InvokeVoidAsync("dispose");
+                await _editKeys.DisposeAsync();
             }
             if (_fitCanvas is not null)
             {
