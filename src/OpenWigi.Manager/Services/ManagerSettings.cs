@@ -237,6 +237,11 @@ public sealed class ManagerSettings
 
     public void RequestPreviewWindow() => PreviewDetachRequested?.Invoke();
 
+    /// <summary>O layout do Blazor desenhou pela primeira vez: a janela tira a tela de abertura.</summary>
+    public event Action? UiReady;
+
+    public void NotifyUiReady() => UiReady?.Invoke();
+
     /// <summary>Rota pedida antes de a janela terminar de carregar; o layout consome ao iniciar.</summary>
     public string? PendingRoute { get; set; }
 

@@ -6,9 +6,26 @@
         Title="OpenWigiDash Manager" Width="1280" Height="820" MinWidth="1100" MinHeight="720"
         Background="#121318" WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/Assets/openwigidash.ico">
-    <blazor:BlazorWebView x:Name="WebView" HostPage="wwwroot\index.html">
-        <blazor:BlazorWebView.RootComponents>
-            <blazor:RootComponent Selector="#app" ComponentType="{x:Type local:Root}" />
-        </blazor:BlazorWebView.RootComponents>
-    </blazor:BlazorWebView>
+    <Grid>
+        <blazor:BlazorWebView x:Name="WebView" HostPage="wwwroot\index.html">
+            <blazor:BlazorWebView.RootComponents>
+                <blazor:RootComponent Selector="#app" ComponentType="{x:Type local:Root}" />
+            </blazor:BlazorWebView.RootComponents>
+        </blazor:BlazorWebView>
+
+        <!-- Tela de abertura: cobre o WebView2 enquanto ele sobe e o Blazor desenha pela primeira vez,
+             nas cores do tema escolhido. O BlazorWebView usa o controle de composição, então dá para
+             pôr conteúdo WPF por cima dele. As cores vêm do code-behind (ApplyTheme). -->
+        <Grid x:Name="Splash" Background="#121318">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Image Source="pack://application:,,,/Assets/openwigidash-512.png" Width="144" Height="144"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <TextBlock x:Name="SplashTitle" Text="OpenWigiDash Manager" HorizontalAlignment="Center"
+                           Margin="0,16,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22"
+                           FontWeight="SemiBold" Foreground="#E8E9ED" />
+                <ProgressBar x:Name="SplashProgress" IsIndeterminate="True" Width="168" Height="3"
+                             Margin="0,20,0,0" BorderThickness="0" Foreground="#E5243B" Background="#24262E" />
+            </StackPanel>
+        </Grid>
+    </Grid>
 </Window>
