@@ -282,7 +282,7 @@
                         <MudStack Row="true" AlignItems="AlignItems.Center">
                             <MudText Typo="Typo.overline" Color="Color.Secondary" Class="flex-grow-1">Moldura da página</MudText>
                             <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(frame == TileFrame.Default)"
-                                       OnClick="() => SetFrame(TileFrame.Default)">Padrão</MudButton>
+                                       OnClick="ResetFrame">Padrão</MudButton>
                         </MudStack>
 
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">Espaço entre os tiles</MudText>
@@ -539,6 +539,19 @@
     }
 
     private Task SetFrame(TileFrame frame) => Dashboard.SetPageFrameAsync(_page, frame);
+
+    // Voltar ao padrão apaga espaço, borda, cantos e cores escolhidos para a página: pergunta antes.
+    private async Task ResetFrame()
+    {
+        if (CurrentPage is not { } page)
+            return;
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Moldura padrão",
+            $"Voltar a moldura da página \"{page.Name}\" ao padrão? O espaço entre os tiles, a borda, os cantos e as cores que você escolheu para ela voltam aos valores padrão.",
+            yesText: "Voltar ao padrão", cancelText: "Cancelar");
+        if (confirmed == true)
+            await SetFrame(TileFrame.Default);
+    }
 
     private Task SetColor(ChangeEventArgs e, Func<TileFrame, WidgetColor, TileFrame> apply) =>
         CurrentPage is { } page && ParseColor(e.Value as string) is { } color
