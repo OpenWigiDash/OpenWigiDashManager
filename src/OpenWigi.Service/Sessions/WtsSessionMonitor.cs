@@ -36,7 +36,8 @@ public sealed class WtsSessionMonitor : ISessionMonitor
         int? consoleId = console == SessionNative.NoSession ? null : (int)console;
         var locked = consoleId is { } id && SessionNative.IsLocked(id) == true;
         var active = knownSessions.Where(SessionNative.IsActive).ToHashSet();
-        return new SessionSnapshot(consoleId, locked, active);
+        var hasUser = consoleId is { } c && SessionNative.UserName(c).Length > 0;
+        return new SessionSnapshot(consoleId, locked, active, hasUser);
     }
 
     public IReadOnlyList<WindowsSession> ListUserSessions()

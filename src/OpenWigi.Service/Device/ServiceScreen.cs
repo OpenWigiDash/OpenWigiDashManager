@@ -41,7 +41,9 @@ public static class ServiceScreen
         Color.FromArgb(160, 80, 60), Color.FromArgb(150, 110, 40), Color.FromArgb(70, 80, 105),
     ];
 
+    // Imagem do GDI+ não aceita uso de duas threads ao mesmo tempo: o desenho do logo passa pelo lock.
     private static readonly Lazy<Image?> Logo = new(LoadLogo);
+    private static readonly Lock LogoLock = new();
 
     public static byte[] Render(ServiceScreenModel model)
     {
@@ -254,7 +256,9 @@ public static class ServiceScreen
 
     private static void DrawLogo(Graphics g, RectangleF where)
     {
-        if (Logo.Value is { } logo)
+        if (Logo.Value is not { } logo)
+            return;
+        lock (LogoLock)
             g.DrawImage(logo, where);
     }
 

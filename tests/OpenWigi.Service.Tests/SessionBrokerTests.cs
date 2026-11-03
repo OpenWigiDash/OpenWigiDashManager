@@ -78,12 +78,13 @@ public class SessionBrokerTests
     {
         // Victor no RDP: a sessão dele saiu do console, que ficou sem usuário.
         _sessions.Console = 2;
+        _sessions.ConsoleHasUser = false;
         _sessions.Remote.Add(1);
         _sessions.UserSessions.Add(new WindowsSession(1, "victo", WindowsSessionState.Active, true));
         await ConnectAsync(1, "victo");
 
         Assert.Null(_broker.Owner);
-        Assert.True(OwnershipPolicy.IsLocked(_broker.Reason));
+        Assert.Equal(OwnershipPolicy.NoConsoleUserReason, _broker.Reason);
         var session = Assert.Single(_broker.ListSessions());
         Assert.True(session.Remote);
         Assert.Equal(WindowsSessionState.Active, session.State);
@@ -316,6 +317,7 @@ public class SessionBrokerTests
     {
         public int? Console { get; set; }
         public bool Locked { get; set; }
+        public bool ConsoleHasUser { get; set; } = true;
         public event Action? Changed;
 
         /// <summary>Sessões remotas ativas (RDP, Windows Sandbox).</summary>
@@ -326,7 +328,7 @@ public class SessionBrokerTests
             var active = new HashSet<int>(Remote);
             if (Console is { } c)
                 active.Add(c);
-            return new SessionSnapshot(Console, Locked, active);
+            return new SessionSnapshot(Console, Locked, active, ConsoleHasUser);
         }
 
         public List<WindowsSession> UserSessions { get; } = [];

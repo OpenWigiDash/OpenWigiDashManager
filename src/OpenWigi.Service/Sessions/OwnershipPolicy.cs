@@ -3,8 +3,12 @@ namespace OpenWigi.Service.Sessions;
 /// <summary>Um agente conectado, do ponto de vista da decisão de posse.</summary>
 public sealed record AgentCandidate(Guid AgentId, int SessionId, DateTimeOffset ConnectedAt);
 
-/// <summary>Estado das sessões do Windows num instante.</summary>
-public sealed record SessionSnapshot(int? ConsoleSessionId, bool ConsoleLocked, IReadOnlySet<int> ActiveSessions);
+/// <summary>
+/// Estado das sessões do Windows num instante. <paramref name="ConsoleHasUser"/> é falso quando o console está na
+/// tela de logon, por exemplo enquanto o usuário usa a própria sessão pelo RDP.
+/// </summary>
+public sealed record SessionSnapshot(int? ConsoleSessionId, bool ConsoleLocked, IReadOnlySet<int> ActiveSessions,
+    bool ConsoleHasUser = true);
 
 public sealed record OwnershipDecision(Guid? Owner, string Reason);
 
@@ -43,7 +47,7 @@ public static class OwnershipPolicy
                 return new OwnershipDecision(remote.AgentId, "Sessão remota ativa");
         }
 
-        return new OwnershipDecision(null, sessions.ConsoleSessionId is null
+        return new OwnershipDecision(null, sessions.ConsoleSessionId is null || !sessions.ConsoleHasUser
             ? NoConsoleUserReason
             : "OpenWigiDash não está aberto para o usuário do console");
     }

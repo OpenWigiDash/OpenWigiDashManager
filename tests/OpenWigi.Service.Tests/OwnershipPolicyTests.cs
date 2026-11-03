@@ -11,6 +11,18 @@ public class OwnershipPolicyTests
         new(session, locked, active.Concat(session is { } s ? [s] : []).ToHashSet());
 
     [Fact]
+    public void Console_na_tela_de_logon_conta_como_sem_usuario()
+    {
+        // Victor usando a própria sessão pelo RDP: o console ficou na tela de logon, sem usuário.
+        var agents = new[] { new AgentCandidate(Victor, 1, T0) };
+        var decision = OwnershipPolicy.Decide(agents, Console(2, false, 1) with { ConsoleHasUser = false }, false);
+
+        Assert.Null(decision.Owner);
+        Assert.Equal(OwnershipPolicy.NoConsoleUserReason, decision.Reason);
+        Assert.True(OwnershipPolicy.IsLocked(decision.Reason));
+    }
+
+    [Fact]
     public void Dono_e_o_agente_da_sessao_do_console()
     {
         var agents = new[] { new AgentCandidate(Victor, 1, T0), new AgentCandidate(Esposa, 3, T0) };
