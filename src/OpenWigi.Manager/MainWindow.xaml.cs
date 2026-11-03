@@ -30,18 +30,28 @@ public partial class MainWindow : Window
         WebView.Services = services;
         RestorePlacement();
 
+        StartupLog.Write($"Janela criada (WPF desenhando no nível {RenderCapability.Tier >> 16}).");
+
         _settings.UiReady += OnUiReady;
         _settings.Changed += OnSettingsChanged;
         // Se o Blazor nunca avisar (erro na primeira renderização), a tela de abertura sai mesmo assim
-        // para o aviso de erro do Blazor aparecer.
+        // para o aviso de erro do Blazor aparecer. Se nem o WebView2 abriu, ela fica e oferece tentar de novo.
         _splashFallback = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
-        _splashFallback.Tick += (_, _) => HideSplash();
+        _splashFallback.Tick += (_, _) => OnSplashTimeout();
         _splashFallback.Start();
         DwmWindow.UseAppTitleBar(this);
         SourceInitialized += (_, _) =>
         {
             if (_cloaked)
                 DwmWindow.SetCloaked(this, true);
+        };
+        // A primeira revelação espera o WPF desenhar a tela de abertura de verdade. Com um tempo fixo, numa
+        // sessão carregada (logo depois do logon, GPU ocupada) a janela aparecia vazia antes da tela de abertura.
+        ContentRendered += (_, _) =>
+        {
+            StartupLog.Write("Primeiro quadro do WPF desenhado.");
+            _contentRendered = true;
+            OnShownAgain();
         };
         IsVisibleChanged += (_, e) =>
         {
@@ -56,10 +66,19 @@ public partial class MainWindow : Window
             else
                 OnShownAgain();
         };
+        WebView.BlazorWebViewInitializing += (_, e) =>
+            StartupLog.Write($"WebView2 abrindo (dados em {e.UserDataFolder ?? "pasta padrão"}).");
         WebView.BlazorWebViewInitialized += (_, e) =>
         {
+            StartupLog.Write($"WebView2 aberto ({e.WebView.CoreWebView2.Environment.BrowserVersionString}).");
             _webView = e.WebView;
             ApplyWebViewBackground();
+            e.WebView.CoreWebView2.ProcessFailed += OnProcessFailed;
+            e.WebView.CoreWebView2.NavigationCompleted += (_, n) =>
+            {
+                _pageLoaded = n.IsSuccess;
+                StartupLog.Write(n.IsSuccess ? "Página carregada." : $"Página não carregou ({n.WebErrorStatus}).");
+            };
         };
         Closed += (_, _) =>
         {
@@ -86,6 +105,7 @@ public partial class MainWindow : Window
         SplashTitle.Foreground = Brush(colors.Text);
         SplashProgress.Foreground = Brush(colors.Accent);
         SplashProgress.Background = Brush(colors.Track);
+        SplashStuckText.Foreground = Brush(colors.Text);
         Cover.Background = Brush(colors.Background);
         CoverProgress.Foreground = Brush(colors.Accent);
         CoverProgress.Background = Brush(colors.Track);
@@ -113,6 +133,9 @@ public partial class MainWindow : Window
     {
         if (!_cloaked && Cover.Visibility != Visibility.Visible)
             return;
+        if (_cloaked && !_contentRendered)
+            return; // abertura a frio: quem revela é o ContentRendered
+        StartupLog.Write(_cloaked ? "Janela revelada." : "Janela de volta.");
         _coverTimer?.Stop();
         var reveal = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(_cloaked ? 120 : 0) };
         _coverTimer = reveal;
@@ -149,6 +172,8 @@ public partial class MainWindow : Window
 
     // Começa true: a primeira exibição também vem encoberta (o cloak de fato entra no SourceInitialized).
     private bool _cloaked = true;
+    private bool _contentRendered;
+    private bool _pageLoaded;
 
     private void ShowCover()
     {
@@ -156,6 +181,51 @@ public partial class MainWindow : Window
         Cover.BeginAnimation(OpacityProperty, null);
         Cover.Opacity = 1;
         Cover.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// O WebView2 desta janela não tem mais conserto (o navegador caiu, ou a pessoa pediu para tentar de
+    /// novo): o App fecha esta janela e abre outra no lugar.
+    /// </summary>
+    public event Action? ReopenRequested;
+
+    // Um processo do WebView2 caiu. A página (render) volta com um reload; o da GPU o próprio WebView2
+    // recria. Se foi o navegador, o controle não serve mais e a janela é trocada por uma nova.
+    private void OnProcessFailed(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2ProcessFailedEventArgs e)
+    {
+        StartupLog.Write($"WebView2: {e.ProcessFailedKind} ({e.Reason}, código {e.ExitCode}).");
+        switch (e.ProcessFailedKind)
+        {
+            case Microsoft.Web.WebView2.Core.CoreWebView2ProcessFailedKind.BrowserProcessExited:
+                Dispatcher.BeginInvoke(new Action(() => ReopenRequested?.Invoke()));
+                break;
+            case Microsoft.Web.WebView2.Core.CoreWebView2ProcessFailedKind.RenderProcessExited:
+            case Microsoft.Web.WebView2.Core.CoreWebView2ProcessFailedKind.RenderProcessUnresponsive:
+                _webView?.CoreWebView2?.Reload();
+                break;
+        }
+    }
+
+    // 20 s na tela de abertura. Com o WebView2 de pé, só falta o Blazor: a tela sai para o aviso de erro
+    // dele aparecer. Sem o WebView2 (ou sem a página), sair deixaria a janela vazia: a tela fica, diz o que
+    // houve e oferece tentar de novo.
+    private void OnSplashTimeout()
+    {
+        _splashFallback.Stop();
+        if (_webView?.CoreWebView2 is null || !_pageLoaded)
+        {
+            StartupLog.Write($"Tela de abertura: 20 s e o WebView2 {(_webView is null ? "não abriu" : "não carregou a página")}.");
+            SplashStuck.Visibility = Visibility.Visible;
+            return;
+        }
+        StartupLog.Write("Tela de abertura: 20 s sem o aviso do Blazor, saindo mesmo assim.");
+        HideSplash();
+    }
+
+    private void OnRetryClick(object sender, RoutedEventArgs e)
+    {
+        StartupLog.Write("Tentar de novo: reabrindo a janela.");
+        ReopenRequested?.Invoke();
     }
 
     private static SolidColorBrush Brush(string hex)
@@ -169,6 +239,7 @@ public partial class MainWindow : Window
 
     private void OnUiReady() => Dispatcher.BeginInvoke(new Action(() =>
     {
+        StartupLog.Write("Blazor desenhou a primeira tela.");
         // Um instante para o navegador pintar o que o Blazor acabou de mandar, e então some com um fade.
         var wait = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
         wait.Tick += (_, _) =>

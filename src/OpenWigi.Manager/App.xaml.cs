@@ -131,6 +131,7 @@ public partial class App : System.Windows.Application
         // GPU) ele falha ao abrir; isso não pode derrubar o agente, que segue desenhando no aparelho.
         if (error is System.Runtime.InteropServices.COMException && error.StackTrace?.Contains("WebView2") == true)
         {
+            StartupLog.Write($"WebView2 não abriu: {error.Message} (0x{error.HResult:X8}).");
             _window?.CloseForExit();
             _window = null;
             _tray?.ShowBalloon("Não foi possível abrir a janela agora (sem vídeo nesta sessão). O painel continua rodando.");
@@ -206,8 +207,14 @@ public partial class App : System.Windows.Application
     {
         if (_window is null)
         {
-            _window = new MainWindow(_services!);
-            _window.Closed += (_, _) => _window = null;
+            var created = new MainWindow(_services!);
+            created.Closed += (_, _) =>
+            {
+                if (_window == created)
+                    _window = null;
+            };
+            created.ReopenRequested += () => ReopenMainWindow(created);
+            _window = created;
         }
         var window = _window;
         try
@@ -216,6 +223,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
+            StartupLog.Write($"Show() da janela falhou: {ex.Message}");
             // Um Show() que falha no meio deixa a janela quebrada: reaproveitada, o próximo Show() dá
             // "O Visual raiz de um VisualTarget não pode ter um pai". Ela sai, e a próxima abertura cria
             // outra. O agente segue rodando no tray.
@@ -239,6 +247,19 @@ public partial class App : System.Windows.Application
         window.Activate();
         if (route is not null)
             window.Navigate(route);
+    }
+
+    // Troca a janela por uma nova (WebView2 novo). Só volta a abrir se ela estava aberta: escondida no
+    // tray, a próxima abertura já cria a nova.
+    private void ReopenMainWindow(MainWindow broken)
+    {
+        if (_window != broken)
+            return;
+        var wasVisible = broken.IsVisible;
+        _window = null;
+        broken.CloseForExit();
+        if (wasVisible)
+            ShowMainWindow();
     }
 
     // Mantém a pasta de plugins alternativa; troca a tela pedida pela Loja e tira o --tray e o --autostart.
