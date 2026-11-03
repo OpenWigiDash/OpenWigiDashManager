@@ -29,9 +29,9 @@ public static class ServiceScreen
     public const int MaxSessions = 4;
 
     private static readonly Color Background = Color.FromArgb(16, 18, 24);
-    private static readonly Color Dim = Color.FromArgb(140, 150, 170);
-    private static readonly Color Faint = Color.FromArgb(90, 98, 115);
-    private static readonly Color Divider = Color.FromArgb(36, 40, 52);
+    private static readonly Color Dim = Color.FromArgb(196, 203, 216);
+    private static readonly Color Faint = Color.FromArgb(150, 158, 176);
+    private static readonly Color Divider = Color.FromArgb(48, 53, 68);
     private static readonly Color Accent = Color.FromArgb(46, 196, 190);
 
     // Cores das iniciais de quem não tem foto, escolhidas pelo nome (sempre a mesma para o mesmo usuário).
@@ -74,10 +74,10 @@ public static class ServiceScreen
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
         g.Clear(Background);
 
-        using var clock = new Font("Segoe UI", 132, FontStyle.Bold, GraphicsUnit.Pixel);
+        using var clock = new Font("Segoe UI", 120, FontStyle.Bold, GraphicsUnit.Pixel);
         using var reason = new Font("Segoe UI", 30, GraphicsUnit.Pixel);
         using var title = new Font("Segoe UI Semibold", 22, GraphicsUnit.Pixel);
-        using var tiny = new Font("Segoe UI", 15, GraphicsUnit.Pixel);
+        using var tiny = new Font("Segoe UI", 18, GraphicsUnit.Pixel);
         var time = model.Now.ToString("HH:mm");
 
         if (model.Sessions.Count == 0)
@@ -92,13 +92,13 @@ public static class ServiceScreen
         {
             DrawLogo(g, new RectangleF(20, 12, 64, 64));
             DrawText(g, "OpenWigiDash", title, Dim, 90, 35);
-            DrawCentered(g, time, clock, Color.White, W / 2f, 102);
-            DrawReason(g, model, reason, 257);
+            DrawCentered(g, time, clock, Color.White, W / 2f, 86);
+            DrawReason(g, model, reason, 220);
             DrawSessions(g, model.Sessions);
         }
 
         var version = $"OpenWigiDashManager {model.Version}";
-        DrawText(g, version, tiny, Faint, W - 24 - Measure(g, version, tiny), H - 28);
+        DrawText(g, version, tiny, Faint, W - 24 - Measure(g, version, tiny), H - 32);
         return bitmap;
     }
 
@@ -122,15 +122,15 @@ public static class ServiceScreen
     private static void DrawSessions(Graphics g, IReadOnlyList<ServiceScreenSession> sessions)
     {
         using (var line = new Pen(Divider, 1))
-            g.DrawLine(line, W / 2f - 260, 318, W / 2f + 260, 318);
-        using var caption = new Font("Segoe UI", 16, GraphicsUnit.Pixel);
-        using var name = new Font("Segoe UI", 19, GraphicsUnit.Pixel);
-        using var state = new Font("Segoe UI", 15, GraphicsUnit.Pixel);
-        DrawCentered(g, "Sessões abertas neste PC", caption, Faint, W / 2f, 338);
+            g.DrawLine(line, W / 2f - 300, 272, W / 2f + 300, 272);
+        using var caption = new Font("Segoe UI", 18, GraphicsUnit.Pixel);
+        using var name = new Font("Segoe UI Semibold", 24, GraphicsUnit.Pixel);
+        using var state = new Font("Segoe UI", 19, GraphicsUnit.Pixel);
+        DrawCentered(g, "Sessões abertas neste PC", caption, Faint, W / 2f, 290);
 
         var shown = sessions.Count > MaxSessions ? sessions.Take(MaxSessions - 1).ToList() : sessions.ToList();
         var slots = shown.Count + (sessions.Count > MaxSessions ? 1 : 0);
-        const float spacing = 210, cy = 418, r = 42;
+        const float spacing = 236, cy = 378, r = 56;
         var x0 = W / 2f - spacing * (slots - 1) / 2;
 
         for (var i = 0; i < shown.Count; i++)
@@ -147,8 +147,8 @@ public static class ServiceScreen
             if (s.Remote)
                 DrawRemoteBadge(g, cx + r * 0.71f, cy + r * 0.71f);
 
-            DrawCentered(g, s.Name, name, inUse ? Color.White : Dim, cx, 476, spacing - 12);
-            DrawCentered(g, Describe(s), state, inUse && s.Remote ? Accent : Faint, cx, 502, spacing - 12);
+            DrawCentered(g, s.Name, name, inUse ? Color.White : Dim, cx, 452, spacing - 14);
+            DrawCentered(g, Describe(s), state, inUse && s.Remote ? Accent : Faint, cx, 486, spacing - 14);
         }
 
         if (slots > shown.Count)
@@ -198,16 +198,16 @@ public static class ServiceScreen
     /// <summary>Selo de acesso remoto: um monitor pequeno num círculo, no canto da foto.</summary>
     private static void DrawRemoteBadge(Graphics g, float cx, float cy)
     {
-        const float r = 14;
+        const float r = 16;
         using (var border = new SolidBrush(Background))
             g.FillEllipse(border, cx - r - 3, cy - r - 3, 2 * (r + 3), 2 * (r + 3));
         using (var fill = new SolidBrush(Accent))
             g.FillEllipse(fill, cx - r, cy - r, 2 * r, 2 * r);
 
         using var pen = new Pen(Background, 2);
-        g.DrawRectangle(pen, cx - 7, cy - 6, 14, 9);
-        g.DrawLine(pen, cx, cy + 3, cx, cy + 6);
-        g.DrawLine(pen, cx - 4, cy + 7, cx + 4, cy + 7);
+        g.DrawRectangle(pen, cx - 8, cy - 7, 16, 10);
+        g.DrawLine(pen, cx, cy + 3, cx, cy + 7);
+        g.DrawLine(pen, cx - 5, cy + 8, cx + 5, cy + 8);
     }
 
     /// <summary>Cadeado desenhado em vetor, sem depender de fonte de ícones do Windows. (x, y) é o canto do quadrado.</summary>

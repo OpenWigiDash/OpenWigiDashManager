@@ -22,6 +22,10 @@ jobs:
           name: tela-do-servico
           path: tests/OpenWigi.Service.Tests/bin/Release/**/service-screen/*.png
           if-no-files-found: ignore
+      - name: Tela do serviço em base64 (temporário, para revisão)
+        if: always()
+        shell: pwsh
+        run: Get-ChildItem tests/OpenWigi.Service.Tests/bin/Release -Recurse -Filter *.png | ForEach-Object { "PNG64 $($_.Name) $([Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName)))" }
       - name: Pacote de plugin
         shell: pwsh
         run: ./scripts/Test-PluginPackage.ps1 -Configuration Release
