@@ -123,6 +123,29 @@ public class CompositorTests
     }
 
     [Fact]
+    public async Task Quadro_que_chega_durante_o_envio_da_pagina_nao_se_perde()
+    {
+        // Na abertura, os widgets redesenham (logo do servidor, avatares) enquanto a página inteira ainda
+        // está indo para o aparelho; o quadro novo tem que aparecer na página que entra.
+        var sink = new RecordingSink();
+        var compositor = new Compositor(sink);
+        var shape = new TileShape(WidgetGrid.CellBounds(2, 2, WidgetSize.Small), TileFrame.None);
+        var red = WidgetFrame.Solid(WidgetSize.Small.CellSpan, 255, 0, 0);
+        var green = WidgetFrame.Solid(WidgetSize.Small.CellSpan, 0, 255, 0);
+        var gate = new TaskCompletionSource();
+        sink.FullPageGate = gate.Task;
+
+        var showing = compositor.ShowPageAsync(TileFrame.None.Background, [(shape, red)], Transition.None, CancellationToken.None);
+        compositor.Draw(shape, green);
+        gate.SetResult();
+        await showing;
+        await compositor.FlushAsync(CancellationToken.None);
+
+        var screen = sink.Merged(compositor.FrontPage);
+        Assert.Equal(0x07E0, Pixel(screen, shape.Cell.X + 10, shape.Cell.Y + 10));
+    }
+
+    [Fact]
     public void Mistura_de_cores_vai_de_uma_a_outra()
     {
         Assert.Equal(0xFFFF, Compositor.Mix(0xFFFF, 0x0000, 1f));
@@ -216,15 +239,19 @@ public class CompositorTests
         public List<(int Page, int Offset, int Length)> Writes { get; } = [];
         public byte[]? LastFullPage { get; private set; }
 
-        public ValueTask WriteAsync(int page, int byteOffset, ReadOnlyMemory<byte> rgb565, CancellationToken cancellationToken)
+        /// <summary>Segura o envio de página inteira até completar (para simular o USB lento).</summary>
+        public Task? FullPageGate { get; set; }
+
+        public async ValueTask WriteAsync(int page, int byteOffset, ReadOnlyMemory<byte> rgb565, CancellationToken cancellationToken)
         {
+            if (FullPageGate is { } gate && byteOffset == 0 && rgb565.Length == WigiDashProtocol.FrameBytes)
+                await gate;
             Writes.Add((page, byteOffset, rgb565.Length));
             if (!_pages.TryGetValue(page, out var buffer))
                 _pages[page] = buffer = new byte[WigiDashProtocol.FrameBytes];
             rgb565.Span.CopyTo(buffer.AsSpan(byteOffset));
             if (byteOffset == 0 && rgb565.Length == WigiDashProtocol.FrameBytes)
                 LastFullPage = rgb565.ToArray();
-            return ValueTask.CompletedTask;
         }
 
         /// <summary>A página do aparelho com tudo que já foi escrito nela.</summary>
