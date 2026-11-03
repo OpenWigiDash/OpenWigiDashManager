@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Logo da tela do serviço (sessão bloqueada). -->
+    <EmbeddedResource Include="..\..\assets\branding\png\openwigidash-256.png" LogicalName="OpenWigi.Service.Logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="OpenWigi.Service.Tests" />
   </ItemGroup>
 

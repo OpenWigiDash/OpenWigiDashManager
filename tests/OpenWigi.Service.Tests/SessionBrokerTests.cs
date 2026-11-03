@@ -5,6 +5,7 @@ using OpenWigi.Device.Gestures;
 using OpenWigi.Device.Protocol;
 using OpenWigi.Ipc;
 using OpenWigi.Service.Agents;
+using OpenWigi.Service.Device;
 using OpenWigi.Service.Sessions;
 
 namespace OpenWigi.Service.Tests;
@@ -37,7 +38,84 @@ public class SessionBrokerTests
         var (_, channel) = await ConnectAsync(1, "victor");
 
         Assert.IsType<Welcome>(channel.Sent[0]);
-        Assert.Equal(new Ownership(true, "Sessão ativa no console"), channel.Sent[1]);
+        Assert.Equal(ServiceScreenSettingsStore.Default, channel.Sent[1]);
+        Assert.Equal(new Ownership(true, "Sessão ativa no console"), channel.Sent[2]);
+    }
+
+    [Fact]
+    public async Task Lista_da_tela_do_servico_usa_nome_e_foto_do_agente()
+    {
+        _sessions.Console = 1;
+        _sessions.Locked = true;
+        _sessions.UserSessions.Add(new WindowsSession(3, "ana", WindowsSessionState.Disconnected, false));
+        _sessions.UserSessions.Add(new WindowsSession(1, "victo", WindowsSessionState.Locked, false));
+        var (victor, _) = await ConnectAsync(1, "victo");
+        var picture = new byte[UserProfile.PictureBytes];
+
+        _broker.Handle(victor, new UserProfile("Victor Perez", picture));
+
+        var sessions = _broker.ListSessions();
+        Assert.Equal(["Victor Perez", "ana"], sessions.Select(s => s.Name));
+        Assert.Same(picture, sessions[0].Picture);
+        Assert.Null(sessions[1].Picture);
+    }
+
+    [Fact]
+    public async Task Foto_com_tamanho_errado_e_descartada()
+    {
+        _sessions.UserSessions.Add(new WindowsSession(1, "victo", WindowsSessionState.Locked, false));
+        var (victor, _) = await ConnectAsync(1, "victo");
+
+        _broker.Handle(victor, new UserProfile("  ", new byte[10]));
+
+        var session = Assert.Single(_broker.ListSessions());
+        Assert.Equal("victo", session.Name);
+        Assert.Null(session.Picture);
+    }
+
+    [Fact]
+    public async Task Sessao_remota_aparece_na_lista_da_tela_bloqueada()
+    {
+        // Victor no RDP: a sessão dele saiu do console, que ficou sem usuário.
+        _sessions.Console = 2;
+        _sessions.ConsoleHasUser = false;
+        _sessions.Remote.Add(1);
+        _sessions.UserSessions.Add(new WindowsSession(1, "victo", WindowsSessionState.Active, true));
+        await ConnectAsync(1, "victo");
+
+        Assert.Null(_broker.Owner);
+        Assert.Equal(OwnershipPolicy.NoConsoleUserReason, _broker.Reason);
+        var session = Assert.Single(_broker.ListSessions());
+        Assert.True(session.Remote);
+        Assert.Equal(WindowsSessionState.Active, session.State);
+    }
+
+    [Fact]
+    public async Task Dono_esconde_a_lista_e_todos_os_agentes_ficam_sabendo()
+    {
+        _sessions.Console = 1;
+        _sessions.UserSessions.Add(new WindowsSession(1, "victo", WindowsSessionState.Active, false));
+        var (victor, victorChannel) = await ConnectAsync(1, "victo");
+        var (_, filha) = await ConnectAsync(4, "filha");
+
+        _broker.Handle(victor, new ServiceScreenSettings(false));
+
+        Assert.False(_broker.ScreenSettings.ShowSessions);
+        Assert.Empty(_broker.ListSessions());
+        Assert.Equal(new ServiceScreenSettings(false), victorChannel.Sent.OfType<ServiceScreenSettings>().Last());
+        Assert.Equal(new ServiceScreenSettings(false), filha.Sent.OfType<ServiceScreenSettings>().Last());
+    }
+
+    [Fact]
+    public async Task Quem_nao_e_dono_nao_muda_a_tela_do_servico()
+    {
+        _sessions.Console = 1;
+        await ConnectAsync(1, "victo");
+        var (filha, _) = await ConnectAsync(4, "filha");
+
+        _broker.Handle(filha, new ServiceScreenSettings(false));
+
+        Assert.True(_broker.ScreenSettings.ShowSessions);
     }
 
     [Fact]
@@ -239,6 +317,7 @@ public class SessionBrokerTests
     {
         public int? Console { get; set; }
         public bool Locked { get; set; }
+        public bool ConsoleHasUser { get; set; } = true;
         public event Action? Changed;
 
         /// <summary>Sessões remotas ativas (RDP, Windows Sandbox).</summary>
@@ -249,8 +328,12 @@ public class SessionBrokerTests
             var active = new HashSet<int>(Remote);
             if (Console is { } c)
                 active.Add(c);
-            return new SessionSnapshot(Console, Locked, active);
+            return new SessionSnapshot(Console, Locked, active, ConsoleHasUser);
         }
+
+        public List<WindowsSession> UserSessions { get; } = [];
+
+        public IReadOnlyList<WindowsSession> ListUserSessions() => UserSessions;
 
         public void Raise() => Changed?.Invoke();
     }

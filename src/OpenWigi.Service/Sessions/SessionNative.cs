@@ -7,11 +7,18 @@ internal static class SessionNative
     public const uint NoSession = 0xFFFFFFFF;
 
     // WTS_INFO_CLASS
+    public const int WTSUserName = 5;
+    public const int WTSDomainName = 7;
     public const int WTSConnectState = 8;
+    public const int WTSClientProtocolType = 16;
     public const int WTSSessionInfoEx = 25;
 
     // WTS_CONNECTSTATE_CLASS
     public const int WTSActive = 0;
+    public const int WTSDisconnected = 4;
+
+    // WTSClientProtocolType
+    public const ushort WTS_PROTOCOL_TYPE_CONSOLE = 0;
 
     // WTSINFOEX_LEVEL1.SessionFlags (a partir do Windows 8)
     public const int WTS_SESSIONSTATE_LOCK = 0;
@@ -26,6 +33,108 @@ internal static class SessionNative
 
     [DllImport("wtsapi32.dll")]
     public static extern void WTSFreeMemory(nint memory);
+
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool WTSEnumerateSessionsW(nint server, int reserved, int version, out nint sessionInfo, out int count);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WTS_SESSION_INFOW
+    {
+        public int SessionId;
+        public nint WinStationName;
+        public int State;
+    }
+
+    /// <summary>Sessões da máquina e o estado da conexão de cada uma (WTS_CONNECTSTATE_CLASS), ou null se o Windows negar.</summary>
+    public static IReadOnlyList<(int SessionId, int State)>? EnumerateSessions()
+    {
+        if (!WTSEnumerateSessionsW(0, 0, 1, out var buffer, out var count))
+            return null;
+        try
+        {
+            var size = Marshal.SizeOf<WTS_SESSION_INFOW>();
+            var sessions = new List<(int, int)>(count);
+            for (var i = 0; i < count; i++)
+            {
+                var info = Marshal.PtrToStructure<WTS_SESSION_INFOW>(buffer + i * size);
+                sessions.Add((info.SessionId, info.State));
+            }
+            return sessions;
+        }
+        finally
+        {
+            WTSFreeMemory(buffer);
+        }
+    }
+
+    /// <summary>Usuário logado na sessão, ou vazio (sessão 0, tela de logon, listener).</summary>
+    public static string UserName(int sessionId) => QueryString(sessionId, WTSUserName);
+
+    /// <summary>Domínio da conta da sessão; numa conta local (ou Microsoft) é o nome do PC.</summary>
+    public static string DomainName(int sessionId) => QueryString(sessionId, WTSDomainName);
+
+    private static string QueryString(int sessionId, int infoClass)
+    {
+        if (!WTSQuerySessionInformationW(0, sessionId, infoClass, out var buffer, out _))
+            return string.Empty;
+        try
+        {
+            return Marshal.PtrToStringUni(buffer) ?? string.Empty;
+        }
+        finally
+        {
+            WTSFreeMemory(buffer);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct USER_INFO_10
+    {
+        public string Name;
+        public string Comment;
+        public string UserComment;
+        public string FullName;
+    }
+
+    [DllImport("netapi32.dll", CharSet = CharSet.Unicode)]
+    private static extern int NetUserGetInfo(string? server, string userName, int level, out nint buffer);
+
+    [DllImport("netapi32.dll")]
+    private static extern int NetApiBufferFree(nint buffer);
+
+    /// <summary>
+    /// "Nome completo" de uma conta local (numa conta Microsoft, o nome dela), ou vazio. É o que o serviço consegue
+    /// sozinho; a foto não, porque a pasta das fotos só abre para o próprio usuário e o SYSTEM.
+    /// </summary>
+    public static string LocalFullName(string userName)
+    {
+        if (NetUserGetInfo(null, userName, 10, out var buffer) != 0 || buffer == 0)
+            return string.Empty;
+        try
+        {
+            return Marshal.PtrToStructure<USER_INFO_10>(buffer).FullName?.Trim() ?? string.Empty;
+        }
+        finally
+        {
+            NetApiBufferFree(buffer);
+        }
+    }
+
+    /// <summary>Sessão aberta por um cliente remoto (RDP), e não na frente do PC.</summary>
+    public static bool IsRemote(int sessionId)
+    {
+        if (!WTSQuerySessionInformationW(0, sessionId, WTSClientProtocolType, out var buffer, out _))
+            return false;
+        try
+        {
+            return (ushort)Marshal.ReadInt16(buffer) != WTS_PROTOCOL_TYPE_CONSOLE;
+        }
+        finally
+        {
+            WTSFreeMemory(buffer);
+        }
+    }
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

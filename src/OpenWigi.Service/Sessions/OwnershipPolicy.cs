@@ -3,8 +3,12 @@ namespace OpenWigi.Service.Sessions;
 /// <summary>Um agente conectado, do ponto de vista da decisão de posse.</summary>
 public sealed record AgentCandidate(Guid AgentId, int SessionId, DateTimeOffset ConnectedAt);
 
-/// <summary>Estado das sessões do Windows num instante.</summary>
-public sealed record SessionSnapshot(int? ConsoleSessionId, bool ConsoleLocked, IReadOnlySet<int> ActiveSessions);
+/// <summary>
+/// Estado das sessões do Windows num instante. <paramref name="ConsoleHasUser"/> é falso quando o console está na
+/// tela de logon, por exemplo enquanto o usuário usa a própria sessão pelo RDP.
+/// </summary>
+public sealed record SessionSnapshot(int? ConsoleSessionId, bool ConsoleLocked, IReadOnlySet<int> ActiveSessions,
+    bool ConsoleHasUser = true);
 
 public sealed record OwnershipDecision(Guid? Owner, string Reason);
 
@@ -14,6 +18,12 @@ public sealed record OwnershipDecision(Guid? Owner, string Reason);
 /// </summary>
 public static class OwnershipPolicy
 {
+    public const string LockedReason = "Sessão bloqueada";
+    public const string NoConsoleUserReason = "Nenhum usuário no console";
+
+    /// <summary>Motivos em que o PC está fechado para quem está na frente dele: a tela do serviço mostra o cadeado.</summary>
+    public static bool IsLocked(string reason) => reason is LockedReason or NoConsoleUserReason;
+
     public static OwnershipDecision Decide(IReadOnlyCollection<AgentCandidate> agents, SessionSnapshot sessions, bool allowRemoteSessions)
     {
         if (sessions.ConsoleSessionId is { } console)
@@ -22,7 +32,7 @@ public static class OwnershipPolicy
             if (local is not null)
             {
                 return sessions.ConsoleLocked
-                    ? new OwnershipDecision(null, "Sessão bloqueada")
+                    ? new OwnershipDecision(null, LockedReason)
                     : new OwnershipDecision(local.AgentId, "Sessão ativa no console");
             }
         }
@@ -37,8 +47,8 @@ public static class OwnershipPolicy
                 return new OwnershipDecision(remote.AgentId, "Sessão remota ativa");
         }
 
-        return new OwnershipDecision(null, sessions.ConsoleSessionId is null
-            ? "Nenhum usuário no console"
+        return new OwnershipDecision(null, sessions.ConsoleSessionId is null || !sessions.ConsoleHasUser
+            ? NoConsoleUserReason
             : "OpenWigiDash não está aberto para o usuário do console");
     }
 }

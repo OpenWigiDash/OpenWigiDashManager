@@ -25,7 +25,22 @@ public class IpcConnectionTests
         new DeviceStatus(true, Guid.NewGuid(), "virtual", DeviceKind.Virtual, UsbPresent: true),
         DeviceStatus.Disconnected with { Reconnecting = true },
         new DeviceStatus(true, Guid.NewGuid(), "WigiDash-1.0", Reconnecting: true),
+        new ServiceScreenSettings(false),
     ];
+
+    [Fact]
+    public void Perfil_do_usuario_sobrevive_a_codificacao()
+    {
+        var picture = new byte[UserProfile.PictureBytes];
+        Random.Shared.NextBytes(picture);
+
+        var decoded = Assert.IsType<UserProfile>(IpcConnection.Decode(IpcConnection.Encode(new UserProfile("Victor Perez", picture))));
+        var empty = Assert.IsType<UserProfile>(IpcConnection.Decode(IpcConnection.Encode(new UserProfile("victo", []))));
+
+        Assert.Equal("Victor Perez", decoded.DisplayName);
+        Assert.Equal(picture, decoded.Picture);
+        Assert.Empty(empty.Picture);
+    }
 
     [Theory]
     [MemberData(nameof(Messages))]
