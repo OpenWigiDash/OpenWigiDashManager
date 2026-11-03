@@ -62,6 +62,10 @@ public sealed class Compositor(IDisplaySink sink)
     private readonly List<(int Top, int Bottom)> _dirty = []; // ordenadas, sem sobreposição; Bottom exclusivo
     private int _front;           // índice em HardwarePages da página que está na tela
 
+    // Desenhos que chegam enquanto uma página inteira está a caminho do aparelho: vão para a página da
+    // frente (que está saindo) e são refeitos na nova quando ela entra, senão se perdem até o próximo quadro.
+    private List<Func<byte[], PixelRect>>? _lateDraws;
+
     /// <summary>Fundo da página que está na tela: o que <see cref="Clear"/> pinta.</summary>
     public WidgetColor Background { get; set; } = new(0, 0, 0);
 
@@ -83,14 +87,20 @@ public sealed class Compositor(IDisplaySink sink)
     {
         lock (_gate)
         {
-            var content = shape.Content;
-            var region = frame.ChangedRegion;
-            var screen = _buffers[_front];
-            Blit(screen, content, frame, region);
-            var changed = new PixelRect(content.X + region.X, content.Y + region.Y, region.Width, region.Height);
-            RoundCorners(screen, content, shape.InnerRadius, shape.InnerOutside, changed);
+            var changed = DrawOn(_buffers[_front], shape, frame);
             MarkDirty(changed.Y, changed.Bottom);
+            _lateDraws?.Add(screen => DrawOn(screen, shape, frame));
         }
+    }
+
+    private static PixelRect DrawOn(byte[] screen, TileShape shape, WidgetFrame frame)
+    {
+        var content = shape.Content;
+        var region = frame.ChangedRegion;
+        Blit(screen, content, frame, region);
+        var changed = new PixelRect(content.X + region.X, content.Y + region.Y, region.Width, region.Height);
+        RoundCorners(screen, content, shape.InnerRadius, shape.InnerOutside, changed);
+        return changed;
     }
 
     /// <summary>Copia o quadro para um retângulo sem moldura.</summary>
@@ -103,6 +113,11 @@ public sealed class Compositor(IDisplaySink sink)
         {
             Fill(_buffers[_front], bounds, Background);
             MarkDirty(bounds.Y, bounds.Bottom);
+            _lateDraws?.Add(screen =>
+            {
+                Fill(screen, bounds, Background);
+                return bounds;
+            });
         }
     }
 
@@ -143,15 +158,31 @@ public sealed class Compositor(IDisplaySink sink)
             Fill(back, new PixelRect(0, 0, WigiDashProtocol.Width, WigiDashProtocol.Height), background);
             foreach (var (shape, frame) in widgets)
                 PaintTile(back, shape, frame);
+            _lateDraws = [];
         }
 
-        await sink.WriteAsync(HardwarePages[backIndex], 0, back.ToArray(), cancellationToken);
-        await sink.ShowAsync(HardwarePages[backIndex], transition, cancellationToken);
-        lock (_gate)
+        try
         {
-            _front = backIndex;
-            Background = background;
-            _dirty.Clear();
+            await sink.WriteAsync(HardwarePages[backIndex], 0, back.ToArray(), cancellationToken);
+            await sink.ShowAsync(HardwarePages[backIndex], transition, cancellationToken);
+            lock (_gate)
+            {
+                _front = backIndex;
+                Background = background;
+                _dirty.Clear();
+                // O que mudou durante o envio ainda não está na página nova: refaz por cima, na ordem em
+                // que chegou, e marca para o próximo FlushAsync mandar.
+                foreach (var draw in _lateDraws!)
+                {
+                    var changed = draw(back);
+                    MarkDirty(changed.Y, changed.Bottom);
+                }
+            }
+        }
+        finally
+        {
+            lock (_gate)
+                _lateDraws = null;
         }
     }
 
