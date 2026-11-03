@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using Microsoft.Extensions.Options;
 using OpenWigi.Device.Gestures;
 using OpenWigi.Device.Protocol;
@@ -28,11 +29,15 @@ public sealed class SessionBroker : BackgroundService
     private Guid? _owner;
     private string _reason = string.Empty;
     private bool _regrant = true;
-    private DateTimeOffset _screenDrawnFor = DateTimeOffset.MinValue;
+    private string? _screenDrawn;
+    private readonly ServiceScreenSettingsStore? _screenStore;
+    private ServiceScreenSettings _screenSettings;
 
     public SessionBroker(IDisplay display, ISessionMonitor sessions, IOptions<ServiceOptions> options, TimeProvider time,
-        ILogger<SessionBroker> logger)
+        ILogger<SessionBroker> logger, ServiceScreenSettingsStore? screenSettings = null)
     {
+        _screenStore = screenSettings;
+        _screenSettings = screenSettings?.Load() ?? ServiceScreenSettingsStore.Default;
         _display = display;
         _sessions = sessions;
         _options = options.Value;
@@ -50,11 +55,18 @@ public sealed class SessionBroker : BackgroundService
     private bool AllowRemoteSessions => _options.AllowRemoteSessions || _display.Status.Kind == DeviceKind.Virtual;
     public string Reason => _reason;
 
+    public ServiceScreenSettings ScreenSettings => _screenSettings;
+
+    /// <summary>Versão mostrada na tela do serviço: a do instalador, que é a mesma do manager (sem o "+commit").</summary>
+    private static readonly string Version = typeof(SessionBroker).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "?";
+
     public async Task RegisterAsync(AgentSession agent, CancellationToken cancellationToken = default)
     {
         _agents[agent.Id] = agent;
         _logger.LogInformation("Agente conectado: {Agent}", agent);
         await agent.Channel.SendAsync(new Welcome(agent.SessionId, _display.Status), cancellationToken);
+        await agent.Channel.SendAsync(_screenSettings, cancellationToken);
         await EvaluateAsync(cancellationToken);
     }
 
@@ -71,6 +83,24 @@ public sealed class SessionBroker : BackgroundService
         if (message is Hello hello)
         {
             agent.UserName = hello.UserName;
+            return;
+        }
+
+        // Cada agente só fala da própria sessão (que vem do pipe), então qualquer um pode mandar o perfil.
+        if (message is UserProfile profile)
+        {
+            var name = profile.DisplayName.Trim();
+            agent.DisplayName = name.Length == 0 ? null : name.Length > 64 ? name[..64] : name;
+            agent.Picture = profile.Picture.Length == UserProfile.PictureBytes ? profile.Picture : null;
+            _wakeUp.Release();
+            return;
+        }
+
+        // Ajuste da máquina, com a mesma regra da troca de aparelho: o dono ou, sem dono, qualquer um.
+        if (message is ServiceScreenSettings settings)
+        {
+            if (_owner is null || _owner == agent.Id)
+                ApplyScreenSettings(settings);
             return;
         }
 
@@ -208,25 +238,61 @@ public sealed class SessionBroker : BackgroundService
         }
     }
 
+    private void ApplyScreenSettings(ServiceScreenSettings settings)
+    {
+        if (settings == _screenSettings)
+            return;
+        _screenSettings = settings;
+        _screenStore?.Save(settings);
+        _logger.LogInformation("Ajustes da tela do serviço: {Settings}", settings);
+        foreach (var other in _agents.Values)
+            _ = TrySendAsync(other, settings, CancellationToken.None);
+        _wakeUp.Release();
+    }
+
     private void DrawServiceScreen(bool force)
     {
-        // Redesenha ao mudar de estado e a cada minuto, por causa do relógio.
+        // Redesenha ao mudar de estado, a cada minuto (relógio) e quando a lista de sessões muda.
         var now = _time.GetLocalNow();
-        var minute = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, now.Offset);
-        if (!force && minute == _screenDrawnFor)
+        var model = new ServiceScreenModel(_reason, OwnershipPolicy.IsLocked(_reason), now.DateTime, Version, ListSessions());
+        var key = Describe(model);
+        if (!force && key == _screenDrawn)
             return;
 
         if (force)
             _logger.LogInformation("Sem dono; tela do serviço: {Reason}", _reason);
-        var frame = ServiceScreen.Render(_reason, now.DateTime);
+        var frame = ServiceScreen.Render(model);
         if (_display.WriteFrame(ServiceOptions.ServicePage, frame, 0)
             && _display.ShowPage(ServiceOptions.ServicePage, Transition.None))
         {
             _mirror.Write(ServiceOptions.ServicePage, frame, 0);
             _mirror.Show(ServiceOptions.ServicePage);
-            _screenDrawnFor = minute;
+            _screenDrawn = key;
         }
     }
+
+    /// <summary>Sessões para a tela do serviço, com nome e foto mandados pelo agente de cada uma (quando há agente).</summary>
+    internal IReadOnlyList<ServiceScreenSession> ListSessions()
+    {
+        if (!_screenSettings.ShowSessions)
+            return [];
+
+        var console = _sessions.Capture([]).ConsoleSessionId;
+        return _sessions.ListUserSessions()
+            .OrderByDescending(s => s.SessionId == console)
+            .ThenBy(s => s.SessionId)
+            .Select(s =>
+            {
+                var agent = _agents.Values.Where(a => a.SessionId == s.SessionId).MaxBy(a => a.Picture is not null);
+                return new ServiceScreenSession(agent?.DisplayName ?? s.UserName, s.State, s.Remote, agent?.Picture);
+            })
+            .ToList();
+    }
+
+    // O que muda o desenho: o minuto, o motivo e, de cada sessão, nome, estado, RDP e se tem foto.
+    private static string Describe(ServiceScreenModel model) =>
+        $"{model.Now:yyyyMMddHHmm}|{model.Reason}|" + string.Join("|", model.Sessions.Select(s =>
+            $"{s.Name}:{s.State}:{s.Remote}:{(s.Picture is null ? 0 : s.Picture.GetHashCode())}"));
 
     private void OnGesture(GestureEvent gesture)
     {
@@ -243,7 +309,7 @@ public sealed class SessionBroker : BackgroundService
 
         // Aparelho novo ou reconectado: as páginas estão vazias, o dono precisa redesenhar.
         _regrant = true;
-        _screenDrawnFor = DateTimeOffset.MinValue;
+        _screenDrawn = null;
         _wakeUp.Release();
     }
 

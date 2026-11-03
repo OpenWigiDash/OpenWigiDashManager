@@ -94,6 +94,14 @@ public sealed class AgentClient : IAsyncDisposable
     /// </summary>
     public Task SelectDeviceAsync(DeviceKind kind) => SendAsync(new SelectDevice(kind));
 
+    /// <summary>
+    /// Mostra ou não as sessões abertas na tela do serviço (PC bloqueado). Null até o serviço contar como está.
+    /// Vale para a máquina e segue a regra do aparelho: o serviço aceita do dono da tela ou, sem dono, de qualquer um.
+    /// </summary>
+    public bool? ShowSessionsOnServiceScreen { get; private set; }
+
+    public Task SetShowSessionsOnServiceScreenAsync(bool show) => SendAsync(new ServiceScreenSettings(show));
+
     public Task TouchAsync(TouchContact contact, int x, int y) =>
         Status == AgentStatus.Owner ? SendAsync(new EmulatedTouch(contact, x, y)) : Task.CompletedTask;
 
@@ -130,6 +138,7 @@ public sealed class AgentClient : IAsyncDisposable
             }
 
             _connection = null;
+            ShowSessionsOnServiceScreen = null;
             if (Dashboard.IsActive)
                 await Dashboard.ActivateAsync(false, CancellationToken.None);
             Set(AgentStatus.NoService, "Serviço OpenWigiDash não encontrado. Ele está instalado e rodando?");
@@ -151,6 +160,7 @@ public sealed class AgentClient : IAsyncDisposable
         await using var connection = new IpcConnection(pipe);
         await connection.SendAsync(new Hello(IpcConnection.ProtocolVersion, Environment.UserName), cancellationToken);
         await connection.SendAsync(new SubscribePreview(true), cancellationToken);
+        await connection.SendAsync(await AccountProfile.LoadAsync(_logger), cancellationToken);
         _connection = connection;
 
         while (await connection.ReceiveAsync(cancellationToken) is { } message)
@@ -190,6 +200,10 @@ public sealed class AgentClient : IAsyncDisposable
                     {
                         Brightness = brightness.Percent;
                     }
+                    Changed?.Invoke();
+                    break;
+                case ServiceScreenSettings screen:
+                    ShowSessionsOnServiceScreen = screen.ShowSessions;
                     Changed?.Invoke();
                     break;
                 case PreviewFrame frame:

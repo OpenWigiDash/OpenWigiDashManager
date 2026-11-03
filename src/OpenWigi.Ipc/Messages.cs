@@ -47,6 +47,23 @@ public sealed record EmulatedTouch(TouchContact Contact, int X, int Y) : IpcMess
 /// <summary>Troca o aparelho ativo (USB ou virtual). Vale para a máquina toda e fica gravado. Só vale do dono.</summary>
 public sealed record SelectDevice(DeviceKind Kind) : IpcMessage;
 
+/// <summary>
+/// Nome e foto do usuário do agente, para a lista de sessões da tela do serviço. A foto já vai decodificada
+/// (BGRA, <see cref="PictureSize"/> x <see cref="PictureSize"/>, sem pré-multiplicar), para o serviço não ter
+/// que abrir imagem vinda de outro usuário; vazia quando o Windows não deu a foto.
+/// </summary>
+public sealed record UserProfile(string DisplayName, byte[] Picture) : IpcMessage
+{
+    public const int PictureSize = 96;
+    public const int PictureBytes = PictureSize * PictureSize * 4;
+}
+
+/// <summary>
+/// Ajustes da tela do serviço (sessão bloqueada), que valem para a máquina toda. O serviço manda ao agente
+/// ao conectar e quando mudam; o agente manda para mudar, aceito do dono da tela ou, sem dono, de qualquer um.
+/// </summary>
+public sealed record ServiceScreenSettings(bool ShowSessions) : IpcMessage;
+
 // Serviço -> agente
 
 public sealed record Welcome(int SessionId, DeviceStatus Device) : IpcMessage;

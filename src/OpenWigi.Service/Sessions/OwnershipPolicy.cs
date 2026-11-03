@@ -14,6 +14,12 @@ public sealed record OwnershipDecision(Guid? Owner, string Reason);
 /// </summary>
 public static class OwnershipPolicy
 {
+    public const string LockedReason = "Sessão bloqueada";
+    public const string NoConsoleUserReason = "Nenhum usuário no console";
+
+    /// <summary>Motivos em que o PC está fechado para quem está na frente dele: a tela do serviço mostra o cadeado.</summary>
+    public static bool IsLocked(string reason) => reason is LockedReason or NoConsoleUserReason;
+
     public static OwnershipDecision Decide(IReadOnlyCollection<AgentCandidate> agents, SessionSnapshot sessions, bool allowRemoteSessions)
     {
         if (sessions.ConsoleSessionId is { } console)
@@ -22,7 +28,7 @@ public static class OwnershipPolicy
             if (local is not null)
             {
                 return sessions.ConsoleLocked
-                    ? new OwnershipDecision(null, "Sessão bloqueada")
+                    ? new OwnershipDecision(null, LockedReason)
                     : new OwnershipDecision(local.AgentId, "Sessão ativa no console");
             }
         }
@@ -38,7 +44,7 @@ public static class OwnershipPolicy
         }
 
         return new OwnershipDecision(null, sessions.ConsoleSessionId is null
-            ? "Nenhum usuário no console"
+            ? NoConsoleUserReason
             : "OpenWigiDash não está aberto para o usuário do console");
     }
 }

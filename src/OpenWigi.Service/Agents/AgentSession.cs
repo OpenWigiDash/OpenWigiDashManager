@@ -8,6 +8,10 @@ public sealed class AgentSession(int sessionId, IAgentChannel channel, DateTimeO
     public Guid Id { get; } = Guid.NewGuid();
     public int SessionId { get; } = sessionId;
     public string UserName { get; set; } = string.Empty;
+
+    /// <summary>Nome de exibição e foto (BGRA) do <see cref="UserProfile"/>, para a lista da tela do serviço.</summary>
+    public string? DisplayName { get; set; }
+    public byte[]? Picture { get; set; }
     public DateTimeOffset ConnectedAt { get; } = connectedAt;
     public IAgentChannel Channel { get; } = channel;
 

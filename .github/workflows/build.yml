@@ -15,6 +15,13 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build --configuration Release
       - run: dotnet test --configuration Release --no-build
+      - name: Tela do serviço (PNGs dos testes, para conferir o desenho)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tela-do-servico
+          path: tests/OpenWigi.Service.Tests/bin/Release/**/service-screen/*.png
+          if-no-files-found: ignore
       - name: Pacote de plugin
         shell: pwsh
         run: ./scripts/Test-PluginPackage.ps1 -Configuration Release

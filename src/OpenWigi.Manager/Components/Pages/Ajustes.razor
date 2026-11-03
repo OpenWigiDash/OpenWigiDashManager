@@ -21,6 +21,14 @@
             O virtual é para quem não tem o aparelho: a tela aparece na prévia e o mouse nela vira toque.
             A escolha vale para todos os usuários deste PC. Com a tela em outra sessão, só quem está com ela troca.
         </MudText>
+        <MudSwitch T="bool" Value="@(Agent.ShowSessionsOnServiceScreen ?? true)" ValueChanged="SetShowSessions" Color="Color.Primary"
+                   Disabled="@(Agent.ShowSessionsOnServiceScreen is null)">
+            Mostrar as sessões abertas na tela de bloqueio do WigiDash
+        </MudSwitch>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
+            Com o PC bloqueado, o WigiDash mostra o nome e a foto de quem tem sessão aberta e se ela está ativa pelo
+            acesso remoto. Vale para todos os usuários deste PC.
+        </MudText>
         <MudText Typo="Typo.body2" Class="mb-2">Brilho da tela agora (não fica gravado no aparelho).</MudText>
         <MudSlider T="int" Value="Brightness" ValueChanged="SetBrightness" Min="5" Max="100" Step="5"
                    Disabled="@(Agent.Status != AgentStatus.Owner)" Color="Color.Primary">@Brightness%</MudSlider>
@@ -309,4 +317,6 @@
         : "WigiDash (USB) — desconectado";
 
     private Task SelectDevice(DeviceKind kind) => Agent.SelectDeviceAsync(kind);
+
+    private Task SetShowSessions(bool show) => Agent.SetShowSessionsOnServiceScreenAsync(show);
 }

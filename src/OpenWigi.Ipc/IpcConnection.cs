@@ -13,7 +13,7 @@ namespace OpenWigi.Ipc;
 public sealed class IpcConnection(Stream stream) : IAsyncDisposable
 {
     public const string PipeName = "OpenWigiDash.v1";
-    public const ushort ProtocolVersion = 3;
+    public const ushort ProtocolVersion = 4;
     private const int MaxMessageBytes = 4 * 1024 * 1024;
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -29,6 +29,9 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         SubscribePreview = 7,
         EmulatedTouch = 8,
         SelectDevice = 9,
+        UserProfile = 10,
+        // Vai nos dois sentidos.
+        ServiceScreenSettings = 11,
         Welcome = 64,
         Ownership = 65,
         DeviceStatus = 66,
@@ -127,6 +130,16 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
                 w.Write((byte)Kind.SelectDevice);
                 w.Write((byte)m.Kind);
                 break;
+            case UserProfile m:
+                w.Write((byte)Kind.UserProfile);
+                w.Write(m.DisplayName);
+                w.Write(m.Picture.Length);
+                w.Write(m.Picture);
+                break;
+            case ServiceScreenSettings m:
+                w.Write((byte)Kind.ServiceScreenSettings);
+                w.Write(m.ShowSessions);
+                break;
             case PreviewFrame m:
                 w.Write((byte)Kind.PreviewFrame);
                 w.Write((byte)m.Page);
@@ -185,6 +198,8 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
             Kind.SubscribePreview => new SubscribePreview(r.ReadBoolean()),
             Kind.EmulatedTouch => new EmulatedTouch((TouchContact)r.ReadByte(), r.ReadInt32(), r.ReadInt32()),
             Kind.SelectDevice => new SelectDevice((DeviceKind)r.ReadByte()),
+            Kind.UserProfile => new UserProfile(r.ReadString(), r.ReadBytes(r.ReadInt32())),
+            Kind.ServiceScreenSettings => new ServiceScreenSettings(r.ReadBoolean()),
             Kind.PreviewFrame => new PreviewFrame(r.ReadByte(), r.ReadBytes(r.ReadInt32())),
             Kind.Welcome => new Welcome(r.ReadInt32(), ReadStatus(r)),
             Kind.Ownership => new Ownership(r.ReadBoolean(), r.ReadString()),

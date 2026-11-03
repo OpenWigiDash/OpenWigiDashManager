@@ -40,6 +40,8 @@ builder.Services.AddSingleton(sp => new DeviceChoiceStore(DeviceChoiceStore.Defa
 builder.Services.AddSingleton<IDisplay>(sp => new SwitchableDisplay(
     new DeviceHostDisplay(sp.GetRequiredService<DeviceHost>()), sp.GetRequiredService<VirtualDisplay>(),
     sp.GetRequiredService<DeviceChoiceStore>(), sp.GetRequiredService<ILogger<SwitchableDisplay>>()));
+builder.Services.AddSingleton(sp => new ServiceScreenSettingsStore(ServiceScreenSettingsStore.DefaultPath,
+    sp.GetRequiredService<ILogger<ServiceScreenSettingsStore>>()));
 builder.Services.AddSingleton<SessionBroker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionBroker>());
 builder.Services.AddHostedService<AgentServer>();
