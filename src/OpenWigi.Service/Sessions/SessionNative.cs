@@ -8,6 +8,7 @@ internal static class SessionNative
 
     // WTS_INFO_CLASS
     public const int WTSUserName = 5;
+    public const int WTSDomainName = 7;
     public const int WTSConnectState = 8;
     public const int WTSClientProtocolType = 16;
     public const int WTSSessionInfoEx = 25;
@@ -68,9 +69,14 @@ internal static class SessionNative
     }
 
     /// <summary>Usuário logado na sessão, ou vazio (sessão 0, tela de logon, listener).</summary>
-    public static string UserName(int sessionId)
+    public static string UserName(int sessionId) => QueryString(sessionId, WTSUserName);
+
+    /// <summary>Domínio da conta da sessão; numa conta local (ou Microsoft) é o nome do PC.</summary>
+    public static string DomainName(int sessionId) => QueryString(sessionId, WTSDomainName);
+
+    private static string QueryString(int sessionId, int infoClass)
     {
-        if (!WTSQuerySessionInformationW(0, sessionId, WTSUserName, out var buffer, out _))
+        if (!WTSQuerySessionInformationW(0, sessionId, infoClass, out var buffer, out _))
             return string.Empty;
         try
         {
@@ -79,6 +85,39 @@ internal static class SessionNative
         finally
         {
             WTSFreeMemory(buffer);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct USER_INFO_10
+    {
+        public string Name;
+        public string Comment;
+        public string UserComment;
+        public string FullName;
+    }
+
+    [DllImport("netapi32.dll", CharSet = CharSet.Unicode)]
+    private static extern int NetUserGetInfo(string? server, string userName, int level, out nint buffer);
+
+    [DllImport("netapi32.dll")]
+    private static extern int NetApiBufferFree(nint buffer);
+
+    /// <summary>
+    /// "Nome completo" de uma conta local (numa conta Microsoft, o nome dela), ou vazio. É o que o serviço consegue
+    /// sozinho; a foto não, porque a pasta das fotos só abre para o próprio usuário e o SYSTEM.
+    /// </summary>
+    public static string LocalFullName(string userName)
+    {
+        if (NetUserGetInfo(null, userName, 10, out var buffer) != 0 || buffer == 0)
+            return string.Empty;
+        try
+        {
+            return Marshal.PtrToStructure<USER_INFO_10>(buffer).FullName?.Trim() ?? string.Empty;
+        }
+        finally
+        {
+            NetApiBufferFree(buffer);
         }
     }
 

@@ -8,7 +8,10 @@ public enum WindowsSessionState
     Disconnected,
 }
 
-/// <summary>Uma sessão com usuário logado. <paramref name="Remote"/>: aberta por RDP, e não na frente do PC.</summary>
+/// <summary>
+/// Uma sessão com usuário logado. <paramref name="UserName"/>: o nome completo da conta local, ou o login.
+/// <paramref name="Remote"/>: aberta por RDP, e não na frente do PC.
+/// </summary>
 public sealed record WindowsSession(int SessionId, string UserName, WindowsSessionState State, bool Remote);
 
 public interface ISessionMonitor
@@ -57,9 +60,26 @@ public sealed class WtsSessionMonitor : ISessionMonitor
             var state = connectState == SessionNative.WTSDisconnected ? WindowsSessionState.Disconnected
                 : SessionNative.IsLocked(id) == true ? WindowsSessionState.Locked
                 : WindowsSessionState.Active;
-            list.Add(new WindowsSession(id, user, state, state != WindowsSessionState.Disconnected && SessionNative.IsRemote(id)));
+            list.Add(new WindowsSession(id, DisplayName(id, user), state,
+                state != WindowsSessionState.Disconnected && SessionNative.IsRemote(id)));
         }
         return list;
+    }
+
+    // Nome completo da conta local, guardado por login: muda raramente e a consulta roda a cada segundo sem dono.
+    private readonly Dictionary<string, string> _names = new(StringComparer.OrdinalIgnoreCase);
+
+    private string DisplayName(int sessionId, string user)
+    {
+        // Conta de domínio: o nome viria do controlador, que o LocalService não consulta. Fica o login.
+        if (!string.Equals(SessionNative.DomainName(sessionId), Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+            return user;
+        lock (_names)
+        {
+            if (!_names.TryGetValue(user, out var name))
+                _names[user] = name = SessionNative.LocalFullName(user) is { Length: > 0 } full ? full : user;
+            return name;
+        }
     }
 
     public void NotifyChanged() => Changed?.Invoke();
