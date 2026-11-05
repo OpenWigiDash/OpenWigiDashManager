@@ -197,7 +197,7 @@ internal static class ClockColors
     public static Color ToDrawing(WidgetColor color) => Color.FromArgb(color.R, color.G, color.B);
 }
 
-/// <summary>Contador: tap soma, long-press zera. Mostra o anel de progresso enquanto o dedo segura.</summary>
+/// <summary>Contador: tap soma, long-press zera, swipe para cima entra e sai da tela cheia. Mostra o anel de progresso enquanto o dedo segura.</summary>
 public sealed class CounterWidget : IWidget
 {
     public WidgetManifest Manifest { get; } = new()
@@ -206,8 +206,9 @@ public sealed class CounterWidget : IWidget
         Name = "Contador (exemplo)",
         Version = new(1, 0),
         Author = "OpenWigiDashManager",
-        Description = "Tap soma um, long-press zera. Exemplo de toques ricos.",
+        Description = "Tap soma um, long-press zera, swipe para cima abre em tela cheia. Exemplo de toques ricos.",
         SupportedSizes = [WidgetSize.Small, WidgetSize.Wide],
+        SupportsFullscreen = true,
     };
 
     public ValueTask<IWidgetInstance> CreateInstanceAsync(IWidgetContext context, CancellationToken cancellationToken) =>
@@ -273,6 +274,10 @@ public sealed class CounterInstance(IWidgetContext context) : IWidgetInstance
             case TouchKind.PressEnded:
                 _progress = 0;
                 break;
+            case TouchKind.SwipeUp:
+                // Pedido de dentro do toque: o host troca a tela quando este OnTouchAsync voltar.
+                await context.RequestFullscreenAsync(!context.IsFullscreen, cancellationToken);
+                return;
             default:
                 return;
         }

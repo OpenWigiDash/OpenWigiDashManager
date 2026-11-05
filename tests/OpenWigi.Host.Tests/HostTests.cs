@@ -188,6 +188,28 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Tela_cheia_pedida_dentro_do_toque_nao_trava_o_painel()
+    {
+        var host = await StartAsync();
+        await host.ActivateAsync(true);
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter);
+        var bounds = counter.Bounds;
+
+        // O contador pede a tela cheia de dentro do OnTouchAsync. Antes o host esperava a vez do próprio
+        // widget com _state preso, e nenhum toque ou troca de página andava mais.
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.SwipeUp, bounds.X + 10, bounds.Y + 10, TimeSpan.FromMilliseconds(150)))
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitUntilAsync(() => host.FrameOf(counter.InstanceId)?.Size == WidgetGrid.Screen);
+
+        // O painel segue respondendo: em tela cheia o swipe chega ao contador de novo e ele volta ao tamanho dele.
+        await host.HandleGestureAsync(new GestureEvent(GestureKind.SwipeUp, 500, 300, TimeSpan.FromMilliseconds(150)))
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitUntilAsync(() => host.FrameOf(counter.InstanceId)?.Size is { } size && size != WidgetGrid.Screen);
+        Assert.Equal(new PixelSize(bounds.Width - 2 * TileFrame.Default.Inset, bounds.Height - 2 * TileFrame.Default.Inset),
+            host.FrameOf(counter.InstanceId)!.Size);
+    }
+
+    [Fact]
     public async Task Toque_no_espaco_entre_widgets_vai_para_o_mais_perto()
     {
         var host = await StartAsync();
@@ -735,6 +757,13 @@ public sealed class HostTests : IAsyncLifetime
         var broken = Path.Combine(Plugins, "Quebrado");
         Directory.CreateDirectory(broken);
         Assert.Null(PluginCatalog.FindEntry(broken));
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var i = 0; i < 100 && !condition(); i++)
+            await Task.Delay(20);
+        Assert.True(condition());
     }
 
     private async Task WaitForWriteAsync()
