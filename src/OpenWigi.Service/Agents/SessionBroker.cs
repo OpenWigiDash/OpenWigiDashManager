@@ -112,6 +112,16 @@ public sealed class SessionBroker : BackgroundService
             return;
         }
 
+        // O pedido da prévia vale para a conexão, não para a posse: o manager pede uma vez ao conectar,
+        // muitas vezes antes de ser o dono (sessão que ainda não é a do console, ou a posse decidida só
+        // depois). Ignorado ali, a prévia destacada ficava preta para sempre. Só o dono recebe quadros.
+        if (message is SubscribePreview subscribe)
+        {
+            agent.WantsPreview = subscribe.Enabled;
+            _mirror.MarkDirty();
+            return;
+        }
+
         if (_owner != agent.Id)
             return;
 
@@ -124,10 +134,6 @@ public sealed class SessionBroker : BackgroundService
             case ShowPage show when show.Page != ServiceOptions.ServicePage:
                 if (_display.ShowPage(show.Page, show.Transition))
                     _mirror.Show(show.Page);
-                break;
-            case SubscribePreview subscribe:
-                agent.WantsPreview = subscribe.Enabled;
-                _mirror.MarkDirty();
                 break;
             case EmulatedTouch touch:
                 _display.InjectTouch(touch.Contact, touch.X, touch.Y);
