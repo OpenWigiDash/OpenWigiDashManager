@@ -216,10 +216,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # O SignPath pede a política de assinatura também na página de download.
+          # O SignPath pede a política de assinatura também na página de download. Sem assinatura, só as notas geradas.
           $notes = if ($env:SIGN -eq 'true') {
             "Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). " +
             "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)"
-          } else { "[Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)" }
+          } else { '' }
           gh release create $env:TAG --target '${{ github.sha }}' --title "OpenWigiDash $env:VERSION" --notes $notes --generate-notes `
             .artifacts/installer/OpenWigiDash-Setup.exe .artifacts/installer/OpenWigiDash.msi .artifacts/installer/SHA256SUMS.txt

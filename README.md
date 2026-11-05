@@ -155,30 +155,17 @@ layout do seu usuário.
 
 | Tag | O que sai |
 | --- | --- |
-| `vX.Y.Z` | Release do GitHub com o `OpenWigiDash-Setup.exe` e o MSI (`scripts\Build-Installer.ps1` faz o mesmo localmente), assinados pelo SignPath quando ele estiver configurado ([docs/assinatura.md](docs/assinatura.md)) |
+| `vX.Y.Z` | Release do GitHub com o `OpenWigiDash-Setup.exe` e o MSI (`scripts\Build-Installer.ps1` faz o mesmo localmente), sem assinatura por enquanto ([Assinatura](#assinatura)) |
 | `sdk-vX.Y.Z` | O pacote `OpenWigiDash.Sdk` no nuget.org, por Trusted Publishing |
 
-## Code signing policy
+## Assinatura
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+O instalador sai sem assinatura por enquanto: o SignPath Foundation, que assinaria as releases, não
+aprovou o projeto. Por isso o Windows pode mostrar o aviso do SmartScreen ao abrir o
+`OpenWigiDash-Setup.exe`. Cada release traz o `SHA256SUMS.txt` para conferir os arquivos. O caminho da
+assinatura continua no workflow, desligado ([docs/assinatura.md](docs/assinatura.md)).
 
-O `OpenWigiDash-Setup.exe`, o `OpenWigiDash.msi` e os `.exe` e `.dll` do projeto que vão dentro dele são
-assinados pelo SignPath a partir do workflow [Release](.github/workflows/release.yml), que roda num runner
-do GitHub a cada tag `vX.Y.Z`. Nada é assinado fora desse build. Bibliotecas de terceiros que vão no
-instalador (o runtime do .NET, o bootstrapper do WebView2, o MudBlazor) não são assinadas pelo projeto:
-ficam com a assinatura dos próprios autores, quando têm.
-
-Papéis:
-
-| Papel | Quem |
-| --- | --- |
-| Autores (committers) e revisores | [victorperez2911](https://github.com/victorperez2911) |
-| Aprovadores (aprovam cada assinatura no SignPath) | [victorperez2911](https://github.com/victorperez2911) |
-
-Mudanças de outras pessoas entram só por pull request revisado por um revisor. Todos os membros usam
-autenticação em dois fatores no GitHub e no SignPath.
-
-### Política de privacidade
+## Política de privacidade
 
 Este programa não manda informação para outros sistemas na rede a não ser quando o usuário, ou quem
 instala ou opera o programa, pede. As exceções são as abaixo, todas para buscar dados públicos, sem
