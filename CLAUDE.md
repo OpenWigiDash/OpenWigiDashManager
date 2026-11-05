@@ -39,7 +39,9 @@ empurrar tag. Para publicar, rode o workflow com a versão (sem o "v") no `main`
 pedir a publicação daquela versão:
 
 - Manager: workflow **Release** (`release.yml`), input `version` (ex.: `1.4.0`). Cria a tag `v1.4.0`
-  e a release, com assinatura do SignPath (precisa de aprovação no site).
+  e a release. Sem assinatura por enquanto: o SignPath Foundation negou o projeto (nov/2026), então
+  a variável `SIGNPATH_ORGANIZATION_ID` fica fora do repositório e a release sai sem assinar. Não
+  marque "assinar" nem proponha outro serviço de assinatura sem o Victor pedir.
 - SDK: workflow **Publicar SDK no NuGet** (`sdk-publish.yml`), input `version` (ex.: `1.2.0-preview.1`).
   Publica no nuget.org e cria a tag `sdk-v1.2.0-preview.1`.
 - Widgets (Discord, Stream Deck Mirror): workflow **Release Widget** (`release.yml`), input `version`.
