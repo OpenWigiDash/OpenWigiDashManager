@@ -238,6 +238,31 @@ public class SessionBrokerTests
     }
 
     [Fact]
+    public async Task Previa_pedida_antes_da_posse_chega_quando_vira_dono()
+    {
+        // Manager aberto numa sessão que ainda não é a do console (troca rápida de usuário): pede a prévia
+        // ao conectar e só ganha a posse depois, quando a sessão vira a do console.
+        _sessions.Console = 4;
+        var (victor, channel) = await ConnectAsync(3, "victor");
+        _broker.Handle(victor, new SubscribePreview(true));
+        Assert.Null(_broker.Owner);
+
+        _sessions.Console = 3;
+        await _broker.EvaluateAsync();
+        Assert.Equal(victor.Id, _broker.Owner);
+
+        var pixels = new byte[WigiDashProtocol.FrameBytes];
+        pixels[0] = 0xCD;
+        _broker.Handle(victor, new Frame(1, 0, pixels));
+        _broker.Handle(victor, new ShowPage(1, Transition.None));
+        await _broker.PublishPreviewAsync();
+
+        var preview = Assert.Single(channel.Sent.OfType<PreviewFrame>());
+        Assert.Equal(1, preview.Page);
+        Assert.Equal(0xCD, preview.Pixels[0]);
+    }
+
+    [Fact]
     public async Task Previa_nao_vaza_para_outra_sessao()
     {
         _sessions.Console = 1;
