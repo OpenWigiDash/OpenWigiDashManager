@@ -1,5 +1,9 @@
 # Assinatura do instalador (SignPath Foundation)
 
+> **Parado.** O SignPath Foundation negou o projeto em novembro de 2026. As releases saem sem
+> assinatura (sem a variável `SIGNPATH_ORGANIZATION_ID`, o workflow pula esses passos). O resto deste
+> documento fica como referência, caso a assinatura volte.
+
 A release é assinada de graça pelo [SignPath Foundation](https://signpath.org), que assina projetos open
 source. O certificado é deles: no Windows, o publicador aparece como **SignPath Foundation**. A chave fica
 num HSM do SignPath; o repositório nunca vê certificado nem senha, só um token de API.
