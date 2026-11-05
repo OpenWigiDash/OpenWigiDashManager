@@ -12,6 +12,8 @@ namespace OpenWigi.Host.Instances;
 internal sealed class WidgetRuntime : IAsyncDisposable
 {
     private readonly SemaphoreSlim _calls = new(1, 1);
+    // Qual instância está com a vez neste fluxo assíncrono: o host chamando o plugin e o plugin chamando o host de volta.
+    private static readonly AsyncLocal<WidgetRuntime?> s_inCall = new();
     private readonly ILogger _logger;
     private int _renderRequested;
     private WidgetFrame? _lastFrame;
@@ -59,12 +61,19 @@ internal sealed class WidgetRuntime : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// true quando quem pergunta está dentro de uma chamada desta instância (o plugin, no meio do
+    /// OnTouchAsync por exemplo, chamou o host de volta). Aí a vez é dele: esperar por ela trava.
+    /// </summary>
+    public bool InCall => ReferenceEquals(s_inCall.Value, this);
+
     /// <summary>Roda uma chamada no plugin, uma por vez. Devolve false se o plugin falhou.</summary>
     public async Task<bool> CallAsync(string what, Func<IWidgetInstance, CancellationToken, ValueTask> call, CancellationToken cancellationToken)
     {
         if (Instance is not { } instance)
             return false;
         await _calls.WaitAsync(cancellationToken);
+        s_inCall.Value = this;
         try
         {
             await call(instance, cancellationToken);

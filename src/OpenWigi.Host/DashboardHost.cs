@@ -986,6 +986,35 @@ public event Action? LayoutChanged;
         if (!_runtimes.TryGetValue(context.InstanceId, out var runtime) || !runtime.Widget.Manifest.SupportsFullscreen)
             return false;
 
+        if (runtime.InCall)
+        {
+            // Pedido de dentro de uma chamada do próprio widget (um swipe no OnTouchAsync, por exemplo). Ele
+            // segura a vez dele até voltar, e a troca precisa chamá-lo (OnFullscreenChangedAsync e RenderAsync):
+            // esperar aqui travaria o widget e, com _state preso, a tela inteira. A troca roda quando ele soltar.
+            if (fullscreen && _fullscreen is { } other && !ReferenceEquals(other, runtime))
+                return false;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SwitchFullscreenAsync(runtime, context, fullscreen, _stopping.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "{Widget}: falha ao trocar a tela cheia", runtime.Name);
+                }
+            });
+            return true;
+        }
+
+        return await SwitchFullscreenAsync(runtime, context, fullscreen, cancellationToken);
+    }
+
+    private async Task<bool> SwitchFullscreenAsync(WidgetRuntime runtime, WidgetContext context, bool fullscreen, CancellationToken cancellationToken)
+    {
         await _state.WaitAsync(cancellationToken);
         try
         {
