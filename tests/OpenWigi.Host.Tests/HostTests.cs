@@ -752,6 +752,37 @@ public sealed class HostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Tela_do_plugin_inteiro_chega_ao_manager_pela_pasta_e_pela_instancia()
+    {
+        var host = await StartAsync();
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).InstanceId;
+        var directory = host.AvailableWidgets.Single(w => w.Manifest.Id == Counter).PluginDirectory;
+
+        var settings = host.GetPluginSettings(directory);
+        Assert.NotNull(settings);
+        Assert.Equal("SamplesPluginSettings", settings.Component.Name);
+        Assert.Equal(directory, settings.Host.ResourceDirectory);
+        Assert.Same(settings, host.GetPluginSettingsOf(counter));
+        Assert.Null(host.GetPluginSettings(Path.Combine(_root, "Outro")));
+        Assert.Null(host.GetPluginSettingsOf(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task Widget_abre_a_pagina_do_plugin_so_quando_o_manager_escuta()
+    {
+        var host = await StartAsync();
+        var counter = host.Layout.AllPlacements.Single(p => p.WidgetId == Counter).InstanceId;
+        var context = host.GetSettings(counter)!.Value.Context;
+
+        Assert.False(await context.OpenPluginSettingsAsync());
+
+        string? requested = null;
+        host.PluginSettingsRequested += directory => requested = directory;
+        Assert.True(await context.OpenPluginSettingsAsync());
+        Assert.Equal(host.AvailableWidgets.Single(w => w.Manifest.Id == Counter).PluginDirectory, requested);
+    }
+
+    [Fact]
     public void Plugin_sem_dll_de_entrada_vira_erro_e_nao_derruba_o_resto()
     {
         var broken = Path.Combine(Plugins, "Quebrado");

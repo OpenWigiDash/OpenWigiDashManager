@@ -69,6 +69,9 @@ internal sealed class WidgetContext : IWidgetContext
     public ValueTask<bool> RequestFullscreenAsync(bool fullscreen, CancellationToken cancellationToken = default) =>
         _owner.RequestFullscreenAsync(this, fullscreen, cancellationToken);
 
+    public ValueTask<bool> OpenPluginSettingsAsync(CancellationToken cancellationToken = default) =>
+        _owner.OpenPluginSettingsAsync(this, cancellationToken);
+
     public void Stop()
     {
         if (!_stopping.IsCancellationRequested)
@@ -82,6 +85,7 @@ internal interface IWidgetContextOwner
     ValueTask PresentAsync(WidgetContext context, WidgetFrame frame, CancellationToken cancellationToken);
     void RequestRender(WidgetContext context);
     ValueTask<bool> RequestFullscreenAsync(WidgetContext context, bool fullscreen, CancellationToken cancellationToken);
+    ValueTask<bool> OpenPluginSettingsAsync(WidgetContext context, CancellationToken cancellationToken);
 }
 
 /// <summary>Central de ações ainda sem as regras do usuário (fase 7): registra e loga.</summary>

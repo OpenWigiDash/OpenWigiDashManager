@@ -120,12 +120,13 @@ public partial class WidgetIconsTests
     }
 
     [Fact]
-    public void Contrato_3_1_carrega_plugin_3_0()
+    public void Contrato_3_2_carrega_plugin_3_0_e_3_1()
     {
-        Assert.Equal(new Version(3, 1), OpenWigiSdk.Version);
+        Assert.Equal(new Version(3, 2), OpenWigiSdk.Version);
         Assert.True(OpenWigiSdk.IsCompatible(new Version(3, 0)));
         Assert.True(OpenWigiSdk.IsCompatible(new Version(3, 1)));
-        Assert.False(OpenWigiSdk.IsCompatible(new Version(3, 2)));
+        Assert.True(OpenWigiSdk.IsCompatible(new Version(3, 2)));
+        Assert.False(OpenWigiSdk.IsCompatible(new Version(3, 3)));
     }
 
     [Fact]

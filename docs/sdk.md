@@ -1,4 +1,4 @@
-# OpenWigi.Sdk — contrato dos widgets (v3.1)
+# OpenWigi.Sdk — contrato dos widgets (v3.2)
 
 Pacote `OpenWigiDash.Sdk` no nuget.org (assembly `OpenWigi.Sdk`, `net10.0-windows`). Substitui o `WigiDashWidgetFramework` (v1, net472) sem
 compatibilidade binária: plugin antigo precisa ser portado.
@@ -13,6 +13,7 @@ compatibilidade binária: plugin antigo precisa ser portado.
 | `IWidgetInstance` | Widget na tela: quadros, toques, repouso, tela cheia, ações, remoção | `IWidgetInstance` + `WithRemoval` + `WithFullscreen` |
 | `IWidgetContext` | O que o host oferece a uma instância | `IWidgetManager` (global) |
 | `WidgetSettingsComponent<T>` | Tela de configurações em Razor (MudBlazor) | `UserControl` WPF |
+| `[assembly: OpenWigiPluginSettings(typeof(X))]` + `PluginSettingsComponent` | Configurações do plugin inteiro, uma vez só na página do plugin | — |
 
 ## Grade
 
@@ -118,6 +119,8 @@ O host nunca chama dois métodos da mesma instância ao mesmo tempo. Todos os ga
 - `RequestFullscreenAsync(bool)`, `IsFullscreen`, `PixelSize` (área de conteúdo; muda em tela cheia e com a moldura), `Frame`, `IsAsleep`.
 - `Logger` (`Microsoft.Extensions.Logging`), `Theme`, `Stopping`, e via `Host`: `ResourceDirectory`,
   `LoggerFactory`, `Time` (`TimeProvider`, para testes).
+- `OpenPluginSettingsAsync()`: abre a página do plugin no manager, na aba Configurações (ver
+  [Configurações do plugin](#configurações-do-plugin)). Devolve `false` se o plugin não tem essa tela.
 
 ## Tela de configurações
 
@@ -129,6 +132,33 @@ O plugin não declara tema: os componentes Mud herdam as cores do manager e troc
 escuro junto com ele. Para seguir o tema, monte a tela com componentes Mud e, em CSS próprio, use as
 variáveis `--mud-palette-*` (ex.: `var(--mud-palette-text-secondary)`) no lugar de cores fixas.
 `WidgetTheme` (em `IWidgetContext.Theme`) é outra coisa: as cores para desenhar no visor do aparelho.
+
+## Configurações do plugin
+
+O que vale para todos os widgets do plugin (uma conta, uma conexão, uma chave de API) não entra na tela de cada
+widget: o manager mostra uma vez só, na página do plugin (Loja de plugins > Detalhes ou Configurar, aba
+Configurações). Declare o componente no assembly, ao lado dos widgets:
+
+```csharp
+[assembly: OpenWigiWidget(typeof(MeuWidget))]
+[assembly: OpenWigiPluginSettings(typeof(MinhaConta))]
+```
+
+```razor
+@inherits PluginSettingsComponent
+
+<MudTextField T="string" @bind-Value="_chave" Label="Chave da API" Variant="Variant.Outlined" />
+<MudButton OnClick="Salvar">Salvar</MudButton>
+```
+
+- Um por assembly. O componente deriva de `PluginSettingsComponent`, que recebe o `IWidgetHost` do plugin em
+  cascata (`Host`: pasta, log, relógio). Não há instância: a tela abre mesmo sem nenhum widget do plugin no layout.
+- Guarde por conta própria, fora das configurações da instância (essas são por widget e vão junto ao duplicar),
+  por exemplo em `%LOCALAPPDATA%\OpenWigiDash\WidgetData\<plugin>`.
+- A tela do widget continua sabendo quando falta configurar o plugin (ex.: conta não autorizada). Mostre o aviso
+  e um botão que chama `Context.OpenPluginSettingsAsync()`: o manager leva a pessoa à página do plugin. Quando o
+  plugin declara a tela, o manager também põe um atalho "Configurações do plugin" no alto da aba Configurações do
+  widget.
 
 ## Biblioteca de ícones
 
@@ -190,13 +220,17 @@ O host carrega uma cópia só de `OpenWigi.Sdk`, `Microsoft.AspNetCore.Component
 cópia na pasta:
 
 ```xml
-<PackageReference Include="OpenWigiDash.Sdk" Version="3.1.0-preview.1" ExcludeAssets="runtime" />
+<PackageReference Include="OpenWigiDash.Sdk" Version="3.2.0-preview.1" ExcludeAssets="runtime" />
 <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
 ```
 
 ## Versão
 
-`OpenWigiSdk.Version` = 3.1. O host carrega widget com o mesmo major e minor menor ou igual ao dele.
+`OpenWigiSdk.Version` = 3.2. O host carrega widget com o mesmo major e minor menor ou igual ao dele.
+
+**3.2:** configurações do plugin inteiro na página do plugin (`OpenWigiPluginSettingsAttribute`,
+`PluginSettingsComponent`, `IWidgetContext.OpenPluginSettingsAsync`). Plugin feito para 3.0 ou 3.1 continua
+carregando; plugin compilado contra 3.2 pede o manager com SDK 3.2.
 
 **3.1:** biblioteca de ícones (`WidgetIcons`, `IWidgetIconPicker`, `WidgetIconView`, `WidgetIconLayout`). Plugin
 feito para 3.0 continua carregando; plugin compilado contra 3.1 pede o manager com SDK 3.1.
@@ -272,7 +306,7 @@ traz o que monta esse pacote: basta ligar `OpenWigiDashPlugin` no `.csproj` e ro
     <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="OpenWigiDash.Sdk" Version="3.1.0-preview.1" ExcludeAssets="runtime" />
+    <PackageReference Include="OpenWigiDash.Sdk" Version="3.2.0-preview.1" ExcludeAssets="runtime" />
     <PackageReference Include="MudBlazor" Version="9.*" ExcludeAssets="runtime" />
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="icon.png" Pack="true" PackagePath="\" />

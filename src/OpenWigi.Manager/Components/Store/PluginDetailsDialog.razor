@@ -1,4 +1,6 @@
-@* Detalhes de um plugin da Loja. Devolve a ação escolhida (install, update, remove); quem abriu executa. *@
+@* Página de um plugin da Loja: detalhes e, quando o plugin tem, as configurações dele (as que valem para todos os
+   widgets do plugin). Devolve a ação escolhida (install, update, remove); quem abriu executa. *@
+@using OpenWigi.Host.Plugins
 @inject PluginStore Store
 @inject AgentClient Agent
 
@@ -26,7 +28,68 @@
         </div>
     </TitleContent>
     <DialogContent>
-        <MudStack Spacing="3">
+        @if (Settings is { } plugin)
+        {
+            <MudTabs @bind-ActivePanelIndex="_tab" Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3" MinimumTabWidth="0px">
+                <MudTabPanel Text="Sobre">@About</MudTabPanel>
+                <MudTabPanel Text="Configurações" Icon="@Icons.Material.Filled.Settings">
+                    @* Tela do plugin inteiro: conta, conexão e o que mais valer para todos os widgets dele. *@
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                        Vale para todos os widgets deste plugin. As opções de cada widget ficam na tela do widget, em Widgets e páginas.
+                    </MudText>
+                    <ErrorBoundary>
+                        <ChildContent>
+                            <CascadingValue Value="plugin.Host">
+                                <DynamicComponent Type="plugin.Component" />
+                            </CascadingValue>
+                        </ChildContent>
+                        <ErrorContent Context="error">
+                            <MudAlert Severity="Severity.Error" Dense="true">A tela de configurações do plugin deu erro: @error.Message</MudAlert>
+                        </ErrorContent>
+                    </ErrorBoundary>
+                </MudTabPanel>
+            </MudTabs>
+        }
+        else
+        {
+            @About
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (Item.Installed is not null)
+        {
+            <MudButton Color="Color.Error" OnClick="@(() => Close("remove"))">Remover</MudButton>
+        }
+        <MudSpacer />
+        <MudButton OnClick="() => Dialog.Cancel()">Fechar</MudButton>
+        @if (Item.Update is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Close("update"))">Atualizar</MudButton>
+        }
+        else if (Item.Installed is null && Item.Package is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="Item.Incompatible" OnClick="@(() => Close("install"))">Instalar</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public StoreItem Item { get; set; } = default!;
+    [Parameter] public string? Icon { get; set; }
+
+    /// <summary>Tela do plugin inteiro, se ele tem; com ela, a página ganha a aba Configurações.</summary>
+    [Parameter] public PluginSettings? Settings { get; set; }
+
+    /// <summary>Abre já na aba Configurações (vindo da tela de um widget).</summary>
+    [Parameter] public bool OpenSettings { get; set; }
+
+    private int _tab;
+
+    protected override void OnInitialized() => _tab = OpenSettings && Settings is not null ? 1 : 0;
+
+    // Detalhes do pacote e widgets do plugin: a página inteira, ou a aba Sobre quando o plugin tem configurações.
+    private RenderFragment About => @<MudStack Spacing="3">
             @if (Item.BlockReason is { } blocked)
             {
                 <MudAlert Severity="Severity.Error" Dense="true">A versão instalada foi bloqueada pelos mantenedores: @blocked</MudAlert>
@@ -74,7 +137,9 @@
             else
             {
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    @(Item.Manual ? "Plugin copiado à mão para a pasta de widgets; a loja não sabe de onde ele veio." : "Sem dados do nuget.org agora (offline?).")
+                    @(Item.Manual ? "Plugin copiado à mão para a pasta de widgets; a loja não sabe de onde ele veio."
+                      : Item.Installed is null && Settings is not null ? "Veio junto com o OpenWigiDash."
+                      : "Sem dados do nuget.org agora (offline?).")
                 </MudText>
             }
 
@@ -114,30 +179,7 @@
                     }
                 </div>
             }
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        @if (Item.Installed is not null)
-        {
-            <MudButton Color="Color.Error" OnClick="@(() => Close("remove"))">Remover</MudButton>
-        }
-        <MudSpacer />
-        <MudButton OnClick="() => Dialog.Cancel()">Fechar</MudButton>
-        @if (Item.Update is not null)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Close("update"))">Atualizar</MudButton>
-        }
-        else if (Item.Installed is null && Item.Package is not null)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="Item.Incompatible" OnClick="@(() => Close("install"))">Instalar</MudButton>
-        }
-    </DialogActions>
-</MudDialog>
-
-@code {
-    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
-    [Parameter] public StoreItem Item { get; set; } = default!;
-    [Parameter] public string? Icon { get; set; }
+        </MudStack>;
 
     private void Close(string action) => Dialog.Close(DialogResult.Ok(action));
 

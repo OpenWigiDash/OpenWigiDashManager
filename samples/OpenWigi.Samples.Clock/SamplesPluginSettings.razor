@@ -1,0 +1,13 @@
+@using MudBlazor
+@using OpenWigi.Sdk
+@inherits PluginSettingsComponent
+
+@* Tela do plugin inteiro: o manager mostra uma vez só, na página do plugin (Loja), e não na tela de cada widget.
+   Aqui entra o que vale para todos os widgets do plugin, como uma conta ou uma conexão. *@
+<MudStack Spacing="2">
+    <MudText Typo="Typo.body2">
+        Este plugin de exemplo não tem nada que valha para todos os widgets: as opções do relógio e do contador
+        ficam na tela de cada widget.
+    </MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">Pasta do plugin: @Host.ResourceDirectory</MudText>
+</MudStack>
