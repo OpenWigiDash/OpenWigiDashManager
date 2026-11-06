@@ -7,7 +7,7 @@ public static class OpenWigiSdk
     /// Versão do contrato. O major muda só com quebra; o host carrega widget com o mesmo major
     /// e minor menor ou igual ao dele (<see cref="IsCompatible"/>).
     /// </summary>
-    public static Version Version { get; } = new(3, 1);
+    public static Version Version { get; } = new(3, 2);
 
     /// <summary>
     /// Assemblies que o host carrega uma vez só e entrega a todos os plugins. O plugin compila contra

@@ -449,6 +449,21 @@ public event Action? LayoutChanged;
                 return $"{widgetName} {n}";
     }
 
+    /// <summary>Tela de configurações do plugin inteiro da pasta <paramref name="pluginDirectory"/>, se ele declara uma.</summary>
+    public PluginSettings? GetPluginSettings(string pluginDirectory) => _catalog.SettingsOf(pluginDirectory);
+
+    /// <summary>Tela de configurações do plugin de onde vem a instância, se ele declara uma.</summary>
+    public PluginSettings? GetPluginSettingsOf(Guid instanceId) =>
+        _layout.AllPlacements.FirstOrDefault(p => p.InstanceId == instanceId) is { } placement && _catalog.Find(placement.WidgetId) is { } widget
+            ? _catalog.SettingsOf(widget.PluginDirectory)
+            : null;
+
+    /// <summary>
+    /// Um widget pediu para abrir a página do plugin nas configurações do plugin (<see cref="IWidgetContext.OpenPluginSettingsAsync"/>).
+    /// O argumento é a pasta do plugin. Sem ninguém ouvindo, o pedido volta <c>false</c> para o widget.
+    /// </summary>
+    public event Action<string>? PluginSettingsRequested;
+
     /// <summary>Tela de configurações da instância (componente Razor do plugin), se houver.</summary>
     public (Type Component, IWidgetInstance Instance, IWidgetContext Context)? GetSettings(Guid instanceId) =>
         _runtimes.GetValueOrDefault(instanceId) is { Instance: { SettingsComponent: { } type } instance } runtime
@@ -968,6 +983,15 @@ public event Action? LayoutChanged;
             return ValueTask.CompletedTask;
         Accept(runtime, frame);
         return ValueTask.CompletedTask;
+    }
+
+    ValueTask<bool> IWidgetContextOwner.OpenPluginSettingsAsync(WidgetContext context, CancellationToken cancellationToken)
+    {
+        if (!_runtimes.TryGetValue(context.InstanceId, out var runtime) || _catalog.SettingsOf(runtime.Widget.PluginDirectory) is null
+            || PluginSettingsRequested is not { } requested)
+            return ValueTask.FromResult(false);
+        requested(runtime.Widget.PluginDirectory);
+        return ValueTask.FromResult(true);
     }
 
     void IWidgetContextOwner.RequestRender(WidgetContext context)

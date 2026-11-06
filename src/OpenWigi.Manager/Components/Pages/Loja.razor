@@ -2,6 +2,7 @@
 @using System.IO
 @using System.Net.Http
 @using System.Threading
+@using OpenWigi.Host.Plugins
 @inject PluginStore Store
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
@@ -103,6 +104,10 @@
                     </MudCardContent>
                     <MudCardActions Class="pt-0">
                         <MudButton Size="Size.Small" OnClick="() => Details(i)">Detalhes</MudButton>
+                        @if (i.Installed is { } withSettings && Store.SettingsOf(withSettings) is not null)
+                        {
+                            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Settings" OnClick="() => Details(i, openSettings: true)">Configurar</MudButton>
+                        }
                         <MudSpacer />
                         @if (_busy.Contains(i.Id))
                         {
@@ -135,6 +140,15 @@
     /// <summary>Texto que a busca já traz preenchido, ex.: /loja?busca=OpenWigiDash.Discord.</summary>
     [SupplyParameterFromQuery(Name = "busca")]
     public string? Busca { get; set; }
+
+    /// <summary>
+    /// Pasta do plugin cuja página abre direto na aba Configurações, ex.: /loja?configurar=OpenWigiDash.Discord. Vem do
+    /// botão da tela de um widget (o que vale para todos os widgets do plugin fica na página do plugin).
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "configurar")]
+    public string? Configurar { get; set; }
+
+    private string? _configured;
 
     private Filter _filter = Filter.Todos;
     private string? _query;
@@ -179,6 +193,9 @@
             package is null ? PluginTrust.Community : Store.TrustOf(package), installed is null ? null : Store.BlockReason(installed));
     }
 
+    private PluginSettings? SettingsOf(StoreItem item) =>
+        item.Installed is { } installed ? Store.SettingsOf(installed) : Store.SettingsOf(item.Id);
+
     private InstalledPlugin? InstalledOf(string id) =>
         _installed.FirstOrDefault(p => id.Equals(p.PackageId, StringComparison.OrdinalIgnoreCase));
 
@@ -202,6 +219,7 @@
     {
         Store.Changed += OnStoreChanged;
         _installed = Store.Installed;
+        OpenRequestedSettings();
         _ = LoadIconsAsync(_installed.Select(p => p.PackageId ?? p.Folder).ToList());
         var policy = RefreshPolicyQuietly();
         // Vindo de um widget quebrado (Widgets e páginas), a Loja já abre procurando o plugin dele.
@@ -213,6 +231,23 @@
         await search;
         await policy;
         await LoadInstalledMetadataAsync();
+    }
+
+    // Já na Loja, um widget pode pedir a página de outro plugin: o endereço muda e os parâmetros chegam de novo.
+    protected override void OnParametersSet() => OpenRequestedSettings();
+
+    private void OpenRequestedSettings()
+    {
+        if (Configurar is not { Length: > 0 } folder || string.Equals(folder, _configured, StringComparison.OrdinalIgnoreCase))
+            return;
+        _configured = folder;
+        var installed = _installed.FirstOrDefault(p =>
+            folder.Equals(p.Folder, StringComparison.OrdinalIgnoreCase) || folder.Equals(p.PackageId, StringComparison.OrdinalIgnoreCase));
+        if (installed is null && Store.SettingsOf(folder) is null)
+            return;
+        // Instalado pela Loja ou copiado à mão: a página de sempre. Veio com o instalador: só nome e configurações.
+        var item = installed is not null ? Item(installed.PackageId ?? installed.Folder, null, installed) : new StoreItem(folder, null, null, null);
+        _ = InvokeAsync(() => Details(item, openSettings: true));
     }
 
     private void OnStoreChanged() => InvokeAsync(() =>
@@ -328,12 +363,14 @@
         _checking = false;
     }
 
-    private async Task Details(StoreItem item)
+    private async Task Details(StoreItem item, bool openSettings = false)
     {
         var parameters = new DialogParameters<PluginDetailsDialog>
         {
             { d => d.Item, item },
             { d => d.Icon, _icons.GetValueOrDefault(item.Id) },
+            { d => d.Settings, SettingsOf(item) },
+            { d => d.OpenSettings, openSettings },
         };
         var dialog = await Dialogs.ShowAsync<PluginDetailsDialog>(item.Title, parameters,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });

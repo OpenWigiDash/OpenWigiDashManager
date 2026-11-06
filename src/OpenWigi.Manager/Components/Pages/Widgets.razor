@@ -227,6 +227,7 @@
                 @if (Selected is { } selected)
                 {
                     var settings = Dashboard.GetSettings(selected.InstanceId);
+                    var pluginSettings = Dashboard.GetPluginSettingsOf(selected.InstanceId);
                     var selectedProblem = Dashboard.ProblemOf(selected.InstanceId);
                     <MudPaper Class="pa-3 mb-4" Outlined="true">
                         @* Cabeçalho: o ícone e o nome do tipo do widget (o que o plugin diz que ele é) e o nome desta instância. *@
@@ -307,9 +308,22 @@
                                                OnClick="() => Remove(selected.InstanceId)">Tirar</MudButton>
                                 </MudStack>
                             </MudTabPanel>
-                            <MudTabPanel Text="Configurações" Disabled="@(settings is null)"
-                                         ToolTip="@(settings is null ? "Este widget não tem configurações" : null)">
-                                @* Configurações do próprio plugin: o que mudar aqui já aparece no tile. *@
+                            <MudTabPanel Text="Configurações" Disabled="@(settings is null && pluginSettings is null)"
+                                         ToolTip="@(settings is null && pluginSettings is null ? "Este widget não tem configurações" : null)">
+                                @* O que vale para todos os widgets do plugin (conta, conexão) fica na página do plugin, uma vez só. *@
+                                @if (pluginSettings is { } shared)
+                                {
+                                    <div class="d-flex align-center gap-2 mb-3">
+                                        <MudIcon Icon="@Icons.Material.Filled.Extension" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="flex-grow-1">
+                                            O que vale para todos os widgets deste plugin fica na página do plugin.
+                                        </MudText>
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Href="@PluginStore.SettingsRoute(shared.PluginDirectory)">
+                                            Configurações do plugin
+                                        </MudButton>
+                                    </div>
+                                }
+                                @* Configurações do próprio widget: o que mudar aqui já aparece no tile. *@
                                 @if (settings is { } plugin)
                                 {
                                     <div @key="@($"settings-{selected.InstanceId}")" class="owd-widget-settings">

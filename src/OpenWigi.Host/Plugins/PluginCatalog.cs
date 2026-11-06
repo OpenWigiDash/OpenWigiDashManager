@@ -11,6 +11,12 @@ public sealed record LoadedWidget(IWidget Widget, string PluginDirectory)
     public WidgetManifest Manifest => Widget.Manifest;
 }
 
+/// <summary>
+/// Tela de configurações do plugin inteiro (<see cref="OpenWigiPluginSettingsAttribute"/>), com o
+/// <see cref="IWidgetHost"/> que ela recebe em cascata.
+/// </summary>
+public sealed record PluginSettings(string PluginDirectory, Type Component, IWidgetHost Host);
+
 /// <summary>Plugin que não carregou, com o motivo, para a UI mostrar.</summary>
 public sealed record PluginLoadError(string PluginDirectory, string Reason);
 
@@ -22,13 +28,21 @@ public sealed record PluginLoadError(string PluginDirectory, string Reason);
 public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposable
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<PluginCatalog>();
-    private readonly List<(PluginLoadContext Context, List<LoadedWidget> Widgets)> _plugins = [];
+    private readonly List<(PluginLoadContext Context, List<LoadedWidget> Widgets, PluginSettings? Settings)> _plugins = [];
     private readonly List<PluginLoadError> _errors = [];
 
     public IReadOnlyList<LoadedWidget> Widgets => _plugins.SelectMany(p => p.Widgets).ToList();
     public IReadOnlyList<PluginLoadError> Errors => _errors;
 
     public LoadedWidget? Find(Guid widgetId) => Widgets.FirstOrDefault(w => w.Manifest.Id == widgetId);
+
+    /// <summary>Tela de configurações do plugin da pasta <paramref name="pluginDirectory"/>, ou null se ele não tem.</summary>
+    public PluginSettings? SettingsOf(string pluginDirectory) =>
+        _plugins.Select(p => p.Settings).FirstOrDefault(s => s is not null && SamePath(s.PluginDirectory, pluginDirectory));
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
 
     public Task LoadAllAsync(string root, IWidgetHostFactory hosts, CancellationToken cancellationToken = default) =>
         LoadAllAsync([root], hosts, cancellationToken);
@@ -93,6 +107,8 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
 
         var context = new PluginLoadContext(entry);
         var widgets = new List<LoadedWidget>();
+        PluginSettings? settings = null;
+        IWidgetHost? firstHost = null; // a tela do plugin recebe o mesmo host dos widgets (pasta, log, relógio, tema)
         try
         {
             var assembly = context.LoadFromAssemblyPath(entry);
@@ -114,10 +130,14 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
                 if (Find(widget.Manifest.Id) is { } clash)
                     throw new InvalidOperationException($"Id {widget.Manifest.Id} já usado por {clash.Manifest.Name}.");
 
-                await widget.LoadAsync(hosts.Create(widget.Manifest, pluginDirectory), cancellationToken);
+                var host = hosts.Create(widget.Manifest, pluginDirectory);
+                await widget.LoadAsync(host, cancellationToken);
                 widgets.Add(new LoadedWidget(widget, pluginDirectory));
                 _logger.LogInformation("Widget carregado: {Name} {Version} ({Id})", widget.Manifest.Name, widget.Manifest.Version, widget.Manifest.Id);
+                firstHost ??= host;
             }
+            if (firstHost is not null)
+                settings = ReadSettings(assembly, pluginDirectory, firstHost);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -128,13 +148,30 @@ public sealed class PluginCatalog(ILoggerFactory loggerFactory) : IAsyncDisposab
             return;
         }
 
-        _plugins.Add((context, widgets));
+        _plugins.Add((context, widgets, settings));
+    }
+
+    /// <summary>
+    /// A tela do plugin inteiro, se o assembly declara uma. Tipo que não é componente Razor fica de fora com aviso
+    /// no log: os widgets carregam do mesmo jeito.
+    /// </summary>
+    private PluginSettings? ReadSettings(Assembly assembly, string pluginDirectory, IWidgetHost host)
+    {
+        if (assembly.GetCustomAttribute<OpenWigiPluginSettingsAttribute>() is not { ComponentType: { } type })
+            return null;
+        if (!typeof(Microsoft.AspNetCore.Components.IComponent).IsAssignableFrom(type) || type.IsAbstract)
+        {
+            _logger.LogWarning("Plugin {Directory}: {Type} não é um componente Razor; a tela de configurações do plugin fica de fora",
+                pluginDirectory, type);
+            return null;
+        }
+        return new PluginSettings(pluginDirectory, type, host);
     }
 
     /// <summary>Descarrega todos os plugins. As instâncias já devem ter sido descartadas.</summary>
     public async ValueTask DisposeAsync()
     {
-        foreach (var (context, widgets) in _plugins)
+        foreach (var (context, widgets, _) in _plugins)
         {
             foreach (var widget in widgets)
                 await TryUnloadAsync(widget.Widget);

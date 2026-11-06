@@ -158,6 +158,22 @@ public sealed class PluginStore : IDisposable
     public IReadOnlyList<LoadedWidget> WidgetsOf(InstalledPlugin plugin) =>
         _dashboard.AvailableWidgets.Where(w => SamePath(w.PluginDirectory, plugin.Directory)).ToList();
 
+    /// <summary>Tela de configurações do plugin inteiro, se ele declara uma e carregou nesta sessão.</summary>
+    public PluginSettings? SettingsOf(InstalledPlugin plugin) => _dashboard.GetPluginSettings(plugin.Directory);
+
+    /// <summary>
+    /// Tela do plugin inteiro pela pasta (nome) do plugin, inclusive os que vêm com o instalador, que a Loja não lista
+    /// como instalados.
+    /// </summary>
+    public PluginSettings? SettingsOf(string folder) =>
+        _dashboard.AvailableWidgets.Select(w => w.PluginDirectory).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(d => Path.GetFileName(d.TrimEnd(Path.DirectorySeparatorChar)).Equals(folder, StringComparison.OrdinalIgnoreCase))
+            .Select(_dashboard.GetPluginSettings).FirstOrDefault(s => s is not null);
+
+    /// <summary>Endereço da página do plugin já na aba Configurações (o mesmo plugin pela pasta).</summary>
+    public static string SettingsRoute(string pluginDirectory) =>
+        $"/loja?configurar={Uri.EscapeDataString(Path.GetFileName(pluginDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)))}";
+
     /// <summary>Quantos widgets deste plugin estão no layout (ficam como ausentes ao remover).</summary>
     public int InstancesOf(InstalledPlugin plugin)
     {

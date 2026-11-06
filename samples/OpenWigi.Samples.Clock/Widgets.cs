@@ -8,6 +8,7 @@ using OpenWigi.Sdk;
 
 [assembly: OpenWigiWidget(typeof(ClockWidget))]
 [assembly: OpenWigiWidget(typeof(CounterWidget))]
+[assembly: OpenWigiPluginSettings(typeof(SamplesPluginSettings))]
 
 namespace OpenWigi.Samples.Clock;
 

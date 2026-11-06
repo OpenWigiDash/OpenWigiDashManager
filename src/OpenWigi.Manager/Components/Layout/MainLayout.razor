@@ -97,6 +97,8 @@
         Store.Changed += Refresh;
         Updates.Changed += Refresh;
         Settings.NavigationRequested += Navigate;
+        // A tela de um widget pediu a página do plugin (IWidgetContext.OpenPluginSettingsAsync): abre a Loja nas configurações dele.
+        Dashboard.PluginSettingsRequested += OpenPluginSettings;
         if (Settings.PendingRoute is { } route)
         {
             Settings.PendingRoute = null;
@@ -114,11 +116,14 @@
 
     private void Navigate(string route) => InvokeAsync(() => Navigation.NavigateTo(route));
 
+    private void OpenPluginSettings(string pluginDirectory) => Navigate(PluginStore.SettingsRoute(pluginDirectory));
+
     public void Dispose()
     {
         Settings.Changed -= Refresh;
         Store.Changed -= Refresh;
         Updates.Changed -= Refresh;
         Settings.NavigationRequested -= Navigate;
+        Dashboard.PluginSettingsRequested -= OpenPluginSettings;
     }
 }

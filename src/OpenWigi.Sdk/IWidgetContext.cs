@@ -48,6 +48,14 @@ public interface IWidgetContext
 
     /// <summary>Pede para ocupar a tela inteira (ou voltar). <c>false</c> se o host recusou.</summary>
     ValueTask<bool> RequestFullscreenAsync(bool fullscreen, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Abre, no manager, a página do plugin na aba de configurações do plugin
+    /// (<see cref="OpenWigiPluginSettingsAttribute"/>). Use na tela de configurações do widget, no aviso de que falta
+    /// configurar algo que vale para o plugin inteiro (conta, conexão). <c>false</c> se o host não abriu (plugin sem
+    /// tela de configurações do plugin, ou host de antes do SDK 3.2).
+    /// </summary>
+    ValueTask<bool> OpenPluginSettingsAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(false);
 }
 
 /// <summary>
