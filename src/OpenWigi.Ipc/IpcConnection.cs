@@ -13,7 +13,7 @@ namespace OpenWigi.Ipc;
 public sealed class IpcConnection(Stream stream) : IAsyncDisposable
 {
     public const string PipeName = "OpenWigiDash.v1";
-    public const ushort ProtocolVersion = 4;
+    public const ushort ProtocolVersion = 5;
     private const int MaxMessageBytes = 4 * 1024 * 1024;
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -38,6 +38,7 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
         Gesture = 67,
         PreviewFrame = 68,
         BrightnessReport = 69,
+        TurnOffMonitors = 70,
         Error = 127,
     }
 
@@ -172,6 +173,9 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
                 w.Write((byte)Kind.BrightnessReport);
                 w.Write(m.Percent);
                 break;
+            case TurnOffMonitors:
+                w.Write((byte)Kind.TurnOffMonitors);
+                break;
             case IpcError m:
                 w.Write((byte)Kind.Error);
                 w.Write(m.Message);
@@ -207,6 +211,7 @@ public sealed class IpcConnection(Stream stream) : IAsyncDisposable
             Kind.Gesture => new Gesture(new GestureEvent((GestureKind)r.ReadByte(), r.ReadInt32(), r.ReadInt32(),
                 TimeSpan.FromMilliseconds(r.ReadInt32()), r.ReadDouble())),
             Kind.BrightnessReport => new BrightnessReport(r.ReadInt32()),
+            Kind.TurnOffMonitors => new TurnOffMonitors(),
             Kind.Error => new IpcError(r.ReadString()),
             _ => throw new InvalidDataException($"Tipo de mensagem IPC desconhecido: {(byte)kind}."),
         };

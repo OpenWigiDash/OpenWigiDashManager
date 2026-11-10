@@ -94,4 +94,11 @@ public sealed record BrightnessReport(int Percent) : IpcMessage;
 /// <summary>Cópia do que está na tela do aparelho: a página mostrada, em RGB565.</summary>
 public sealed record PreviewFrame(int Page, byte[] Pixels) : IpcMessage;
 
+/// <summary>
+/// Pede ao agente que desligue os monitores do PC (botão da tela do serviço, com a sessão bloqueada). Quem desliga é
+/// o agente porque o serviço roda na sessão 0, isolada: um SC_MONITORPOWER mandado de lá não chega aos monitores do
+/// console. Vai só ao agente da sessão do console.
+/// </summary>
+public sealed record TurnOffMonitors : IpcMessage;
+
 public sealed record IpcError(string Message) : IpcMessage;

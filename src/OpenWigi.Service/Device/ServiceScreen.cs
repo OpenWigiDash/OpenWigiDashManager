@@ -15,10 +15,11 @@ public sealed record ServiceScreenSession(string Name, WindowsSessionState State
 
 /// <summary>
 /// O que a tela do serviço mostra. <paramref name="Locked"/> põe o cadeado ao lado do motivo (PC bloqueado ou sem
-/// usuário no console). Sem sessões, a tela fica só com o logo, o relógio e o motivo.
+/// usuário no console). Sem sessões, a tela fica só com o logo, o relógio e o motivo. <paramref name="MonitorOff"/>
+/// mostra o botão "Desligar monitor" (só quando há um agente na sessão do console para desligar).
 /// </summary>
 public sealed record ServiceScreenModel(string Reason, bool Locked, DateTime Now, string Version,
-    IReadOnlyList<ServiceScreenSession> Sessions);
+    IReadOnlyList<ServiceScreenSession> Sessions, bool MonitorOff = false);
 
 /// <summary>Tela que o serviço mostra quando nenhuma sessão tem a posse: logo, relógio, motivo, sessões abertas e versão.</summary>
 public static class ServiceScreen
@@ -28,11 +29,26 @@ public static class ServiceScreen
     /// <summary>Quantas sessões cabem lado a lado. Passando disso, a última vaga vira "+N".</summary>
     public const int MaxSessions = 4;
 
+    /// <summary>Botão "Desligar monitor", no canto de baixo à esquerda (o canto direito é da versão).</summary>
+    public static RectangleF MonitorOffButton { get; } = new(24, H - 18 - 50, 260, 50);
+
+    // Folga em volta do botão para o toque: o dedo não acerta pixel.
+    private const float TouchSlack = 14;
+
+    /// <summary>Se um toque em (x, y) cai no botão "Desligar monitor".</summary>
+    public static bool HitsMonitorOff(int x, int y)
+    {
+        var area = MonitorOffButton;
+        area.Inflate(TouchSlack, TouchSlack);
+        return area.Contains(x, y);
+    }
+
     private static readonly Color Background = Color.FromArgb(16, 18, 24);
     private static readonly Color Dim = Color.FromArgb(196, 203, 216);
     private static readonly Color Faint = Color.FromArgb(150, 158, 176);
     private static readonly Color Divider = Color.FromArgb(48, 53, 68);
     private static readonly Color Accent = Color.FromArgb(46, 196, 190);
+    private static readonly Color ButtonFill = Color.FromArgb(32, 36, 47);
 
     // Cores das iniciais de quem não tem foto, escolhidas pelo nome (sempre a mesma para o mesmo usuário).
     private static readonly Color[] AvatarColors =
@@ -96,6 +112,9 @@ public static class ServiceScreen
             DrawReason(g, model, reason, 220);
             DrawSessions(g, model.Sessions);
         }
+
+        if (model.MonitorOff)
+            DrawMonitorOffButton(g);
 
         var version = $"OpenWigiDashManager {model.Version}";
         DrawText(g, version, tiny, Faint, W - 24 - Measure(g, version, tiny), H - 32);
@@ -193,6 +212,47 @@ public static class ServiceScreen
             g.FillEllipse(fill, box);
         using var font = new Font("Segoe UI Semibold", r * 0.8f, GraphicsUnit.Pixel);
         DrawCentered(g, Initials(s.Name), font, Color.White, cx, cy - font.Size * 0.35f);
+    }
+
+    private static void DrawMonitorOffButton(Graphics g)
+    {
+        var box = MonitorOffButton;
+        using (var path = RoundedRectangle(box, box.Height / 2))
+        {
+            using var fill = new SolidBrush(ButtonFill);
+            g.FillPath(fill, path);
+            using var border = new Pen(Divider, 1.5f);
+            g.DrawPath(border, path);
+        }
+
+        using var font = new Font("Segoe UI Semibold", 22, GraphicsUnit.Pixel);
+        const string label = "Desligar monitor";
+        const float icon = 30, gap = 12;
+        var width = icon + gap + Measure(g, label, font);
+        var x = box.X + (box.Width - width) / 2;
+        var cy = box.Y + box.Height / 2;
+        DrawMonitorOff(g, x, cy - icon / 2, icon, Dim);
+        DrawText(g, label, font, Dim, x + icon + gap, cy - font.Size * 0.35f);
+    }
+
+    /// <summary>Monitor com o símbolo de energia na tela, em vetor. (x, y) é o canto do quadrado de lado <paramref name="s"/>.</summary>
+    private static void DrawMonitorOff(Graphics g, float x, float y, float s, Color color)
+    {
+        var stroke = Math.Max(2f, s * 0.08f);
+        using var pen = new Pen(color, stroke) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        var screen = new RectangleF(x + stroke / 2, y + s * 0.08f, s - stroke, s * 0.62f);
+        using (var frame = RoundedRectangle(screen, s * 0.08f))
+            g.DrawPath(pen, frame);
+        var cx = x + s / 2;
+        g.DrawLine(pen, cx, screen.Bottom, cx, y + s * 0.88f);
+        g.DrawLine(pen, cx - s * 0.22f, y + s * 0.92f, cx + s * 0.22f, y + s * 0.92f);
+
+        // Símbolo de energia: arco aberto em cima e o traço no meio.
+        using var thin = new Pen(color, Math.Max(1.6f, s * 0.065f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        var r = s * 0.17f;
+        var cy = screen.Y + screen.Height / 2 + r * 0.12f;
+        g.DrawArc(thin, cx - r, cy - r, 2 * r, 2 * r, -60, 300);
+        g.DrawLine(thin, cx, cy - r * 1.25f, cx, cy - r * 0.15f);
     }
 
     /// <summary>Selo de acesso remoto: um monitor pequeno num círculo, no canto da foto.</summary>

@@ -30,6 +30,7 @@ public sealed class SessionBroker : BackgroundService
     private string _reason = string.Empty;
     private bool _regrant = true;
     private string? _screenDrawn;
+    private volatile bool _monitorOffShown;
     private readonly ServiceScreenSettingsStore? _screenStore;
     private ServiceScreenSettings _screenSettings;
 
@@ -260,7 +261,8 @@ public sealed class SessionBroker : BackgroundService
     {
         // Redesenha ao mudar de estado, a cada minuto (relógio) e quando a lista de sessões muda.
         var now = _time.GetLocalNow();
-        var model = new ServiceScreenModel(_reason, OwnershipPolicy.IsLocked(_reason), now.DateTime, Version, ListSessions());
+        var model = new ServiceScreenModel(_reason, OwnershipPolicy.IsLocked(_reason), now.DateTime, Version, ListSessions(),
+            MonitorOff: ConsoleAgent() is not null);
         var key = Describe(model);
         if (!force && key == _screenDrawn)
             return;
@@ -274,7 +276,20 @@ public sealed class SessionBroker : BackgroundService
             _mirror.Write(ServiceOptions.ServicePage, frame, 0);
             _mirror.Show(ServiceOptions.ServicePage);
             _screenDrawn = key;
+            _monitorOffShown = model.MonitorOff;
         }
+    }
+
+    /// <summary>
+    /// Agente que desliga os monitores: o da sessão do console, com ela bloqueada. Só ele alcança os monitores do PC
+    /// (o serviço está na sessão 0); o de outra sessão desligaria só a tela dela, que não está em monitor nenhum.
+    /// </summary>
+    private AgentSession? ConsoleAgent()
+    {
+        if (_reason != OwnershipPolicy.LockedReason)
+            return null;
+        var console = _sessions.Capture([]).ConsoleSessionId;
+        return _agents.Values.Where(a => a.SessionId == console).MaxBy(a => a.ConnectedAt);
     }
 
     /// <summary>Sessões para a tela do serviço, com nome e foto mandados pelo agente de cada uma (quando há agente).</summary>
@@ -295,17 +310,28 @@ public sealed class SessionBroker : BackgroundService
             .ToList();
     }
 
-    // O que muda o desenho: o minuto, o motivo e, de cada sessão, nome, estado, RDP e se tem foto.
+    // O que muda o desenho: o minuto, o motivo, o botão de desligar monitor e, de cada sessão, nome, estado, RDP e se tem foto.
     private static string Describe(ServiceScreenModel model) =>
-        $"{model.Now:yyyyMMddHHmm}|{model.Reason}|" + string.Join("|", model.Sessions.Select(s =>
+        $"{model.Now:yyyyMMddHHmm}|{model.Reason}|{model.MonitorOff}|" + string.Join("|", model.Sessions.Select(s =>
             $"{s.Name}:{s.State}:{s.Remote}:{(s.Picture is null ? 0 : s.Picture.GetHashCode())}"));
 
     private void OnGesture(GestureEvent gesture)
     {
         if (_owner is { } owner && _agents.TryGetValue(owner, out var agent))
+        {
             _ = TrySendAsync(agent, new Gesture(gesture), CancellationToken.None);
-        else if (gesture.Kind == GestureKind.Tap)
-            _display.Wake();
+            return;
+        }
+        if (gesture.Kind != GestureKind.Tap)
+            return;
+
+        _display.Wake();
+        // Confere de novo quem está no console: o agente pode ter saído depois do último desenho.
+        if (_monitorOffShown && ServiceScreen.HitsMonitorOff(gesture.X, gesture.Y) && ConsoleAgent() is { } console)
+        {
+            _logger.LogInformation("Desligar monitor tocado na tela do serviço; pedindo a {Agent}", console);
+            _ = TrySendAsync(console, new TurnOffMonitors(), CancellationToken.None);
+        }
     }
 
     private void OnDeviceStatus(DeviceStatus status)

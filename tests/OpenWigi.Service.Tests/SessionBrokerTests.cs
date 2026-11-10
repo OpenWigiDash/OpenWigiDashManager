@@ -191,6 +191,65 @@ public class SessionBrokerTests
         Assert.DoesNotContain(filha.Sent, m => m is Gesture);
     }
 
+    private static GestureEvent Tap(int x, int y) => new(GestureKind.Tap, x, y, TimeSpan.FromMilliseconds(80), 1);
+
+    [Fact]
+    public async Task Botao_desligar_monitor_pede_ao_agente_do_console()
+    {
+        _sessions.Console = 1;
+        _sessions.Locked = true;
+        var (_, victor) = await ConnectAsync(1, "victor");
+        var (_, filha) = await ConnectAsync(4, "filha");
+
+        _display.RaiseGesture(Tap(100, 550));
+        await Task.Delay(50);
+
+        Assert.Single(victor.Sent.OfType<TurnOffMonitors>());
+        Assert.DoesNotContain(filha.Sent, m => m is TurnOffMonitors);
+    }
+
+    [Fact]
+    public async Task Toque_fora_do_botao_nao_desliga_monitor()
+    {
+        _sessions.Console = 1;
+        _sessions.Locked = true;
+        var (_, victor) = await ConnectAsync(1, "victor");
+
+        _display.RaiseGesture(Tap(500, 300));
+        _display.RaiseGesture(new GestureEvent(GestureKind.LongPress, 100, 550, TimeSpan.FromMilliseconds(600), 1));
+        await Task.Delay(50);
+
+        Assert.DoesNotContain(victor.Sent, m => m is TurnOffMonitors);
+    }
+
+    [Fact]
+    public async Task Sem_agente_no_console_nao_tem_botao_desligar_monitor()
+    {
+        // Victor no RDP: o console está na tela de logon, não há quem desligue os monitores dele.
+        _sessions.Console = 2;
+        _sessions.ConsoleHasUser = false;
+        _sessions.Remote.Add(1);
+        var (_, victor) = await ConnectAsync(1, "victo");
+
+        _display.RaiseGesture(Tap(100, 550));
+        await Task.Delay(50);
+
+        Assert.DoesNotContain(victor.Sent, m => m is TurnOffMonitors);
+    }
+
+    [Fact]
+    public async Task Dono_da_tela_recebe_o_toque_e_nao_desliga_monitor()
+    {
+        _sessions.Console = 1;
+        var (_, victor) = await ConnectAsync(1, "victor");
+
+        _display.RaiseGesture(Tap(100, 550));
+        await Task.Delay(50);
+
+        Assert.Contains(victor.Sent, m => m is Gesture);
+        Assert.DoesNotContain(victor.Sent, m => m is TurnOffMonitors);
+    }
+
     [Fact]
     public async Task Aparelho_reconectado_pede_redesenho_ao_dono()
     {
