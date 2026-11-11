@@ -26,6 +26,7 @@ public class IpcConnectionTests
         DeviceStatus.Disconnected with { Reconnecting = true },
         new DeviceStatus(true, Guid.NewGuid(), "WigiDash-1.0", Reconnecting: true),
         new ServiceScreenSettings(false),
+        new TurnOffMonitors(),
     ];
 
     [Fact]

@@ -13,6 +13,16 @@ public class ServiceScreenTests
     public static TheoryData<string, ServiceScreenModel> Screens() => new()
     {
         { "bloqueada-sem-lista", new ServiceScreenModel("Sessão bloqueada", true, Now, "0.4.3", []) },
+        { "bloqueada-sem-lista-desligar-monitor", new ServiceScreenModel("Sessão bloqueada", true, Now, "0.4.3", [], MonitorOff: true) },
+        {
+            "bloqueada-com-sessoes-desligar-monitor", new ServiceScreenModel("Sessão bloqueada", true, Now, "0.4.3",
+            [
+                new ServiceScreenSession("Victor Perez", WindowsSessionState.Locked, false, Picture()),
+                new ServiceScreenSession("Ana Souza", WindowsSessionState.Disconnected, false, null),
+                new ServiceScreenSession("convidado", WindowsSessionState.Disconnected, false, null),
+                new ServiceScreenSession("d", WindowsSessionState.Disconnected, false, null),
+            ], MonitorOff: true)
+        },
         {
             "bloqueada-com-sessoes", new ServiceScreenModel("Sessão bloqueada", true, Now, "0.4.3",
             [
@@ -50,6 +60,16 @@ public class ServiceScreenTests
         bitmap.Save(Path.Combine(folder, $"{name}.png"), ImageFormat.Png);
 
         Assert.Equal(WigiDashProtocol.FrameBytes, ServiceScreen.Render(model).Length);
+    }
+
+    [Theory]
+    [InlineData(40, 560, true)]
+    [InlineData(150, 514, true)] // folga de toque acima do botão
+    [InlineData(500, 560, false)]
+    [InlineData(150, 300, false)]
+    public void Toque_no_botao_desligar_monitor(int x, int y, bool hits)
+    {
+        Assert.Equal(hits, ServiceScreen.HitsMonitorOff(x, y));
     }
 
     [Theory]

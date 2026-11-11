@@ -19,6 +19,16 @@ troca de console) e, por garantia, a cada segundo. Quem perde a tela recebe `Own
 quem ganha recebe `Ownership(true)` e manda o quadro inteiro de novo. A página 2 do hardware é
 reservada para a tela do serviço.
 
+## Desligar monitor pela tela bloqueada
+
+Com a sessão do console bloqueada e o manager aberto nela, a tela do serviço mostra o botão
+"Desligar monitor" no canto de baixo à esquerda. O toque nele faz o serviço mandar `TurnOffMonitors`
+ao agente da sessão do console, e é o agente que desliga os monitores (`SC_MONITORPOWER`). O serviço
+não consegue desligar sozinho: ele roda como LocalService na sessão 0, isolada, e a mensagem mandada
+de lá não chega aos monitores do console. Criar um processo na sessão do usuário (`CreateProcessAsUser`)
+exigiria LocalSystem. Por isso, sem o manager no console (tela de logon, usuário só pelo RDP), o
+botão não aparece. Os monitores voltam com o mouse ou o teclado.
+
 ## Quando a conexão USB cai
 
 Uma queda isolada (cabo, aparelho reiniciando) só reconecta. Se a conexão cai de novo antes de
@@ -65,7 +75,8 @@ mais perto do que o instalador vai fazer. Mas cada atualização com ele pede ad
 
 1. Serviço instalado (acima) e atualizado: `scripts\Deploy-DevService.ps1 -StopOfficial`.
 2. No seu usuário: `dotnet run --project src\OpenWigi.Agent`. A tela fica com a sua cor e o seu nome.
-3. Win+L: a tela vira o relógio "Sessão bloqueada". Desbloqueie: volta a sua tela.
+3. Win+L: a tela vira o relógio "Sessão bloqueada". Desbloqueie: volta a sua tela. Bloqueado, o toque em
+   "Desligar monitor" aparece no console do agente (quem desliga de verdade é o manager).
 4. Troque de usuário (sem sair do seu) e rode o agente no outro usuário: a tela muda de cor e de nome.
 5. Volte para o seu usuário: a sua tela volta, sem replugar o cabo.
 6. Toque, arraste e segure na tela: os gestos aparecem no console do agente do usuário ativo.

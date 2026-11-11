@@ -135,6 +135,10 @@ async Task RunAsync(CancellationToken cancellationToken)
                     await DrawDemoAsync(connection, cancellationToken);
                 }
                 break;
+            case TurnOffMonitors:
+                // Quem desliga os monitores é o manager; o agente de teste só mostra que o pedido chegou.
+                log.LogInformation("pedido para desligar os monitores (botão da tela bloqueada)");
+                break;
             case PreviewFrame frame:
                 preview?.ShowFrame(frame.Pixels);
                 break;

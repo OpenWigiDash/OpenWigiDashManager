@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -205,6 +206,12 @@ public sealed class AgentClient : IAsyncDisposable
                 case ServiceScreenSettings screen:
                     ShowSessionsOnServiceScreen = screen.ShowSessions;
                     Changed?.Invoke();
+                    break;
+                case TurnOffMonitors:
+                    if (MonitorPower.TurnOff())
+                        _logger.LogInformation("Monitores desligados pelo botão da tela bloqueada");
+                    else
+                        _logger.LogWarning("O Windows recusou desligar os monitores (erro {Error})", Marshal.GetLastPInvokeError());
                     break;
                 case PreviewFrame frame:
                     Preview = frame.Pixels;
