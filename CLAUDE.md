@@ -23,6 +23,12 @@ branch do #20).
 
 Referência: [About stacked PRs](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs).
 
+## Merge de PR
+
+Quem aprova e faz o merge dos PRs é o Victor. Quando ele pedir "aprova o PR" (ou parecido), não faça o
+merge: mande o link do PR para ele aprovar e fazer o merge, e siga com o resto do pedido (ex.: publicar a
+versão) só depois que o merge acontecer.
+
 ## Issues e PRs (ligação no board)
 
 Todo PR diz quais issues ele entrega com palavra de fechamento, uma por issue:
