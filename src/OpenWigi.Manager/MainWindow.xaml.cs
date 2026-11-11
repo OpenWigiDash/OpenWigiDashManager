@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
 using OpenWigi.Manager.Services;
 
 namespace OpenWigi.Manager;
@@ -30,7 +31,15 @@ public partial class MainWindow : Window
         WebView.Services = services;
         RestorePlacement();
 
-        StartupLog.Write($"Janela criada (WPF desenhando no nível {RenderCapability.Tier >> 16}).");
+        _createdTier = RenderCapability.Tier >> 16;
+        StartupLog.Write($"Janela criada (WPF desenhando no nível {_createdTier}).");
+        if (_createdTier == 0)
+        {
+            // Criada sem placa de vídeo (sessão fora do console, RDP). Quando a sessão volta ao console o
+            // WebView2CompositionControl não se recupera e a janela fica só no fundo do tema, sem a página.
+            RenderCapability.TierChanged += OnRenderTierChanged;
+            SystemEvents.SessionSwitch += OnSessionSwitch;
+        }
 
         _settings.UiReady += OnUiReady;
         _settings.Changed += OnSettingsChanged;
@@ -85,7 +94,48 @@ public partial class MainWindow : Window
             _splashFallback.Stop();
             _settings.UiReady -= OnUiReady;
             _settings.Changed -= OnSettingsChanged;
+            _gpuCheck?.Stop();
+            RenderCapability.TierChanged -= OnRenderTierChanged;
+            SystemEvents.SessionSwitch -= OnSessionSwitch;
         };
+    }
+
+    private readonly int _createdTier;
+    private DispatcherTimer? _gpuCheck;
+    private bool _gpuReopenRequested;
+
+    // A sessão voltou (console, RDP, desbloqueio): o nível de desenho pode subir um pouco depois.
+    private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason is SessionSwitchReason.ConsoleConnect or SessionSwitchReason.RemoteConnect
+            or SessionSwitchReason.SessionUnlock or SessionSwitchReason.SessionLogon)
+            Dispatcher.BeginInvoke(new Action(ScheduleGpuCheck));
+    }
+
+    private void OnRenderTierChanged(object? sender, EventArgs e) =>
+        Dispatcher.BeginInvoke(new Action(ScheduleGpuCheck));
+
+    private void ScheduleGpuCheck()
+    {
+        _gpuCheck?.Stop();
+        _gpuCheck = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _gpuCheck.Tick += (_, _) =>
+        {
+            _gpuCheck.Stop();
+            ReopenIfGpuCameBack();
+        };
+        _gpuCheck.Start();
+    }
+
+    // A janela nasceu desenhando em software e agora há placa de vídeo: troca por uma nova, criada já com GPU.
+    private void ReopenIfGpuCameBack()
+    {
+        var tier = RenderCapability.Tier >> 16;
+        if (_gpuReopenRequested || tier <= _createdTier)
+            return;
+        _gpuReopenRequested = true;
+        StartupLog.Write($"WPF passou do nível {_createdTier} para {tier}: reabrindo a janela para o WebView2 voltar a pintar.");
+        ReopenRequested?.Invoke();
     }
 
     // Cores da tela de abertura e da janela, iguais às do OpenWigiDashTheme (fundo, texto, primária, linhas).
