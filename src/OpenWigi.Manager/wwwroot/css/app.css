@@ -342,13 +342,30 @@ html, body {
     z-index: 1;
 }
 
-/* Carrossel de páginas: cartões com miniatura ao vivo, nome (renomear) e ações (mover, excluir).
-   Quebra em linhas em vez de rolar de lado: usa a largura que tiver. */
-.owd-pages {
+/* Carrossel de páginas: cartões com miniatura ao vivo, nome (renomear) e ações (mover, excluir). */
+.owd-pages-row {
     display: flex;
-    flex-wrap: wrap;
+    align-items: stretch;
     gap: 12px;
-    padding: 8px 2px 4px;
+}
+
+/* Uma linha só, que rola de lado (a roda do mouse também, por owd.wheelScrollsSideways): a altura do
+   carrossel não muda com o número de páginas. O "Nova página" fica fora dela, logo depois da última
+   miniatura, e sempre à vista. */
+.owd-pages {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: 8px 2px 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+
+.owd-pages-row > .owd-page-add {
+    margin: 8px 2px 6px 0;
 }
 
 .owd-page-card {
@@ -450,13 +467,93 @@ html, body {
     text-overflow: ellipsis;
 }
 
-/* Painel do widget: fica à vista ao rolar a tela e rola por dentro quando o plugin tem muitos campos. */
+/* Editor: Canvas e painel do widget lado a lado. A coluna do Canvas vai só até a largura que ele usa (a
+   altura livre vezes 1016/592, mais o respiro do papel) e o painel fica com o resto: em Full HD o Canvas é
+   limitado pela altura, e a largura que sobrava virava margem vazia em volta dele. O painel nunca fica
+   abaixo de 300 px. */
+.owd-editor {
+    --owd-canvas-min: 440px;
+    --owd-canvas-fit: max(var(--owd-canvas-height, 100vh - 480px), var(--owd-canvas-min));
+    display: grid;
+    grid-template-columns: minmax(0, calc(var(--owd-canvas-fit) * 1016 / 592 + 26px)) minmax(300px, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.owd-editor-main {
+    min-width: 0;
+}
+
+/* O painel não dá altura à linha: preso à célula (absolute), ele tem a altura do Canvas. Assim um plugin com
+   muitos campos rola dentro do painel em vez de empurrar o carrossel de páginas para baixo. */
+.owd-editor-side {
+    position: relative;
+    align-self: stretch;
+    min-width: 0;
+}
+
 .owd-side {
-    position: sticky;
-    top: 16px;
-    max-height: calc(100vh - 96px);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.owd-side-paper {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* O miolo rola (no painel da página); no de um widget, só o conteúdo da aba (.owd-side-body-tabs). */
+.owd-side-body {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    padding: 12px;
+}
+
+/* Painel de um widget: o cabeçalho (ícone e nome) e as abas ficam parados, e só o conteúdo da aba rola.
+   Sem isso, num plugin com muitos campos o cabeçalho sumia ao rolar. */
+.owd-side-body-tabs {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+}
+
+.owd-side-body-tabs > * {
+    flex: none;
+}
+
+.owd-side-body-tabs > .owd-side-tabs {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.owd-side-tabs .mud-tabs-tabbar {
+    flex: none;
+}
+
+.owd-side-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 12px;
+}
+
+/* Rodapé do painel: o Tirar sempre embaixo, alinhado com o fim do Canvas. */
+.owd-side-foot {
+    flex: none;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--mud-palette-lines-default);
 }
 
 /* Tela do plugin: o que ele fixar mais largo que o painel rola de lado em vez de vazar. */
@@ -465,19 +562,90 @@ html, body {
     overflow-x: auto;
 }
 
-/* Em telas estreitas o painel desce para baixo do Canvas: aí não precisa ficar preso. */
+/* Canvas sem passar da altura da janela: assim o carrossel de páginas aparece sem rolar. A altura livre vem
+   de owd.fitCanvas, que mede o resto da tela; a conta fixa só vale até ele rodar. Mas nunca abaixo de
+   --owd-canvas-min: em Full HD com escala de 125% ou 150% sobra pouca altura, e tiles pequenos ficam
+   difíceis de ver e de pegar. Aí o Canvas fica do tamanho mínimo e rola dentro da sua janela
+   (.owd-canvas-viewport), com a altura que sobra: a tela não rola e o carrossel de páginas fica à vista. */
+.owd-canvas {
+    max-width: calc(var(--owd-canvas-fit) * 1016 / 592);
+    margin: 0 auto;
+}
+
+.owd-canvas-viewport {
+    max-height: max(var(--owd-canvas-height, 100vh - 480px), 160px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+}
+
+/* Janela estreita: o painel desce para baixo do Canvas, com altura própria (rola por dentro do mesmo jeito,
+   com o Tirar no rodapé), e o Canvas usa a largura toda. */
 @media (max-width: 959.98px) {
+    .owd-editor {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .owd-editor-side {
+        position: static;
+    }
+
     .owd-side {
         position: static;
+        max-height: 70vh;
+    }
+
+    .owd-canvas {
+        max-width: none;
+    }
+
+    .owd-canvas-viewport {
         max-height: none;
     }
 }
-/* Canvas sem passar da altura da janela: assim o carrossel de páginas aparece sem rolar em telas largas.
-   A altura livre vem de owd.fitCanvas, que mede o resto da tela; a conta fixa só vale até ele rodar. */
-.owd-canvas {
-    max-width: calc((var(--owd-canvas-height, 100vh - 540px)) * 1016 / 592);
-    min-width: 420px;
-    margin: 0 auto;
+
+/* Janela baixa (Full HD com escala de 125% ou mais): sai o texto de apresentação e as miniaturas das
+   páginas encolhem, para a altura ir para o Canvas. */
+@media (max-height: 899.98px) {
+    .owd-page-intro {
+        display: none;
+    }
+
+    .owd-thumb-grid {
+        height: 60px;
+    }
+
+    .owd-page-name {
+        min-height: 26px;
+    }
+
+    .owd-page-card {
+        flex-basis: 140px;
+        width: 140px;
+    }
+
+    /* Cabeçalho do painel do widget menor: ele fica parado, e a altura vai para as configurações. */
+    .owd-side-icon.owd-type-icon {
+        height: 56px;
+        min-width: 48px;
+    }
+}
+
+/* Aba clicada com o mouse não fica com o contorno de foco (ele continua para quem navega pelo teclado). */
+.owd-side-tabs .mud-tab:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Explicação de como mexer na grade, no balão do "?" da barra do Canvas. */
+.owd-help {
+    display: inline-flex;
+    cursor: help;
+}
+
+.owd-help-text {
+    max-width: 380px;
+    white-space: normal;
+    text-align: left;
 }
 
 /* Abas do painel do widget: o cabeçalho fica no topo enquanto o conteúdo rola. */

@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IDisposable
+@inject IJSRuntime JS
 @inject ManagerSettings Settings
 @inject AgentClient Agent
 @inject NavigationManager Navigation
@@ -17,12 +18,16 @@
 
 <MudLayout>
     <MudAppBar Elevation="0" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" Class="mr-1"
+                       OnClick="() => _drawerOpen = !_drawerOpen" aria-label="@(_drawerOpen ? "Recolher o menu" : "Abrir o menu")" />
         <MudIcon Icon="@Icons.Material.Filled.Dashboard" Color="Color.Primary" Class="mr-3" />
         <MudText Typo="Typo.h6">OpenWigiDash Manager</MudText>
         <MudSpacer />
         <StatusChip />
     </MudAppBar>
-    <MudDrawer Open="true" Variant="DrawerVariant.Persistent" Elevation="0" ClipMode="DrawerClipMode.Always">
+    @* Menu lateral: em janela estreita (monitor Full HD com escala alta, ou janela pequena) ele recolhe sozinho
+       para só os ícones, e a largura vai para a tela. O botão do canto abre e recolhe a qualquer momento. *@
+    <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Mini" Elevation="0" ClipMode="DrawerClipMode.Always">
         <MudNavMenu Class="mt-2">
             <MudNavLink Href="/widgets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Widgets e páginas</MudNavLink>
             <MudNavLink Href="/loja" Icon="@Icons.Material.Filled.Storefront">
@@ -106,11 +111,35 @@
         }
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    // Abaixo desta largura (em pixels da página, já com a escala do Windows) o menu lateral recolhe sozinho.
+    private const int NarrowWidth = 1400;
+    private bool _drawerOpen = true;
+    private DotNetObjectReference<MainLayout>? _self;
+    private IJSObjectReference? _narrow;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-            Settings.NotifyUiReady();
+        if (!firstRender)
+            return;
+        Settings.NotifyUiReady();
+        try
+        {
+            _self = DotNetObjectReference.Create(this);
+            _narrow = await JS.InvokeAsync<IJSObjectReference>("owd.onNarrow", _self, NarrowWidth);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+        }
     }
+
+    // A janela passou da largura limite (para menos ou para mais): o menu acompanha. Entre uma passagem e
+    // outra vale o que a pessoa escolheu no botão.
+    [JSInvokable]
+    public void NarrowChanged(bool narrow) => InvokeAsync(() =>
+    {
+        _drawerOpen = !narrow;
+        StateHasChanged();
+    });
 
     private void Refresh() => InvokeAsync(StateHasChanged);
 
@@ -125,5 +154,20 @@
         Updates.Changed -= Refresh;
         Settings.NavigationRequested -= Navigate;
         Dashboard.PluginSettingsRequested -= OpenPluginSettings;
+        if (_narrow is { } narrow)
+            _ = DisposeNarrowAsync(narrow);
+        _self?.Dispose();
+    }
+
+    private static async Task DisposeNarrowAsync(IJSObjectReference narrow)
+    {
+        try
+        {
+            await narrow.InvokeVoidAsync("dispose");
+            await narrow.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+        }
     }
 }
