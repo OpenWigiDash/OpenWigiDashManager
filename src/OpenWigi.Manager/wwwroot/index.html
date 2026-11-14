@@ -31,11 +31,35 @@
                 const r = el.getBoundingClientRect();
                 return [r.left, r.top, r.width, r.height];
             },
-            // Retângulos de vários elementos (as miniaturas das páginas), na ordem do documento.
+            // Retângulos de vários elementos (as miniaturas das páginas), na ordem do documento. Cortados pela
+            // faixa que rola (.owd-pages): miniatura fora da vista não vira alvo de soltar.
             rects: selector => [...document.querySelectorAll(selector)].map(el => {
                 const r = el.getBoundingClientRect();
-                return [r.left, r.top, r.width, r.height];
+                const clip = el.closest('.owd-pages')?.getBoundingClientRect();
+                if (!clip) return [r.left, r.top, r.width, r.height];
+                const left = Math.max(r.left, clip.left), right = Math.min(r.right, clip.right);
+                return right > left ? [left, r.top, right - left, r.height] : [0, 0, 0, 0];
             }),
+            // Carrossel de páginas: a roda do mouse rola de lado. Na ponta, deixa a roda rolar a tela.
+            wheelScrollsSideways: el => {
+                const handler = e => {
+                    if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+                    const max = el.scrollWidth - el.clientWidth;
+                    if (max <= 0 || (e.deltaY < 0 && el.scrollLeft <= 0) || (e.deltaY > 0 && el.scrollLeft >= max - 1)) return;
+                    e.preventDefault();
+                    el.scrollLeft += e.deltaY;
+                };
+                el.addEventListener('wheel', handler, { passive: false });
+                return { dispose: () => el.removeEventListener('wheel', handler) };
+            },
+            // Traz para a vista o cartão selecionado da faixa que rola, sem mexer na rolagem da tela.
+            revealSelected: el => {
+                const card = el?.querySelector('.selected');
+                if (!card) return;
+                const box = el.getBoundingClientRect(), r = card.getBoundingClientRect();
+                if (r.left < box.left) el.scrollLeft -= box.left - r.left + 8;
+                else if (r.right > box.right) el.scrollLeft += r.right - box.right + 8;
+            },
             // Arrastar um widget para fora do Canvas (até uma miniatura): o Canvas segura o ponteiro até soltar,
             // senão o arraste acabaria ao sair dele.
             capture: (el, pointerId) => {
@@ -72,20 +96,20 @@
                 return { dispose: () => document.removeEventListener('keydown', handler) };
             },
             // Altura que sobra para o Canvas: a janela menos tudo o que não é ele (cabeçalho, faixas, páginas).
-            // Medido em vez de chutado, para a tela não passar da janela em nenhuma resolução ou escala.
+            // Medido em vez de chutado, para a tela não passar da janela em nenhuma resolução ou escala. O CSS
+            // não deixa passar de um mínimo (--owd-canvas-min): abaixo dele a tela rola, em vez de os tiles
+            // ficarem pequenos demais para ver e pegar (Full HD com escala de 125% ou 150%).
+            // A variável vai na .owd-editor: a coluna do Canvas também a usa para dar o resto da largura ao painel.
+            // O painel do widget não entra na conta: ele tem a altura da linha do Canvas e rola por dentro.
             fitCanvas: canvas => {
-                const paper = canvas.closest('.mud-paper');
-                const item = canvas.closest('.mud-grid-item');
+                const editor = canvas.closest('.owd-editor');
                 const container = canvas.closest('.mud-container');
                 let frame = 0;
                 const fit = () => {
                     frame = 0;
-                    // A linha do Canvas tem a altura do maior entre ele e o painel do widget; o painel rola por dentro.
                     const content = container.getBoundingClientRect().bottom + window.scrollY;
-                    const box = paper.getBoundingClientRect();
-                    const row = item.getBoundingClientRect().bottom - box.top;
-                    const around = content - row + box.height - canvas.getBoundingClientRect().height;
-                    canvas.style.setProperty('--owd-canvas-height', Math.max(0, Math.floor(window.innerHeight - around - 1)) + 'px');
+                    const around = content - canvas.getBoundingClientRect().height;
+                    editor.style.setProperty('--owd-canvas-height', Math.max(0, Math.floor(window.innerHeight - around - 1)) + 'px');
                 };
                 const schedule = () => frame ||= requestAnimationFrame(fit);
                 const observer = new ResizeObserver(schedule);
