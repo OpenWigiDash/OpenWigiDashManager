@@ -40,6 +40,14 @@
                 const left = Math.max(r.left, clip.left), right = Math.min(r.right, clip.right);
                 return right > left ? [left, r.top, right - left, r.height] : [0, 0, 0, 0];
             }),
+            // Avisa quando a janela fica mais estreita ou mais larga que `width` (o menu lateral recolhe ou abre).
+            onNarrow: (target, width) => {
+                const query = window.matchMedia(`(max-width: ${width - 0.02}px)`);
+                const handler = () => target.invokeMethodAsync('NarrowChanged', query.matches);
+                query.addEventListener('change', handler);
+                handler();
+                return { dispose: () => query.removeEventListener('change', handler) };
+            },
             // Carrossel de páginas: a roda do mouse rola de lado. Na ponta, deixa a roda rolar a tela.
             wheelScrollsSideways: el => {
                 const handler = e => {

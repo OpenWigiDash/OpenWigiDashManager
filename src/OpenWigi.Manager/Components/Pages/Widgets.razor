@@ -241,7 +241,8 @@
                     var pluginSettings = Dashboard.GetPluginSettingsOf(selected.InstanceId);
                     var selectedProblem = Dashboard.ProblemOf(selected.InstanceId);
                     <MudPaper Class="owd-side-paper" Outlined="true">
-                        <div class="owd-side-body">
+                        @* Cabeçalho e abas ficam parados; só o conteúdo da aba rola (owd-side-scroll). *@
+                        <div class="owd-side-body owd-side-body-tabs">
                         @* Cabeçalho: o ícone e o nome do tipo do widget (o que o plugin diz que ele é) e o nome desta instância. *@
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Widget selecionado</MudText>
                         <div class="owd-side-head mb-1">
@@ -292,7 +293,7 @@
                             </MudAlert>
                         }
                         @* Abas: o que todo widget tem (Geral) e as configurações do plugin, quando ele tem. *@
-                        <MudTabs @bind-ActivePanelIndex="_sideTab" Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3" MinimumTabWidth="0px"
+                        <MudTabs @bind-ActivePanelIndex="_sideTab" Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3 owd-side-scroll" MinimumTabWidth="0px"
                                  Class="owd-side-tabs">
                             <MudTabPanel Text="Geral">
                                 @* Nome da instância: o sugerido ao adicionar, editável; vazio volta ao nome do widget. *@

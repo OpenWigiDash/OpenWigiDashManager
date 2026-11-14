@@ -507,13 +507,43 @@ html, body {
     overflow: hidden;
 }
 
-/* O miolo rola; as abas ficam presas no topo dele (.owd-side-tabs). */
+/* O miolo rola (no painel da página); no de um widget, só o conteúdo da aba (.owd-side-body-tabs). */
 .owd-side-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 12px;
+}
+
+/* Painel de um widget: o cabeçalho (ícone e nome) e as abas ficam parados, e só o conteúdo da aba rola.
+   Sem isso, num plugin com muitos campos o cabeçalho sumia ao rolar. */
+.owd-side-body-tabs {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+}
+
+.owd-side-body-tabs > * {
+    flex: none;
+}
+
+.owd-side-body-tabs > .owd-side-tabs {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.owd-side-tabs .mud-tabs-tabbar {
+    flex: none;
+}
+
+.owd-side-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 12px;
 }
 
 /* Rodapé do painel: o Tirar sempre embaixo, alinhado com o fim do Canvas. */
@@ -577,6 +607,17 @@ html, body {
         flex-basis: 140px;
         width: 140px;
     }
+
+    /* Cabeçalho do painel do widget menor: ele fica parado, e a altura vai para as configurações. */
+    .owd-side-icon.owd-type-icon {
+        height: 56px;
+        min-width: 48px;
+    }
+}
+
+/* Aba clicada com o mouse não fica com o contorno de foco (ele continua para quem navega pelo teclado). */
+.owd-side-tabs .mud-tab:focus:not(:focus-visible) {
+    outline: none;
 }
 
 /* Explicação de como mexer na grade, no balão do "?" da barra do Canvas. */
