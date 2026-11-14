@@ -564,11 +564,19 @@ html, body {
 
 /* Canvas sem passar da altura da janela: assim o carrossel de páginas aparece sem rolar. A altura livre vem
    de owd.fitCanvas, que mede o resto da tela; a conta fixa só vale até ele rodar. Mas nunca abaixo de
-   --owd-canvas-min: em Full HD com escala de 125% ou 150% sobra pouca altura, e aí é melhor a tela rolar um
-   pouco do que os tiles pequenos ficarem difíceis de ver e de pegar. */
+   --owd-canvas-min: em Full HD com escala de 125% ou 150% sobra pouca altura, e tiles pequenos ficam
+   difíceis de ver e de pegar. Aí o Canvas fica do tamanho mínimo e rola dentro da sua janela
+   (.owd-canvas-viewport), com a altura que sobra: a tela não rola e o carrossel de páginas fica à vista. */
 .owd-canvas {
     max-width: calc(var(--owd-canvas-fit) * 1016 / 592);
     margin: 0 auto;
+}
+
+.owd-canvas-viewport {
+    max-height: max(var(--owd-canvas-height, 100vh - 480px), 160px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
 }
 
 /* Janela estreita: o painel desce para baixo do Canvas, com altura própria (rola por dentro do mesmo jeito,
@@ -590,6 +598,10 @@ html, body {
     .owd-canvas {
         max-width: none;
     }
+
+    .owd-canvas-viewport {
+        max-height: none;
+    }
 }
 
 /* Janela baixa (Full HD com escala de 125% ou mais): sai o texto de apresentação e as miniaturas das
@@ -600,7 +612,11 @@ html, body {
     }
 
     .owd-thumb-grid {
-        height: 72px;
+        height: 60px;
+    }
+
+    .owd-page-name {
+        min-height: 26px;
     }
 
     .owd-page-card {

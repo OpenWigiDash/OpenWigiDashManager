@@ -113,6 +113,9 @@
                 </MudStack>
                 @* Arrastar com eventos de ponteiro, não com o drag and drop do HTML: o WebView2 do WPF (controle
                    de composição) não entrega o arrastar nativo do Windows, e por RDP ele simplesmente não acontece. *@
+                @* Janela do Canvas: quando a altura livre fica abaixo do mínimo do Canvas, ele rola aqui dentro, e
+                   não a tela: o carrossel de páginas fica sempre à vista. *@
+                <div class="owd-canvas-viewport">
                 <div class="owd-grid owd-canvas @(_dragging is null ? "" : "dragging") @(_resizing is null ? "" : "resizing")" @ref="_grid"
                      style="@PageStyle(CurrentPage)"
                      @onpointermove="Move" @onpointerup="Release" @onpointerleave="Cancel" @onpointercancel="Cancel"
@@ -180,6 +183,7 @@
                                  style="grid-column: @(c + 2) / span @dragged.Size.Columns; grid-row: @(r + 2) / span @dragged.Size.Rows"></div>
                         }
                     }
+                </div>
                 </div>
                 @* Menu de contexto (botão direito): no widget, as ações dele; no espaço vazio, colar ali. *@
                 <MudMenu @ref="_menu" PositionAtCursor="true" Dense="true" Class="owd-context-anchor">

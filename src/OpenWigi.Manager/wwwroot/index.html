@@ -104,19 +104,20 @@
                 return { dispose: () => document.removeEventListener('keydown', handler) };
             },
             // Altura que sobra para o Canvas: a janela menos tudo o que não é ele (cabeçalho, faixas, páginas).
-            // Medido em vez de chutado, para a tela não passar da janela em nenhuma resolução ou escala. O CSS
-            // não deixa passar de um mínimo (--owd-canvas-min): abaixo dele a tela rola, em vez de os tiles
-            // ficarem pequenos demais para ver e pegar (Full HD com escala de 125% ou 150%).
+            // Medido em vez de chutado, para a tela não passar da janela em nenhuma resolução ou escala. O Canvas
+            // não fica menor que --owd-canvas-min (tiles pequenos demais para ver e pegar): abaixo disso ele rola
+            // dentro da sua janela (.owd-canvas-viewport), e o carrossel de páginas continua à vista.
             // A variável vai na .owd-editor: a coluna do Canvas também a usa para dar o resto da largura ao painel.
             // O painel do widget não entra na conta: ele tem a altura da linha do Canvas e rola por dentro.
             fitCanvas: canvas => {
                 const editor = canvas.closest('.owd-editor');
+                const viewport = canvas.closest('.owd-canvas-viewport') ?? canvas;
                 const container = canvas.closest('.mud-container');
                 let frame = 0;
                 const fit = () => {
                     frame = 0;
                     const content = container.getBoundingClientRect().bottom + window.scrollY;
-                    const around = content - canvas.getBoundingClientRect().height;
+                    const around = content - viewport.getBoundingClientRect().height;
                     editor.style.setProperty('--owd-canvas-height', Math.max(0, Math.floor(window.innerHeight - around - 1)) + 'px');
                 };
                 const schedule = () => frame ||= requestAnimationFrame(fit);
